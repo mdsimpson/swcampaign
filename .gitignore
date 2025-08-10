@@ -12,5 +12,7 @@ __pycache__/
 *.log
 *.tmp
 *.swp
+# Other
 .idea/
 .amplify/
+.data/
