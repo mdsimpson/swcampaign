@@ -7,11 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "sandbox": "npx ampx sandbox",
+    "sandbox": "ampx sandbox",
     "deploy": "echo 'Use Amplify Hosting connected to GitHub'",
     "import:homeowners": "tsx scripts/import-homeowners.ts",
     "import:votes": "tsx scripts/import-votes.ts",
-    "seed:admin": "bash scripts/create-admin-user.sh",
+    "seed:admin": "tsx scripts/seed-admin.ts",
     "export:backup": "tsx scripts/export-backup.ts"
   },
   "dependencies": {
@@ -22,10 +22,11 @@
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.24.0"
+    "react-router-dom": "^6.24.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.620.0"
   },
   "devDependencies": {
-    "@aws-amplify/backend": "^1.5.0",
+    "@aws-amplify/backend": "^1.16.1",
     "@aws-amplify/backend-cli": "^1.8.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.864.0",
     "@types/react": "^18.2.66",
