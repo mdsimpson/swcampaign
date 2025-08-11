@@ -52,11 +52,20 @@ export default function SignUp() {
         <form onSubmit={submit} style={{maxWidth: 600, margin: '40px auto', display: 'grid', gap: 12}}>
             <h2>Sign-up for Login</h2>
             <p>You must be verified as an SWHOA member before your login is granted.</p>
-            <input required placeholder='Email' type='email' value={form.email}
-                   onChange={e => setForm({...form, email: e.target.value})}/>
+            <p style={{fontSize: 14, color: '#666', fontStyle: 'italic'}}>
+                <span style={{color: '#dc3545'}}>*</span> indicates required fields
+            </p>
+            
             <div>
-                <input required placeholder='Password (min 12 chars)' type='password' value={form.password}
-                       onChange={e => handlePasswordChange(e.target.value)} minLength={12}/>
+                <input required placeholder='Email *' type='email' value={form.email}
+                       onChange={e => setForm({...form, email: e.target.value})}
+                       style={{borderColor: form.email ? '#28a745' : '#dc3545'}}/>
+            </div>
+            
+            <div>
+                <input required placeholder='Password (min 12 chars) *' type='password' value={form.password}
+                       onChange={e => handlePasswordChange(e.target.value)} minLength={12}
+                       style={{borderColor: passwordErrors.length === 0 && form.password ? '#28a745' : '#dc3545'}}/>
                 {passwordErrors.length > 0 && (
                     <div style={{color: '#dc3545', fontSize: 14, marginTop: 4}}>
                         Password requirements:
@@ -66,14 +75,31 @@ export default function SignUp() {
                     </div>
                 )}
             </div>
-            <input required placeholder='First Name' value={form.firstName}
-                   onChange={e => setForm({...form, firstName: e.target.value})}/>
-            <input required placeholder='Last Name' value={form.lastName}
-                   onChange={e => setForm({...form, lastName: e.target.value})}/>
-            <input required placeholder='Street Address' value={form.street}
-                   onChange={e => setForm({...form, street: e.target.value})}/>
-            <input placeholder='Mobile Phone' value={form.mobile}
-                   onChange={e => setForm({...form, mobile: e.target.value})}/>
+            
+            <div>
+                <input required placeholder='First Name *' value={form.firstName}
+                       onChange={e => setForm({...form, firstName: e.target.value})}
+                       style={{borderColor: form.firstName ? '#28a745' : '#dc3545'}}/>
+            </div>
+            
+            <div>
+                <input required placeholder='Last Name *' value={form.lastName}
+                       onChange={e => setForm({...form, lastName: e.target.value})}
+                       style={{borderColor: form.lastName ? '#28a745' : '#dc3545'}}/>
+            </div>
+            
+            <div>
+                <input required placeholder='Street Address *' value={form.street}
+                       onChange={e => setForm({...form, street: e.target.value})}
+                       style={{borderColor: form.street ? '#28a745' : '#dc3545'}}/>
+            </div>
+            
+            <div>
+                <input required placeholder='Mobile Phone *' value={form.mobile}
+                       onChange={e => setForm({...form, mobile: e.target.value})}
+                       style={{borderColor: form.mobile ? '#28a745' : '#dc3545'}}/>
+            </div>
+            
             <button type='submit'>Submit Registration</button>
         </form>
     )
