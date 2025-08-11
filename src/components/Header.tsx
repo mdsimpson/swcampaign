@@ -1,18 +1,34 @@
 import {Link} from 'react-router-dom'
 import {useAuthenticator} from '@aws-amplify/ui-react'
+import {useEffect, useState} from 'react'
 
 export default function Header() {
     const {signOut, user} = useAuthenticator(ctx => [ctx.user])
+    const [userGroups, setUserGroups] = useState<string[]>([])
+
+    useEffect(() => {
+        if (user?.signInDetails?.loginId) {
+            const groups = user.getSignInUserSession()?.getIdToken().payload['cognito:groups'] || []
+            setUserGroups(groups)
+        }
+    }, [user])
+
+    const hasRole = (role: string) => userGroups.includes(role)
+    const isCanvasser = hasRole('Canvasser') || hasRole('Organizer') || hasRole('Administrator')
+    const isOrganizer = hasRole('Organizer') || hasRole('Administrator')
+    const isAdmin = hasRole('Administrator')
+
     return (
         <header style={{display: 'flex', alignItems: 'center', gap: 16, padding: 12, borderBottom: '1px solid #eee'}}>
             <img src='/logo.png' alt='SWHOA' style={{height: 40}}/>
             <nav style={{display: 'flex', gap: 12}}>
                 <Link to='/'>Home</Link>
-                <Link to='/canvass'>Canvass</Link>
-                <Link to='/reports'>Reports</Link>
-                <Link to='/organize'>Organize</Link>
-                <Link to='/admin/enroll'>Enroll</Link>
-                <Link to='/admin/votes'>Votes</Link>
+                {isCanvasser && <Link to='/canvass'>Canvass</Link>}
+                {isCanvasser && <Link to='/absentee'>Absentee</Link>}
+                {isOrganizer && <Link to='/reports'>Reports</Link>}
+                {isOrganizer && <Link to='/organize'>Organize</Link>}
+                {isAdmin && <Link to='/admin/enroll'>Enroll</Link>}
+                {isAdmin && <Link to='/admin/votes'>Votes</Link>}
                 <Link to='/profile'>Profile</Link>
             </nav>
             <div style={{marginLeft: 'auto'}}>
