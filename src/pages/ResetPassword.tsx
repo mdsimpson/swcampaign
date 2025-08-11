@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import {Auth} from 'aws-amplify'
+import {resetPassword, confirmResetPassword} from 'aws-amplify/auth'
 import {Link} from 'react-router-dom'
 
 export default function ResetPassword() {
@@ -11,13 +11,23 @@ export default function ResetPassword() {
 
     async function send() {
         if (!email) return alert('Enter your email first');
-        await Auth.forgotPassword(email);
-        setSent(true)
+        try {
+            await resetPassword({username: email});
+            setSent(true)
+        } catch (error) {
+            console.error('Reset password error:', error);
+            alert('Error sending reset code. Please try again.')
+        }
     }
 
     async function confirm() {
-        await Auth.forgotPasswordSubmit(email, code, newPass);
-        setDone(true)
+        try {
+            await confirmResetPassword({username: email, confirmationCode: code, newPassword: newPass});
+            setDone(true)
+        } catch (error) {
+            console.error('Confirm reset password error:', error);
+            alert('Error resetting password. Please check your code and try again.')
+        }
     }
 
     if (done) return <div style={{maxWidth: 600, margin: '40px auto'}}><h2>Password reset!</h2><p><Link to='/landing'>Return
