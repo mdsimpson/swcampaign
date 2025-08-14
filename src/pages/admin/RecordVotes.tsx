@@ -3,11 +3,11 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 
-const client = generateClient<Schema>()
-
 export default function RecordConsents() {
     const [searchTerm, setSearchTerm] = useState('')
     const [homes, setHomes] = useState<any[]>([])
+    
+    const client = generateClient<Schema>()
     const [filteredHomes, setFilteredHomes] = useState<any[]>([])
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploadStatus, setUploadStatus] = useState('')

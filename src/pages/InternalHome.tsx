@@ -6,14 +6,14 @@ import {useAuthenticator} from '@aws-amplify/ui-react'
 import {fetchAuthSession} from 'aws-amplify/auth'
 import {Link} from 'react-router-dom'
 
-const client = generateClient<Schema>()
-
 export default function InternalHome() {
     const {user} = useAuthenticator(ctx => [ctx.user])
     const [stats, setStats] = useState({totalPeople: 0, consentsRecorded: 0, totalHomes: 0, homesWithAllConsents: 0})
     const [pendingRegistrations, setPendingRegistrations] = useState(0)
     const [outstandingAssignments, setOutstandingAssignments] = useState(0)
     const [userGroups, setUserGroups] = useState<string[]>([])
+    
+    const client = generateClient<Schema>()
 
     useEffect(() => {
         loadStats()

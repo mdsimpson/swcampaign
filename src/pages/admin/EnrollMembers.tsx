@@ -3,13 +3,13 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 
-const client = generateClient<Schema>()
-
 export default function EnrollMembers() {
     const [registrations, setRegistrations] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [sortField, setSortField] = useState<string>('submittedAt')
     const [sortAsc, setSortAsc] = useState(false)
+    
+    const client = generateClient<Schema>()
 
     useEffect(() => {
         loadRegistrations()

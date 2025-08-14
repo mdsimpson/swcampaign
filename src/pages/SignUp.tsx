@@ -3,8 +3,6 @@ import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 import {Link} from 'react-router-dom'
 
-const client = generateClient<Schema>()
-
 function validatePassword(password: string): string[] {
     const errors = []
     if (password.length < 12) errors.push('Must be at least 12 characters long')
@@ -19,6 +17,8 @@ export default function SignUp() {
     const [form, setForm] = useState({email: '', password: '', firstName: '', lastName: '', street: '', mobile: ''})
     const [submitted, setSubmitted] = useState(false)
     const [passwordErrors, setPasswordErrors] = useState<string[]>([])
+    
+    const client = generateClient<Schema>()
 
     function handlePasswordChange(password: string) {
         setForm({...form, password})

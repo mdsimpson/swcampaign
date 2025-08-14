@@ -5,8 +5,6 @@ import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 import {useAuthenticator} from '@aws-amplify/ui-react'
 
-const client = generateClient<Schema>()
-
 const mapContainerStyle = {
     width: '100%',
     height: '70vh'
@@ -24,6 +22,8 @@ export default function CanvassingMap() {
     const [showAll, setShowAll] = useState(false)
     const [selectedHome, setSelectedHome] = useState<any>(null)
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
+    
+    const client = generateClient<Schema>()
 
     useEffect(() => {
         loadHomes()
