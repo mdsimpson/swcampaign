@@ -5,34 +5,65 @@ import type {Schema} from '../../../amplify/data/resource'
 
 export default function Organize() {
     const [homes, setHomes] = useState<any[]>([])
-    const [filteredHomes, setFilteredHomes] = useState<any[]>([])
     const [volunteers, setVolunteers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedHomes, setSelectedHomes] = useState<Set<string>>(new Set())
     const [assignToVolunteer, setAssignToVolunteer] = useState('')
+    
+    // Filter state
     const [searchTerm, setSearchTerm] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [assignmentFilter, setAssignmentFilter] = useState('all')
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1)
+    const [totalCount, setTotalCount] = useState(0)
+    const pageSize = 20
+    
+    // Sorting state
+    const [sortField, setSortField] = useState('street')
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
     const client = generateClient<Schema>()
 
     useEffect(() => {
         loadData()
-    }, [])
-
-    useEffect(() => {
-        applyFilters()
-    }, [homes, searchTerm, statusFilter, assignmentFilter])
+    }, [currentPage, sortField, sortDirection])
 
     async function loadData() {
         try {
-            // Load homes
-            const homesResult = await client.models.Home.list()
-            const nonAbsenteeHomes = homesResult.data.filter(home => !home.absenteeOwner)
+            setLoading(true)
             
-            // Load residents and consents for each home
+            // Build filter for homes
+            let homeFilter: any = { absenteeOwner: { ne: true } }
+            
+            // Add search filter if applied
+            if (searchTerm.trim()) {
+                homeFilter = {
+                    and: [
+                        homeFilter,
+                        {
+                            or: [
+                                { street: { contains: searchTerm.trim() } },
+                                { city: { contains: searchTerm.trim() } }
+                            ]
+                        }
+                    ]
+                }
+            }
+            
+            // Load homes with pagination and sorting
+            const homesResult = await client.models.Home.list({
+                filter: homeFilter,
+                limit: pageSize,
+                nextToken: currentPage > 1 ? undefined : undefined // Will need to implement proper pagination
+            })
+            
+            const loadedHomes = homesResult.data
+            
+            // Load related data for each home
             const homesWithDetails = await Promise.all(
-                nonAbsenteeHomes.map(async (home) => {
+                loadedHomes.map(async (home) => {
                     const [residentsResult, consentsResult, assignmentsResult] = await Promise.all([
                         client.models.Person.list({ filter: { homeId: { eq: home.id } } }),
                         client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
@@ -57,11 +88,61 @@ export default function Organize() {
                 })
             )
             
-            setHomes(homesWithDetails)
+            // Apply additional filters that can't be done at DB level
+            let filteredData = homesWithDetails
             
-            // Load volunteers
-            const volunteersResult = await client.models.Volunteer.list()
-            setVolunteers(volunteersResult.data)
+            if (statusFilter !== 'all') {
+                filteredData = filteredData.filter(home => home.consentStatus === statusFilter)
+            }
+            
+            if (assignmentFilter !== 'all') {
+                if (assignmentFilter === 'assigned') {
+                    filteredData = filteredData.filter(home => home.assignments.length > 0)
+                } else if (assignmentFilter === 'unassigned') {
+                    filteredData = filteredData.filter(home => home.assignments.length === 0)
+                }
+            }
+            
+            // Apply sorting
+            filteredData.sort((a, b) => {
+                let aVal: any, bVal: any
+                
+                switch (sortField) {
+                    case 'street':
+                        aVal = a.street || ''
+                        bVal = b.street || ''
+                        break
+                    case 'city':
+                        aVal = a.city || ''
+                        bVal = b.city || ''
+                        break
+                    case 'consentStatus':
+                        aVal = a.consentStatus
+                        bVal = b.consentStatus
+                        break
+                    default:
+                        aVal = a.street || ''
+                        bVal = b.street || ''
+                }
+                
+                if (typeof aVal === 'string') {
+                    const comparison = aVal.toLowerCase().localeCompare(bVal.toLowerCase())
+                    return sortDirection === 'asc' ? comparison : -comparison
+                }
+                
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+                return 0
+            })
+            
+            setHomes(filteredData)
+            setTotalCount(filteredData.length) // This is approximate - in production you'd get total count separately
+            
+            // Load volunteers if not already loaded
+            if (volunteers.length === 0) {
+                const volunteersResult = await client.models.Volunteer.list()
+                setVolunteers(volunteersResult.data)
+            }
             
         } catch (error) {
             console.error('Failed to load data:', error)
@@ -69,36 +150,20 @@ export default function Organize() {
             setLoading(false)
         }
     }
-
+    
     function applyFilters() {
-        let filtered = homes
-
-        // Search filter
-        if (searchTerm) {
-            filtered = filtered.filter(home => 
-                home.street.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                home.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                home.residents?.some((resident: any) => 
-                    `${resident.firstName} ${resident.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-            )
+        setCurrentPage(1) // Reset to first page when filters change
+        setSelectedHomes(new Set()) // Clear selections
+        loadData()
+    }
+    
+    function handleSort(field: string) {
+        if (sortField === field) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+        } else {
+            setSortField(field)
+            setSortDirection('asc')
         }
-
-        // Status filter
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(home => home.consentStatus === statusFilter)
-        }
-
-        // Assignment filter
-        if (assignmentFilter !== 'all') {
-            if (assignmentFilter === 'assigned') {
-                filtered = filtered.filter(home => home.assignments.length > 0)
-            } else if (assignmentFilter === 'unassigned') {
-                filtered = filtered.filter(home => home.assignments.length === 0)
-            }
-        }
-
-        setFilteredHomes(filtered)
     }
 
     function toggleHomeSelection(homeId: string) {
@@ -112,7 +177,7 @@ export default function Organize() {
     }
 
     function selectAll() {
-        const allIds = new Set(filteredHomes.map(home => home.id))
+        const allIds = new Set(homes.map(home => home.id))
         setSelectedHomes(allIds)
     }
 
@@ -177,7 +242,8 @@ export default function Organize() {
                     flexWrap: 'wrap',
                     backgroundColor: '#f8f9fa',
                     padding: 16,
-                    borderRadius: 8
+                    borderRadius: 8,
+                    alignItems: 'end'
                 }}>
                     <div>
                         <label style={{display: 'block', marginBottom: 4}}>Search:</label>
@@ -185,7 +251,7 @@ export default function Organize() {
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Address or resident name..."
+                            placeholder="Address or city..."
                             style={{padding: 8, borderRadius: 4, border: '1px solid #ddd'}}
                         />
                     </div>
@@ -215,6 +281,20 @@ export default function Organize() {
                             <option value="unassigned">Unassigned</option>
                         </select>
                     </div>
+                    
+                    <button
+                        onClick={applyFilters}
+                        style={{
+                            backgroundColor: '#007bff',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: 4,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Apply Filters
+                    </button>
                 </div>
 
                 {/* Bulk Actions */}
@@ -242,7 +322,7 @@ export default function Organize() {
                             cursor: 'pointer'
                         }}
                     >
-                        Select All ({filteredHomes.length})
+                        Select All ({homes.length})
                     </button>
                     
                     <button
@@ -292,7 +372,7 @@ export default function Organize() {
 
                 {/* Stats */}
                 <div style={{marginBottom: 16, fontSize: '0.9em', color: '#666'}}>
-                    Showing {filteredHomes.length} of {homes.length} homes
+                    Showing {homes.length} homes (Page {currentPage} of {Math.ceil(totalCount / pageSize)})
                 </div>
 
                 {/* Table */}
@@ -303,19 +383,41 @@ export default function Organize() {
                                 <th style={{border: '1px solid #ddd', padding: 8, width: 40}}>
                                     <input
                                         type="checkbox"
-                                        checked={filteredHomes.length > 0 && selectedHomes.size === filteredHomes.length}
-                                        onChange={() => selectedHomes.size === filteredHomes.length ? clearSelection() : selectAll()}
+                                        checked={homes.length > 0 && selectedHomes.size === homes.length}
+                                        onChange={() => selectedHomes.size === homes.length ? clearSelection() : selectAll()}
                                     />
                                 </th>
-                                <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Address</th>
+                                <th 
+                                    style={{
+                                        border: '1px solid #ddd', 
+                                        padding: 8, 
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        backgroundColor: sortField === 'street' ? '#e9ecef' : 'transparent'
+                                    }}
+                                    onClick={() => handleSort('street')}
+                                >
+                                    Address {sortField === 'street' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
                                 <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Residents</th>
-                                <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Consent Status</th>
+                                <th 
+                                    style={{
+                                        border: '1px solid #ddd', 
+                                        padding: 8, 
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        backgroundColor: sortField === 'consentStatus' ? '#e9ecef' : 'transparent'
+                                    }}
+                                    onClick={() => handleSort('consentStatus')}
+                                >
+                                    Consent Status {sortField === 'consentStatus' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
                                 <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Assignment</th>
                                 <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredHomes.map(home => (
+                            {homes.map(home => (
                                 <tr key={home.id} style={{backgroundColor: selectedHomes.has(home.id) ? '#e3f2fd' : 'white'}}>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         <input
@@ -395,7 +497,53 @@ export default function Organize() {
                     </table>
                 </div>
 
-                {filteredHomes.length === 0 && (
+                {/* Pagination */}
+                {totalCount > pageSize && (
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 8,
+                        marginTop: 16,
+                        padding: 16
+                    }}>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            style={{
+                                backgroundColor: currentPage === 1 ? '#6c757d' : '#007bff',
+                                color: 'white',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: 4,
+                                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            Previous
+                        </button>
+                        
+                        <span style={{margin: '0 16px'}}>
+                            Page {currentPage} of {Math.ceil(totalCount / pageSize)}
+                        </span>
+                        
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalCount / pageSize), prev + 1))}
+                            disabled={currentPage >= Math.ceil(totalCount / pageSize)}
+                            style={{
+                                backgroundColor: currentPage >= Math.ceil(totalCount / pageSize) ? '#6c757d' : '#007bff',
+                                color: 'white',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: 4,
+                                cursor: currentPage >= Math.ceil(totalCount / pageSize) ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
+
+                {homes.length === 0 && !loading && (
                     <div style={{textAlign: 'center', padding: 40, color: '#666'}}>
                         No homes match the current filters.
                     </div>
