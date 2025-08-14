@@ -30,10 +30,15 @@ function flag(args: string[], name: string){
     return kv ? kv.split('=')[1] : undefined
 }
 
+function flagNumber(args: string[], name: string): number | undefined {
+    const val = flag(args, name)
+    return val ? parseInt(val, 10) : undefined
+}
+
 function help(){
     console.log(`
 Usage:
-  npm run import:homeowners:sqlite -- --db <db.sqlite> --table <table> [--preview] \
+  npm run import:homeowners:sqlite -- --db <db.sqlite> --table <table> [--preview] [--limit <num>] [--offset <num>] \
 [--street "col"] [--city "col"] [--state "col"] [--zip "col"] [--unit "col"] \
 [--mailstreet "col"] [--mailcity "col"] [--mailstate "col"] [--mailzip "col"] \
 [--ownerfirst "col"] [--ownerlast "col"] [--owneremail "col"] [--ownercell "col"] \
@@ -60,6 +65,8 @@ async function main(){
     const listOnly = args.includes('--list')
     const table = flag(args,'table')
     const preview = args.includes('--preview')
+    const limit = flagNumber(args, 'limit')
+    const offset = flagNumber(args, 'offset') || 0
     if (!dbPath){ help(); process.exit(1) }
 
     const SQL = await initSqlJs({ locateFile: () => wasmPath })
@@ -123,10 +130,21 @@ async function main(){
         return
     }
 
-    const res = db.exec(`SELECT * FROM "${tQuoted}"`)
+    let sql = `SELECT * FROM "${tQuoted}"`
+    if (limit) {
+        sql += ` LIMIT ${limit}`
+        if (offset > 0) {
+            sql += ` OFFSET ${offset}`
+        }
+    }
+    
+    console.log(`Executing SQL: ${sql}`)
+    const res = db.exec(sql)
     if (!res.length){ console.log('No rows found.'); return }
     const cols = res[0].columns
     const rows = res[0].values.map(v=>Object.fromEntries(cols.map((c,i)=>[c, v[i]]))) as Record<string, any>[]
+    
+    console.log(`Processing ${rows.length} rows (offset: ${offset})`)
 
     let homes=0, persons=0, skipped=0
     for (const row of rows){
