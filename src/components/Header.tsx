@@ -1,16 +1,26 @@
 import {Link} from 'react-router-dom'
 import {useAuthenticator} from '@aws-amplify/ui-react'
 import {useEffect, useState} from 'react'
+import {fetchAuthSession} from 'aws-amplify/auth'
 
 export default function Header() {
     const {signOut, user} = useAuthenticator(ctx => [ctx.user])
     const [userGroups, setUserGroups] = useState<string[]>([])
 
     useEffect(() => {
-        if (user?.signInDetails?.loginId) {
-            const groups = user.getSignInUserSession()?.getIdToken().payload['cognito:groups'] || []
-            setUserGroups(groups)
+        async function getUserGroups() {
+            if (user) {
+                try {
+                    const session = await fetchAuthSession()
+                    const groups = session.tokens?.idToken?.payload['cognito:groups'] || []
+                    setUserGroups(groups)
+                } catch (error) {
+                    console.error('Failed to fetch user groups:', error)
+                    setUserGroups(['Member']) // Default to Member role
+                }
+            }
         }
+        getUserGroups()
     }, [user])
 
     const hasRole = (role: string) => userGroups.includes(role)

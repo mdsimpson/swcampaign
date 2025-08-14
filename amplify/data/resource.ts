@@ -37,7 +37,8 @@ const schema = a.schema({
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
-        allow.groups(['Member']).to(['read'])
+        allow.groups(['Member']).to(['read']),
+        allow.publicApiKey().to(['create']) // Allow import scripts
     ]),
 
     Person: a.model({
@@ -55,7 +56,8 @@ const schema = a.schema({
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
-        allow.groups(['Member']).to(['read'])
+        allow.groups(['Member']).to(['read']),
+        allow.publicApiKey().to(['create']) // Allow import scripts
     ]),
 
     Vote: a.model({

@@ -8,7 +8,9 @@ import { generateClient } from 'aws-amplify/data'
 import type { Schema } from '../amplify/data/resource'
 
 Amplify.configure(outputs)
-const client = generateClient<Schema>()
+const client = generateClient<Schema>({
+    authMode: 'apiKey'
+})
 
 const require = createRequire(import.meta.url)
 const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm')
@@ -140,30 +142,41 @@ async function main(){
         const mailingPostalCode = mailZipKey ? (row[mailZipKey] ? String(row[mailZipKey]) : undefined) : undefined
         const absenteeOwner = Boolean(mailingStreet && mailingStreet.trim() && (mailingStreet.trim() !== street.trim()))
 
-        const { data: home } = await client.models.Home.create({ street, city, state, postalCode, unitNumber, mailingStreet, mailingCity, mailingState, mailingPostalCode, absenteeOwner })
-        homes++
+        try {
+            const result = await client.models.Home.create({ street, city, state, postalCode, unitNumber, mailingStreet, mailingCity, mailingState, mailingPostalCode, absenteeOwner })
+            const home = result.data
+            if (!home) {
+                console.error('Failed to create home for:', street, result.errors)
+                skipped++
+                continue
+            }
+            homes++
 
-        const p1f = ownerFirstKey ? (row[ownerFirstKey] ? String(row[ownerFirstKey]) : undefined) : undefined
-        const p1l = ownerLastKey ? (row[ownerLastKey] ? String(row[ownerLastKey]) : undefined) : undefined
-        const p1e = ownerEmailKey ? (row[ownerEmailKey] ? String(row[ownerEmailKey]) : undefined) : undefined
-        const p1m = ownerCellKey ? (row[ownerCellKey] ? String(row[ownerCellKey]) : undefined) : undefined
-        if (p1f || p1l || p1e || p1m){
-            await client.models.Person.create({ homeId: home.id, role: 'PRIMARY_OWNER', firstName: p1f, lastName: p1l, email: p1e, mobilePhone: normalizePhone(p1m) } as any)
-            persons++
-        }
+            const p1f = ownerFirstKey ? (row[ownerFirstKey] ? String(row[ownerFirstKey]) : undefined) : undefined
+            const p1l = ownerLastKey ? (row[ownerLastKey] ? String(row[ownerLastKey]) : undefined) : undefined
+            const p1e = ownerEmailKey ? (row[ownerEmailKey] ? String(row[ownerEmailKey]) : undefined) : undefined
+            const p1m = ownerCellKey ? (row[ownerCellKey] ? String(row[ownerCellKey]) : undefined) : undefined
+            if (p1f || p1l || p1e || p1m){
+                await client.models.Person.create({ homeId: home.id, role: 'PRIMARY_OWNER', firstName: p1f, lastName: p1l, email: p1e, mobilePhone: normalizePhone(p1m) } as any)
+                persons++
+            }
 
-        const p2f = coFirstKey ? (row[coFirstKey] ? String(row[coFirstKey]) : undefined) : undefined
-        const p2l = coLastKey ? (row[coLastKey] ? String(row[coLastKey]) : undefined) : undefined
-        if (p2f || p2l){
-            await client.models.Person.create({ homeId: home.id, role:'SECONDARY_OWNER', firstName:p2f, lastName:p2l } as any)
-            persons++
-        }
+            const p2f = coFirstKey ? (row[coFirstKey] ? String(row[coFirstKey]) : undefined) : undefined
+            const p2l = coLastKey ? (row[coLastKey] ? String(row[coLastKey]) : undefined) : undefined
+            if (p2f || p2l){
+                await client.models.Person.create({ homeId: home.id, role:'SECONDARY_OWNER', firstName:p2f, lastName:p2l } as any)
+                persons++
+            }
 
-        const rf = renterFirstKey ? (row[renterFirstKey] ? String(row[renterFirstKey]) : undefined) : undefined
-        const rl = renterLastKey ? (row[renterLastKey] ? String(row[renterLastKey]) : undefined) : undefined
-        if (rf || rl){
-            await client.models.Person.create({ homeId: home.id, role:'RENTER', firstName:rf, lastName:rl } as any)
-            persons++
+            const rf = renterFirstKey ? (row[renterFirstKey] ? String(row[renterFirstKey]) : undefined) : undefined
+            const rl = renterLastKey ? (row[renterLastKey] ? String(row[renterLastKey]) : undefined) : undefined
+            if (rf || rl){
+                await client.models.Person.create({ homeId: home.id, role:'RENTER', firstName:rf, lastName:rl } as any)
+                persons++
+            }
+        } catch (error) {
+            console.error('Failed to process row:', street, error)
+            skipped++
         }
     }
     console.log(`Imported ${homes} homes and ${persons} people. Skipped rows: ${skipped}.`)

@@ -3,6 +3,7 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 import {useAuthenticator} from '@aws-amplify/ui-react'
+import {fetchAuthSession} from 'aws-amplify/auth'
 import {Link} from 'react-router-dom'
 
 const client = generateClient<Schema>()
@@ -16,16 +17,27 @@ export default function InternalHome() {
 
     useEffect(() => {
         loadStats()
-        if (user?.signInDetails?.loginId) {
-            const groups = user.getSignInUserSession()?.getIdToken().payload['cognito:groups'] || []
-            setUserGroups(groups)
-            if (groups.includes('Administrator')) {
-                loadPendingRegistrations()
-            }
-            if (groups.includes('Canvasser') || groups.includes('Organizer') || groups.includes('Administrator')) {
-                loadOutstandingAssignments()
+        
+        async function getUserGroups() {
+            if (user) {
+                try {
+                    const session = await fetchAuthSession()
+                    const groups = session.tokens?.idToken?.payload['cognito:groups'] || ['Member']
+                    setUserGroups(groups)
+                    
+                    if (groups.includes('Administrator')) {
+                        loadPendingRegistrations()
+                    }
+                    if (groups.includes('Canvasser') || groups.includes('Organizer') || groups.includes('Administrator')) {
+                        loadOutstandingAssignments()
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch user groups:', error)
+                    setUserGroups(['Member']) // Default to Member role
+                }
             }
         }
+        getUserGroups()
     }, [user])
 
     async function loadStats() {
