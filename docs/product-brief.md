@@ -23,14 +23,15 @@ This project relates to the SWHOA and not the Broadlands HOA.
 # Goals
 
 I am on the HOA board of directors, and I am seeking to dissolve the association.
-This will require 80% of the membership to vote to agree to dissolution.
-Members include all homeowners. Some homes have multiple owners. Some have absentee owners who are renting their home.
-I want to start a campaign to create awareness and get people to vote to dissolve the association.
+* This will require 80% of the membership households to sign a consent form to agree to dissolution.
+* Members include all homeowners. Some homes have multiple owners. Some have absentee owners who are renting their home.
+  * An important subtlety is that for any home to count toward the 80% consent, and all homeowners in that home have to 
+  sign the consent form.
+* I want to start a campaign to create awareness and get people to consent to dissolve the association.
 
 # Challenges
 
-Some difficulties with getting this large supermajority of votes are that many homeowner members are:
-
+Some difficulties with getting this large supermajority of consents are that many homeowner members are:
 1. not fully aware of the situation with the termination of the Verizon contract
 2. don't understand that the SWHOA is no longer doing anything useful, but has to charge them fees as long as it exists
 3. ignoring communications sent via emails, regular mail, and posted in on-line forums
@@ -39,12 +40,12 @@ Some difficulties with getting this large supermajority of votes are that many h
 
 # Organization
 
-I am heading a committee to work on getting votes to dissolve the SWHOA.
+I am heading a committee to work on getting signed consent forms to dissolve the SWHOA.
 To try to get engagement from the membership,
 I plan to have committee members go door-to-door to talk to SWHOA members.
 
 # Needs
 
 1. I need to be able to assign houses for volunteers to canvas to engage SWHOA homeowner members to understand the
-   situation and to vote.
-2. I need help to track engagement with SWHOA members and progress toward getting 80% of votes.
+   situation and to sign the consent form.
+2. I need help to track engagement with SWHOA members and progress toward getting 80% of consents.

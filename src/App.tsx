@@ -12,7 +12,7 @@ import CanvassingMap from './pages/CanvassingMap'
 import InteractionForm from './pages/InteractionForm'
 import InteractionHistory from './pages/InteractionHistory'
 import AbsenteeInteractions from './pages/AbsenteeInteractions'
-import RecordVotes from './pages/admin/RecordVotes'
+import RecordConsents from './pages/admin/RecordVotes'
 import Organize from './pages/organizer/Organize'
 
 export default function App() {
@@ -30,7 +30,7 @@ export default function App() {
             <Route path='/history' element={<Authenticator><InteractionHistory/></Authenticator>}/>
             <Route path='/absentee' element={<Authenticator><AbsenteeInteractions/></Authenticator>}/>
             <Route path='/admin/enroll' element={<Authenticator><EnrollMembers/></Authenticator>}/>
-            <Route path='/admin/votes' element={<Authenticator><RecordVotes/></Authenticator>}/>
+            <Route path='/admin/consents' element={<Authenticator><RecordConsents/></Authenticator>}/>
             <Route path='/organize' element={<Authenticator><Organize/></Authenticator>}/>
             <Route path='*' element={<Navigate to='/landing' replace/>}/>
         </Routes>

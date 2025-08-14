@@ -34,8 +34,8 @@ export default function CanvassingMap() {
     async function loadHomes() {
         try {
             const result = await client.models.Home.list()
-            const homesWithoutVotes = result.data.filter(h => !h.absenteeOwner)
-            setHomes(homesWithoutVotes)
+            const homesWithoutConsents = result.data.filter(h => !h.absenteeOwner)
+            setHomes(homesWithoutConsents)
         } catch (error) {
             console.error('Failed to load homes:', error)
         }
@@ -105,7 +105,7 @@ export default function CanvassingMap() {
                 <div style={{marginBottom: 16}}>
                     <p>
                         {showAll ? 
-                            `Showing ${displayHomes.length} homes without votes` : 
+                            `Showing ${displayHomes.length} homes without signed consents` : 
                             `Showing ${displayHomes.length} of your assigned homes`
                         }
                     </p>
@@ -195,7 +195,7 @@ export default function CanvassingMap() {
                     <p><strong>Legend:</strong></p>
                     <p>🔵 Your current location</p>
                     <p>🔴 Your assigned homes</p>
-                    <p>🔵 Other homes (when "Show All" is enabled)</p>
+                    <p>🔵 Other homes without consent forms (when "Show All" is enabled)</p>
                     <p>Click on any home marker to record an interaction or view history.</p>
                 </div>
             </div>

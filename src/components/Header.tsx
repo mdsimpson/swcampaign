@@ -38,7 +38,7 @@ export default function Header() {
                 {isOrganizer && <Link to='/reports'>Reports</Link>}
                 {isOrganizer && <Link to='/organize'>Organize</Link>}
                 {isAdmin && <Link to='/admin/enroll'>Enroll</Link>}
-                {isAdmin && <Link to='/admin/votes'>Votes</Link>}
+                {isAdmin && <Link to='/admin/consents'>Consents</Link>}
                 <Link to='/profile'>Profile</Link>
             </nav>
             <div style={{marginLeft: 'auto'}}>

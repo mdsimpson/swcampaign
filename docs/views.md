@@ -116,9 +116,8 @@ Upon clicking the `Logout Link`, the user is logged out and redirected automatic
 
 At the top of the page, it will show:
 
-* It will display a voting progress bar showing the % of votes recorded
-* It will display a second progress bar showing the progress of "yes" votes progressing toward 80% of votes.
-* It will display the % "yes" votes and % "no" votes thus far, and the ration of yes:no votes.
+* It will display a progress bar showing the % of signed consent forms recorded
+
 
 ### Inbox Section
 
@@ -180,7 +179,7 @@ This page can be accessed by users with `Canvasser` role.
 
 The page will display a Google map that calls-out homes that are currently assigned for that user to canvas.
 The page has a toggle button to "Show All" or "Show Mine." "Show Mine" is the default view.
-When "Show All" is togged on, then all of the homes that do not have a vote recorded and are not owned
+When "Show All" is togged on, then all of the homes that do not have a signed consent recorded and are not owned
 by Absentee Owners are called-out.
 
 This page is intended to be viewed on the user's phone and is expected to see the user's current location.
@@ -205,10 +204,10 @@ Given that the user has clicked on a home in the `Canvassing Page` to open this 
 property address. The form then gives fields:
 
 * A checkbox list of owners for that property and "Other." Zero, one or many boxes can be checked.
-    * The view indicates if the owner has voted already
+    * The view indicates if the owner has already signed the consent form
 * An interaction type checkox including options: (zero or more may be selected)
     * Spoke to homeowner(s)
-    * Spoke to other occupant
+    * Spoke to another occupant
     * Left a flyer
 * An optional "Notes" text field
 
@@ -244,14 +243,15 @@ How the owner was contacted such as email, phone, text, and/or mail.
 The user can put in notes about the interaction.
 This will be saved in the DB. It is considered a kind of `Interaction Record`
 
-### Record Votes Page
+### Record Consents Page
 
 This page is only accessible to users with `Administrator` role.
 
-The users can look up any homeowner or property and record that fact that the homeowner has voted.
-He can optionally recorder if the homeowner voted "yes" or "no."
+The users can look up any homeowner or property and record that fact that the homeowner has signed the consent form.
 
-On this page, the user can upload a CSV file to input votes in bulk.
+On this page, the user can upload a CSV file to input in bulk the list of members known to have signed the consent form.
+* If a file is uploaded and contains entries that are already recorded, the system should give no error, but should
+indicate how many new items were recorded.
 
 ### Organize Canvassing Page
 
@@ -263,7 +263,7 @@ This page allows the user to create and manage Canvassing Assignments.
 This section gives a drop-down list of users with `Canvasser` role (or higher).
 It has a table of all of the properties that:
 
-* Have owners who have not voted
+* Have owners who have not signed the consent form
 * Do not have absentee owners
 
 It includes columns for:
@@ -271,7 +271,7 @@ It includes columns for:
 * Street address
 * Homeowner name
 * Whether there is a current canvassing assignment for the address
-* Names of homeowners who have not voted
+* Names of homeowners who have not signed the consent form
 * Notes - includes a link - when clicked opens a new browser tab to the Canvassing History Page for that address
 
 Each column (except the Notes column) has a text field where the user can type in text. The table will automatically

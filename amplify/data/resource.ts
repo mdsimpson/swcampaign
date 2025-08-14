@@ -33,7 +33,7 @@ const schema = a.schema({
         residents: a.hasMany('Person','homeId'),
         assignments: a.hasMany('Assignment','homeId'),
         interactions: a.hasMany('InteractionRecord','homeId'),
-        votes: a.hasMany('Vote','homeId'),
+        consents: a.hasMany('Consent','homeId'),
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
@@ -49,10 +49,9 @@ const schema = a.schema({
         lastName: a.string(),
         email: a.string(),
         mobilePhone: a.string(),
-        hasVoted: a.boolean().default(false),
-        voteChoice: a.enum(['YES','NO','UNKNOWN']),
-        votedAt: a.datetime(),
-        votes: a.hasMany('Vote','personId'),
+        hasSigned: a.boolean().default(false),
+        signedAt: a.datetime(),
+        consents: a.hasMany('Consent','personId'),
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
@@ -60,12 +59,11 @@ const schema = a.schema({
         allow.publicApiKey().to(['create']) // Allow import scripts
     ]),
 
-    Vote: a.model({
+    Consent: a.model({
         personId: a.id().required(),
         person: a.belongsTo('Person','personId'),
         homeId: a.id().required(),
         home: a.belongsTo('Home','homeId'),
-        choice: a.enum(['YES','NO','UNKNOWN']),
         recordedBy: a.string(),
         recordedAt: a.datetime().required(),
         source: a.string(), // manual | bulk-upload

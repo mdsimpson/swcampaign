@@ -10,7 +10,7 @@ const client = generateClient<Schema>()
 
 export default function InternalHome() {
     const {user} = useAuthenticator(ctx => [ctx.user])
-    const [stats, setStats] = useState({totalVoters: 0, votesRecorded: 0, yesVotes: 0, noVotes: 0})
+    const [stats, setStats] = useState({totalPeople: 0, consentsRecorded: 0, totalHomes: 0, homesWithAllConsents: 0})
     const [pendingRegistrations, setPendingRegistrations] = useState(0)
     const [outstandingAssignments, setOutstandingAssignments] = useState(0)
     const [userGroups, setUserGroups] = useState<string[]>([])
@@ -42,15 +42,29 @@ export default function InternalHome() {
 
     async function loadStats() {
         try {
-            const votes = await client.models.Vote.list()
+            const consents = await client.models.Consent.list()
             const people = await client.models.Person.list()
+            const homes = await client.models.Home.list()
             
-            const totalVoters = people.data.length
-            const votesRecorded = votes.data.length
-            const yesVotes = votes.data.filter(v => v.choice === 'YES').length
-            const noVotes = votes.data.filter(v => v.choice === 'NO').length
+            const totalPeople = people.data.length
+            const consentsRecorded = consents.data.length
+            const totalHomes = homes.data.length
             
-            setStats({totalVoters, votesRecorded, yesVotes, noVotes})
+            // Calculate homes where ALL owners have signed
+            const homeIds = new Set(homes.data.map(h => h.id))
+            let homesWithAllConsents = 0
+            
+            for (const homeId of homeIds) {
+                const homeOwners = people.data.filter(p => p.homeId === homeId)
+                const homeConsents = consents.data.filter(c => c.homeId === homeId)
+                
+                // Check if all owners have signed
+                if (homeOwners.length > 0 && homeConsents.length >= homeOwners.length) {
+                    homesWithAllConsents++
+                }
+            }
+            
+            setStats({totalPeople, consentsRecorded, totalHomes, homesWithAllConsents})
         } catch (error) {
             console.error('Failed to load stats:', error)
         }
@@ -76,10 +90,9 @@ export default function InternalHome() {
         }
     }
 
-    const voteProgressPercent = stats.totalVoters > 0 ? (stats.votesRecorded / stats.totalVoters) * 100 : 0
-    const yesProgressPercent = stats.totalVoters > 0 ? (stats.yesVotes / stats.totalVoters) * 100 : 0
-    const yesRatio = stats.votesRecorded > 0 ? (stats.yesVotes / stats.votesRecorded) * 100 : 0
-    const noRatio = stats.votesRecorded > 0 ? (stats.noVotes / stats.votesRecorded) * 100 : 0
+    const consentProgressPercent = stats.totalHomes > 0 ? (stats.homesWithAllConsents / stats.totalHomes) * 100 : 0
+    const targetConsentsNeeded = Math.ceil(stats.totalHomes * 0.8)
+    const progressToTarget = stats.totalHomes > 0 ? (stats.homesWithAllConsents / targetConsentsNeeded) * 100 : 0
 
     const hasRole = (role: string) => userGroups.includes(role)
     const isCanvasser = hasRole('Canvasser') || hasRole('Organizer') || hasRole('Administrator')
@@ -93,32 +106,16 @@ export default function InternalHome() {
                 <h2>Campaign Progress</h2>
                 
                 <div style={{marginBottom: 24}}>
-                    <h3>Voting Progress</h3>
+                    <h3>Consent Form Progress</h3>
                     <div style={{marginBottom: 12}}>
                         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 4}}>
-                            <span>Votes Recorded</span>
-                            <span>{stats.votesRecorded} / {stats.totalVoters} ({voteProgressPercent.toFixed(1)}%)</span>
+                            <span>Homes with All Consents Signed (Need 80%)</span>
+                            <span>{stats.homesWithAllConsents} / {targetConsentsNeeded} ({consentProgressPercent.toFixed(1)}%)</span>
                         </div>
                         <div style={{backgroundColor: '#e0e0e0', borderRadius: 4, height: 20}}>
                             <div style={{
-                                backgroundColor: '#4caf50',
-                                width: `${voteProgressPercent}%`,
-                                height: '100%',
-                                borderRadius: 4,
-                                transition: 'width 0.3s ease'
-                            }}/>
-                        </div>
-                    </div>
-                    
-                    <div style={{marginBottom: 12}}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 4}}>
-                            <span>"Yes" Votes Progress (Need 80%)</span>
-                            <span>{stats.yesVotes} / {Math.ceil(stats.totalVoters * 0.8)} ({yesProgressPercent.toFixed(1)}%)</span>
-                        </div>
-                        <div style={{backgroundColor: '#e0e0e0', borderRadius: 4, height: 20}}>
-                            <div style={{
-                                backgroundColor: yesProgressPercent >= 80 ? '#4caf50' : '#ff9800',
-                                width: `${Math.min(yesProgressPercent / 0.8, 100)}%`,
+                                backgroundColor: progressToTarget >= 100 ? '#4caf50' : '#ff9800',
+                                width: `${Math.min(progressToTarget, 100)}%`,
                                 height: '100%',
                                 borderRadius: 4,
                                 transition: 'width 0.3s ease'
@@ -127,9 +124,9 @@ export default function InternalHome() {
                     </div>
 
                     <div style={{display: 'flex', gap: 20, fontSize: 14}}>
-                        <span>Yes: {yesRatio.toFixed(1)}%</span>
-                        <span>No: {noRatio.toFixed(1)}%</span>
-                        <span>Ratio: {stats.noVotes > 0 ? (stats.yesVotes / stats.noVotes).toFixed(1) : '∞'}:1</span>
+                        <span>Total Homes: {stats.totalHomes}</span>
+                        <span>Individual Consents: {stats.consentsRecorded}</span>
+                        <span>Progress to 80%: {progressToTarget.toFixed(1)}%</span>
                     </div>
                 </div>
 

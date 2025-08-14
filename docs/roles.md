@@ -15,21 +15,21 @@ This means all users minimally have the Member role.
 
 Members can view summary pages with information such as:
 
-1. A summary view of progress on how many people have voted
+1. A summary view of progress on how many people have signed the consent form.
 2. Other summary level information as defined later.
 
 Members do not, by default, have the right to view any details about homeowners or other members.
 
 # Canvasser
 
-A Canvassers is a Member who will be going door-to-door to talk to potential voters to encourage them to vote.
+A Canvassers is a Member who will be going door-to-door to talk to SWHOA members to encourage them to sign the consent form.
 Canvassers will be assigned homes to canvass by an Organizer. These assignments can change from time to time.
 
 Canvassers can see certain information all homes, specifically:
 
 * Address of the home
 * Names of homeowners at that address
-* Whether the system has a recorded vote for each homeowner at each assigned address
+* Whether the system has a recorded consent signature for each homeowner at each assigned address
 * A list of previous `Interaction Records` for that address (i.e., notes from Canvassers who have previously canvassed
   that address)
 
@@ -40,7 +40,7 @@ A Canvasser can:
 * Create a new `Interaction Record` for any member homes regardless of whether he is assigned to canvas it or not.
 
 Then can also see the list of homes they have previously canvased along with the total count of homes canvased and total
-votes received by those homes.
+consents received by those homes.
 
 # Organizer
 
