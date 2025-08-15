@@ -170,11 +170,15 @@ export default function Organize() {
                 
                 console.log(`Searched ${searchCount} homes, found ${searchResults.length} matches`)
                 
-                // Remove duplicates from search results (by home ID)
-                const uniqueSearchResults = searchResults.filter((home, index, self) => 
-                    index === self.findIndex(h => h.id === home.id)
-                )
-                console.log(`After removing duplicates: ${uniqueSearchResults.length} unique homes`)
+                // Remove duplicates from search results (by address, not just home ID)
+                const uniqueSearchResults = searchResults.filter((home, index, self) => {
+                    const address = `${home.street?.toLowerCase().trim()}, ${home.city?.toLowerCase().trim()}`
+                    return index === self.findIndex(h => {
+                        const hAddress = `${h.street?.toLowerCase().trim()}, ${h.city?.toLowerCase().trim()}`
+                        return hAddress === address
+                    })
+                })
+                console.log(`After removing address duplicates: ${uniqueSearchResults.length} unique homes (from ${searchResults.length} total results)`)
                 
                 // For pagination on search results
                 const startIndex = (currentPage - 1) * pageSize
@@ -188,25 +192,66 @@ export default function Organize() {
                 // Load details for search results
                 const searchDetailsPromises = currentPageHomes.map(async (home) => {
                     try {
-                        // Get residents for this home and sort them (PRIMARY_OWNER first)
-                        const residents = allPeopleResult.data
-                            .filter(p => p.homeId === home.id)
-                            .sort((a, b) => {
-                                // PRIMARY_OWNER first, then SECONDARY_OWNER, then others
-                                const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
-                                const aOrder = roleOrder[a.role] || 5
-                                const bOrder = roleOrder[b.role] || 5
-                                return aOrder - bOrder
-                            })
+                        // For this address, get residents from ALL matching home records (to handle DB duplicates)
+                        const homeAddress = `${home.street?.toLowerCase().trim()}, ${home.city?.toLowerCase().trim()}`
                         
-                        // Get consents and assignments
-                        const [consentsResult, assignmentsResult] = await Promise.all([
-                            client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
-                            client.models.Assignment.list({ filter: { homeId: { eq: home.id } } })
+                        // Find all home IDs with the same address
+                        const sameAddressHomeIds = searchResults
+                            .filter(h => {
+                                const hAddress = `${h.street?.toLowerCase().trim()}, ${h.city?.toLowerCase().trim()}`
+                                return hAddress === homeAddress
+                            })
+                            .map(h => h.id)
+                        
+                        console.log(`Address "${home.street}" has ${sameAddressHomeIds.length} home records in DB`)
+                        
+                        // Get residents from all home records with this address
+                        const allResidentsForAddress = allPeopleResult.data
+                            .filter(p => sameAddressHomeIds.includes(p.homeId))
+                        
+                        // Remove duplicate residents (same name at same address)
+                        const uniqueResidents = allResidentsForAddress.filter((person, index, self) => {
+                            return index === self.findIndex(p => 
+                                p.firstName === person.firstName && 
+                                p.lastName === person.lastName
+                            )
+                        })
+                        
+                        // Sort residents (PRIMARY_OWNER first)
+                        const residents = uniqueResidents.sort((a, b) => {
+                            const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
+                            const aOrder = roleOrder[a.role] || 5
+                            const bOrder = roleOrder[b.role] || 5
+                            return aOrder - bOrder
+                        })
+                        
+                        console.log(`Address "${home.street}": ${allResidentsForAddress.length} total residents, ${residents.length} unique residents`)
+                        
+                        // Get consents and assignments from all home records with this address
+                        const consentsPromises = sameAddressHomeIds.map(homeId => 
+                            client.models.Consent.list({ filter: { homeId: { eq: homeId } } })
+                        )
+                        const assignmentsPromises = sameAddressHomeIds.map(homeId => 
+                            client.models.Assignment.list({ filter: { homeId: { eq: homeId } } })
+                        )
+                        
+                        const [allConsentsResults, allAssignmentsResults] = await Promise.all([
+                            Promise.all(consentsPromises),
+                            Promise.all(assignmentsPromises)
                         ])
                         
-                        const consents = consentsResult.data
-                        const assignments = assignmentsResult.data.filter(a => a.status !== 'DONE')
+                        // Combine and deduplicate consents and assignments
+                        const allConsents = allConsentsResults.flatMap(result => result.data)
+                        const allAssignments = allAssignmentsResults.flatMap(result => result.data)
+                        
+                        const consents = allConsents.filter((consent, index, self) => 
+                            index === self.findIndex(c => c.id === consent.id)
+                        )
+                        const assignments = allAssignments
+                            .filter(a => a.status !== 'DONE')
+                            .filter((assignment, index, self) => 
+                                index === self.findIndex(a => a.id === assignment.id)
+                            )
                         
                         // Determine consent status
                         const allOwnersSigned = residents.length > 0 && 
@@ -378,13 +423,17 @@ export default function Organize() {
                 return 0
             })
             
-            // Final check for duplicates before setting state
-            const finalUniqueHomes = filteredData.filter((home, index, self) => 
-                index === self.findIndex(h => h.id === home.id)
-            )
+            // Final check for duplicates before setting state (by address, not just ID)
+            const finalUniqueHomes = filteredData.filter((home, index, self) => {
+                const address = `${home.street?.toLowerCase().trim()}, ${home.city?.toLowerCase().trim()}`
+                return index === self.findIndex(h => {
+                    const hAddress = `${h.street?.toLowerCase().trim()}, ${h.city?.toLowerCase().trim()}`
+                    return hAddress === address
+                })
+            })
             
             if (filteredData.length !== finalUniqueHomes.length) {
-                console.log(`⚠️ Removed ${filteredData.length - finalUniqueHomes.length} duplicate homes before setting state`)
+                console.log(`⚠️ Removed ${filteredData.length - finalUniqueHomes.length} duplicate addresses before setting state`)
             }
             
             console.log(`Final: setting ${finalUniqueHomes.length} homes, totalCount should be ${totalCount}`)
