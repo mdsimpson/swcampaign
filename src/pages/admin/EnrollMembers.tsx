@@ -19,11 +19,15 @@ export default function EnrollMembers() {
 
     async function loadRegistrations() {
         try {
+            console.log('Loading registrations as admin...')
             const result = await client.models.Registration.list()
+            console.log(`Found ${result.data.length} total registrations`)
             const pending = result.data.filter(r => r.status === 'SUBMITTED')
+            console.log(`Filtered to ${pending.length} pending registrations`)
             setRegistrations(pending)
         } catch (error) {
             console.error('Failed to load registrations:', error)
+            alert(`Failed to load registrations: ${error.message}. Make sure you are logged in as an Administrator.`)
         } finally {
             setLoading(false)
         }
