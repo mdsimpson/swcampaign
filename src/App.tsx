@@ -14,6 +14,7 @@ import InteractionHistory from './pages/InteractionHistory'
 import AbsenteeInteractions from './pages/AbsenteeInteractions'
 import RecordConsents from './pages/admin/RecordVotes'
 import Organize from './pages/organizer/Organize'
+import RoleProtectedRoute from './components/RoleProtectedRoute'
 
 export default function App() {
     return (
@@ -23,7 +24,13 @@ export default function App() {
             <Route path='/verify' element={<VerifyEmail/>}/>
             <Route path='/reset' element={<ResetPassword/>}/>
             <Route path='/' element={<Authenticator><InternalHome/></Authenticator>}/>
-            <Route path='/profile' element={<Authenticator><UserProfile/></Authenticator>}/>
+            <Route path='/profile' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Member', 'Canvasser', 'Organizer', 'Administrator']}>
+                        <UserProfile/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
             <Route path='/reports' element={<Authenticator><Reports/></Authenticator>}/>
             <Route path='/canvass' element={<Authenticator><CanvassingMap/></Authenticator>}/>
             <Route path='/interact' element={<Authenticator><InteractionForm/></Authenticator>}/>

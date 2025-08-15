@@ -16,7 +16,7 @@ export default function Header() {
                     setUserGroups(groups)
                 } catch (error) {
                     console.error('Failed to fetch user groups:', error)
-                    setUserGroups(['Member']) // Default to Member role
+                    setUserGroups([]) // No groups assigned yet
                 }
             }
         }
@@ -27,11 +27,12 @@ export default function Header() {
     const isCanvasser = hasRole('Canvasser') || hasRole('Organizer') || hasRole('Administrator')
     const isOrganizer = hasRole('Organizer') || hasRole('Administrator')
     const isAdmin = hasRole('Administrator')
+    const isMember = hasRole('Member') || hasRole('Canvasser') || hasRole('Organizer') || hasRole('Administrator')
 
     return (
         <header style={{display: 'flex', alignItems: 'center', gap: 16, padding: 12, borderBottom: '1px solid #eee'}}>
             <img src='/logo.png' alt='SWHOA' style={{height: 40}}/>
-            <nav style={{display: 'flex', gap: 12}}>
+            <nav style={{display: 'flex', gap: 12, alignItems: 'center'}}>
                 <Link to='/'>Home</Link>
                 {isCanvasser && <Link to='/canvass'>Canvass</Link>}
                 {isCanvasser && <Link to='/absentee'>Absentee</Link>}
@@ -39,7 +40,19 @@ export default function Header() {
                 {isOrganizer && <Link to='/organize'>Organize</Link>}
                 {isAdmin && <Link to='/admin/enroll'>Enroll</Link>}
                 {isAdmin && <Link to='/admin/consents'>Consents</Link>}
-                <Link to='/profile'>Profile</Link>
+                {isMember && <Link to='/profile'>Profile</Link>}
+                {user && userGroups.length === 0 && (
+                    <span style={{
+                        color: '#856404',
+                        backgroundColor: '#fff3cd',
+                        padding: '4px 8px',
+                        borderRadius: 4,
+                        fontSize: '0.85em',
+                        border: '1px solid #ffeaa7'
+                    }}>
+                        Pending Approval
+                    </span>
+                )}
             </nav>
             <div style={{marginLeft: 'auto'}}>
                 {user ? <button onClick={signOut}>Logout</button> : <Link to='/landing'>Login</Link>}
