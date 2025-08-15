@@ -62,51 +62,78 @@ export default function Organize() {
                 }
             }
             
-            // Load homes with pagination and sorting
-            const homesResult = await client.models.Home.list({
-                filter: homeFilter,
-                limit: pageSize,
-                nextToken: getNextTokenForPage()
+            // Use same approach as AbsenteeInteractions: start with residents to avoid duplicate homes
+            console.log('Finding homes with residents for Organize page...')
+            
+            // Get all people first
+            const allPeopleResult = await client.models.Person.list({ limit: 1000 })
+            console.log(`Found ${allPeopleResult.data.length} people total`)
+            
+            // Get unique homeIds that have residents
+            const homeIdsWithResidents = [...new Set(allPeopleResult.data.map(p => p.homeId))]
+            console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
+            
+            // For pagination, slice the homeIds
+            const startIndex = (currentPage - 1) * pageSize
+            const endIndex = startIndex + pageSize
+            const currentPageHomeIds = homeIdsWithResidents.slice(startIndex, endIndex)
+            
+            console.log(`Page ${currentPage}: showing homes ${startIndex + 1}-${Math.min(endIndex, homeIdsWithResidents.length)} of ${homeIdsWithResidents.length}`)
+            
+            // Get home details for current page and filter
+            const homesWithDetailsPromises = currentPageHomeIds.map(async (homeId) => {
+                try {
+                    const homeResult = await client.models.Home.get({ id: homeId })
+                    if (homeResult.data) {
+                        const home = homeResult.data
+                        
+                        // Apply filters
+                        const matchesSearch = !searchTerm.trim() || 
+                            home.street?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            home.city?.toLowerCase().includes(searchTerm.toLowerCase())
+                        
+                        if (matchesSearch) {
+                            // Get residents for this home
+                            const residents = allPeopleResult.data.filter(p => p.homeId === homeId)
+                            
+                            // Get consents and assignments
+                            const [consentsResult, assignmentsResult] = await Promise.all([
+                                client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
+                                client.models.Assignment.list({ filter: { homeId: { eq: home.id } } })
+                            ])
+                            
+                            const consents = consentsResult.data
+                            const assignments = assignmentsResult.data.filter(a => a.status !== 'DONE')
+                            
+                            // Determine consent status
+                            const allOwnersSigned = residents.length > 0 && 
+                                residents.every(resident => resident.hasSigned)
+                            
+                            return { 
+                                ...home, 
+                                residents, 
+                                consents,
+                                assignments,
+                                consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error loading home ${homeId}:`, error)
+                }
+                return null
             })
             
-            // Store nextToken for pagination
-            if (homesResult.nextToken && !previousTokens.includes(homesResult.nextToken)) {
-                setPreviousTokens(prev => {
-                    const newTokens = [...prev]
-                    newTokens[currentPage - 1] = homesResult.nextToken!
-                    return newTokens
-                })
-            }
-            setNextToken(homesResult.nextToken || null)
+            const allHomesWithDetails = await Promise.all(homesWithDetailsPromises)
+            const loadedHomes = allHomesWithDetails.filter(home => home !== null)
             
-            const loadedHomes = homesResult.data
+            console.log(`Loaded ${loadedHomes.length} homes with residents for page ${currentPage}`)
             
-            // Load related data for each home
-            const homesWithDetails = await Promise.all(
-                loadedHomes.map(async (home) => {
-                    const [residentsResult, consentsResult, assignmentsResult] = await Promise.all([
-                        client.models.Person.list({ filter: { homeId: { eq: home.id } } }),
-                        client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
-                        client.models.Assignment.list({ filter: { homeId: { eq: home.id } } })
-                    ])
-                    
-                    const residents = residentsResult.data
-                    const consents = consentsResult.data
-                    const assignments = assignmentsResult.data.filter(a => a.status !== 'DONE')
-                    
-                    // Determine consent status
-                    const allOwnersSigned = residents.length > 0 && 
-                        residents.every(resident => resident.hasSigned)
-                    
-                    return { 
-                        ...home, 
-                        residents, 
-                        consents,
-                        assignments,
-                        consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
-                    }
-                })
-            )
+            // Update pagination info
+            const hasMorePages = endIndex < homeIdsWithResidents.length
+            setNextToken(hasMorePages ? 'more' : null)
+            
+            const homesWithDetails = loadedHomes
             
             // Apply additional filters that can't be done at DB level
             let filteredData = homesWithDetails
@@ -156,12 +183,8 @@ export default function Organize() {
             })
             
             setHomes(filteredData)
-            // For total count approximation (GraphQL doesn't provide exact counts)
-            if (currentPage === 1) {
-                // Rough estimate: if we got a full page, there are likely more
-                const estimatedTotal = homesResult.nextToken ? pageSize * 10 : filteredData.length
-                setTotalCount(estimatedTotal)
-            }
+            // Update total count based on homes with residents
+            setTotalCount(homeIdsWithResidents.length)
             
             // Load volunteers if not already loaded
             if (volunteers.length === 0) {
@@ -399,7 +422,7 @@ export default function Organize() {
 
                 {/* Stats */}
                 <div style={{marginBottom: 16, fontSize: '0.9em', color: '#666'}}>
-                    Showing {homes.length} homes on page {currentPage} {nextToken ? '(more pages available)' : '(last page)'}
+                    Showing {homes.length} homes on page {currentPage} of {Math.ceil(totalCount / pageSize)} (Total: {totalCount} homes with residents)
                 </div>
 
                 {/* Table */}
@@ -529,7 +552,7 @@ export default function Organize() {
                 </div>
 
                 {/* Pagination */}
-                {(nextToken || currentPage > 1) && (
+                {totalCount > pageSize && (
                     <div style={{
                         display: 'flex',
                         justifyContent: 'center',
@@ -554,19 +577,19 @@ export default function Organize() {
                         </button>
                         
                         <span style={{margin: '0 16px'}}>
-                            Page {currentPage} {nextToken ? '(more pages available)' : '(last page)'}
+                            Page {currentPage} of {Math.ceil(totalCount / pageSize)}
                         </span>
                         
                         <button
                             onClick={() => setCurrentPage(prev => prev + 1)}
-                            disabled={!nextToken}
+                            disabled={currentPage >= Math.ceil(totalCount / pageSize)}
                             style={{
-                                backgroundColor: nextToken ? '#007bff' : '#6c757d',
+                                backgroundColor: currentPage < Math.ceil(totalCount / pageSize) ? '#007bff' : '#6c757d',
                                 color: 'white',
                                 border: 'none',
                                 padding: '6px 12px',
                                 borderRadius: 4,
-                                cursor: nextToken ? 'pointer' : 'not-allowed'
+                                cursor: currentPage < Math.ceil(totalCount / pageSize) ? 'pointer' : 'not-allowed'
                             }}
                         >
                             Next
