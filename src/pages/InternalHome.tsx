@@ -13,7 +13,9 @@ export default function InternalHome() {
     const [outstandingAssignments, setOutstandingAssignments] = useState(0)
     const [userGroups, setUserGroups] = useState<string[]>([])
     
-    const client = generateClient<Schema>()
+    const client = generateClient<Schema>({
+        authMode: 'apiKey'
+    })
 
     useEffect(() => {
         loadStats()

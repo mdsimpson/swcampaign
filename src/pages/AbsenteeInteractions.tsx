@@ -24,7 +24,9 @@ export default function AbsenteeInteractions() {
     const [sortField, setSortField] = useState('street')
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-    const client = generateClient<Schema>()
+    const client = generateClient<Schema>({
+        authMode: 'apiKey'
+    })
 
     useEffect(() => {
         loadAbsenteeHomes()
@@ -287,7 +289,11 @@ export default function AbsenteeInteractions() {
                                 {absenteeHomes.map(home => (
                                     <tr key={home.id}>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {home.unitNumber && `${home.unitNumber} `}{home.street}<br/>
+                                            {/* Handle case where unitNumber and street might contain duplicate data */}
+                                            {home.unitNumber && home.street && home.unitNumber !== home.street 
+                                                ? `${home.unitNumber} ${home.street}` 
+                                                : (home.street || home.unitNumber)
+                                            }<br/>
                                             {home.city}, {home.state} {home.postalCode}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>

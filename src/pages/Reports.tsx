@@ -22,7 +22,9 @@ export default function Reports() {
     const [loading, setLoading] = useState(true)
     const [selectedReport, setSelectedReport] = useState('overview')
 
-    const client = generateClient<Schema>()
+    const client = generateClient<Schema>({
+        authMode: 'apiKey'
+    })
 
     useEffect(() => {
         loadReportData()

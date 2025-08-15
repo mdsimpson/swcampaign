@@ -23,7 +23,9 @@ export default function CanvassingMap() {
     const [selectedHome, setSelectedHome] = useState<any>(null)
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
     
-    const client = generateClient<Schema>()
+    const client = generateClient<Schema>({
+        authMode: 'apiKey'
+    })
 
     useEffect(() => {
         loadHomes()

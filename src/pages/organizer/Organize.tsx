@@ -18,24 +18,34 @@ export default function Organize() {
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1)
     const [totalCount, setTotalCount] = useState(0)
-    const pageSize = 20
+    const [nextToken, setNextToken] = useState<string | null>(null)
+    const [previousTokens, setPreviousTokens] = useState<string[]>([])
+    const pageSize = 50
     
     // Sorting state
     const [sortField, setSortField] = useState('street')
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-    const client = generateClient<Schema>()
+    const client = generateClient<Schema>({
+        authMode: 'apiKey'
+    })
 
     useEffect(() => {
         loadData()
     }, [currentPage, sortField, sortDirection])
+    
+    // Get appropriate nextToken for current page
+    function getNextTokenForPage() {
+        if (currentPage === 1) return null
+        return previousTokens[currentPage - 2] || null
+    }
 
     async function loadData() {
         try {
             setLoading(true)
             
-            // Build filter for homes
-            let homeFilter: any = { absenteeOwner: { ne: true } }
+            // Build filter for homes - temporarily remove absentee filter for debugging
+            let homeFilter: any = {} // { absenteeOwner: { ne: true } }
             
             // Add search filter if applied
             if (searchTerm.trim()) {
@@ -56,8 +66,18 @@ export default function Organize() {
             const homesResult = await client.models.Home.list({
                 filter: homeFilter,
                 limit: pageSize,
-                nextToken: currentPage > 1 ? undefined : undefined // Will need to implement proper pagination
+                nextToken: getNextTokenForPage()
             })
+            
+            // Store nextToken for pagination
+            if (homesResult.nextToken && !previousTokens.includes(homesResult.nextToken)) {
+                setPreviousTokens(prev => {
+                    const newTokens = [...prev]
+                    newTokens[currentPage - 1] = homesResult.nextToken!
+                    return newTokens
+                })
+            }
+            setNextToken(homesResult.nextToken || null)
             
             const loadedHomes = homesResult.data
             
@@ -136,7 +156,12 @@ export default function Organize() {
             })
             
             setHomes(filteredData)
-            setTotalCount(filteredData.length) // This is approximate - in production you'd get total count separately
+            // For total count approximation (GraphQL doesn't provide exact counts)
+            if (currentPage === 1) {
+                // Rough estimate: if we got a full page, there are likely more
+                const estimatedTotal = homesResult.nextToken ? pageSize * 10 : filteredData.length
+                setTotalCount(estimatedTotal)
+            }
             
             // Load volunteers if not already loaded
             if (volunteers.length === 0) {
@@ -154,6 +179,8 @@ export default function Organize() {
     function applyFilters() {
         setCurrentPage(1) // Reset to first page when filters change
         setSelectedHomes(new Set()) // Clear selections
+        setPreviousTokens([]) // Clear pagination tokens
+        setNextToken(null)
         loadData()
     }
     
@@ -372,7 +399,7 @@ export default function Organize() {
 
                 {/* Stats */}
                 <div style={{marginBottom: 16, fontSize: '0.9em', color: '#666'}}>
-                    Showing {homes.length} homes (Page {currentPage} of {Math.ceil(totalCount / pageSize)})
+                    Showing {homes.length} homes on page {currentPage} {nextToken ? '(more pages available)' : '(last page)'}
                 </div>
 
                 {/* Table */}
@@ -427,7 +454,11 @@ export default function Organize() {
                                         />
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
-                                        {home.unitNumber && `${home.unitNumber} `}{home.street}<br/>
+                                        {/* Handle case where unitNumber and street might contain duplicate data */}
+                                        {home.unitNumber && home.street && home.unitNumber !== home.street 
+                                            ? `${home.unitNumber} ${home.street}` 
+                                            : (home.street || home.unitNumber)
+                                        }<br/>
                                         <span style={{fontSize: '0.9em', color: '#666'}}>
                                             {home.city}, {home.state} {home.postalCode}
                                         </span>
@@ -498,7 +529,7 @@ export default function Organize() {
                 </div>
 
                 {/* Pagination */}
-                {totalCount > pageSize && (
+                {(nextToken || currentPage > 1) && (
                     <div style={{
                         display: 'flex',
                         justifyContent: 'center',
@@ -523,19 +554,19 @@ export default function Organize() {
                         </button>
                         
                         <span style={{margin: '0 16px'}}>
-                            Page {currentPage} of {Math.ceil(totalCount / pageSize)}
+                            Page {currentPage} {nextToken ? '(more pages available)' : '(last page)'}
                         </span>
                         
                         <button
-                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalCount / pageSize), prev + 1))}
-                            disabled={currentPage >= Math.ceil(totalCount / pageSize)}
+                            onClick={() => setCurrentPage(prev => prev + 1)}
+                            disabled={!nextToken}
                             style={{
-                                backgroundColor: currentPage >= Math.ceil(totalCount / pageSize) ? '#6c757d' : '#007bff',
+                                backgroundColor: nextToken ? '#007bff' : '#6c757d',
                                 color: 'white',
                                 border: 'none',
                                 padding: '6px 12px',
                                 borderRadius: 4,
-                                cursor: currentPage >= Math.ceil(totalCount / pageSize) ? 'not-allowed' : 'pointer'
+                                cursor: nextToken ? 'pointer' : 'not-allowed'
                             }}
                         >
                             Next

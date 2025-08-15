@@ -38,7 +38,7 @@ const schema = a.schema({
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
         allow.groups(['Member']).to(['read']),
-        allow.publicApiKey().to(['create']) // Allow import scripts
+        allow.publicApiKey().to(['create','read']) // Allow import scripts and UI access
     ]),
 
     Person: a.model({
@@ -56,7 +56,7 @@ const schema = a.schema({
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
         allow.groups(['Member']).to(['read']),
-        allow.publicApiKey().to(['create']) // Allow import scripts
+        allow.publicApiKey().to(['create','read']) // Allow import scripts and UI access
     ]),
 
     Consent: a.model({

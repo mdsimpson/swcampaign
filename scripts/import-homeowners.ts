@@ -8,7 +8,9 @@ import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../amplify/data/resource'
 
 Amplify.configure(outputs)
-const client = generateClient<Schema>()
+const client = generateClient<Schema>({
+    authMode: 'apiKey'
+})
 type Row = Record<string, string>
 
 function normalizePhone(s?: string) {
@@ -26,73 +28,127 @@ async function main() {
     }
     const raw = fs.readFileSync(path.resolve(csvPath), 'utf8')
     const records: Row[] = parse(raw, {columns: true, skip_empty_lines: true})
-    let homes = 0, persons = 0
+    
+    // Check what's already imported
+    console.log('Checking existing database records...')
+    const existingHomesResult = await client.models.Home.list({ limit: 10000 })
+    const existingHomes = new Set<string>()
+    
+    existingHomesResult.data.forEach(home => {
+        const homeKey = `${home.street}|${home.city}|${home.state || 'VA'}`
+        existingHomes.add(homeKey)
+    })
+    
+    console.log(`Found ${existingHomes.size} existing homes in database`)
+    console.log(`CSV contains ${records.length} total records`)
+    
+    // Group records by address since CSV has one row per person
+    const homeMap = new Map<string, {home: any, people: any[]}>()
+    
     for (const row of records) {
-        const street = row['Property Address'] || row['Unit Address'] || row['Street Address'] || row['Unit Street'] || row['Address'] || ''
+        const street = row['Street'] || ''
         if (!street) continue
+        
         const city = row['City'] || 'Ashburn'
         const state = row['State'] || 'VA'
-        const postalCode = row['Zip'] || row['Postal Code'] || row['ZIP'] || undefined
-        const unitNumber = row['Unit Number'] || row['Unit'] || undefined
-        const mailingStreet = row['Mailing Street'] || row['Billing Street'] || undefined
-        const mailingCity = row['Mailing City'] || row['Billing City'] || undefined
-        const mailingState = row['Mailing State'] || row['Billing State'] || undefined
-        const mailingPostalCode = row['Mailing Zip'] || row['Billing Zip'] || undefined
+        const postalCode = row['Zip'] || undefined
+        const mailingStreet = row['Billing Address Street'] || undefined
+        const mailingCity = row['Billing Address City'] || undefined
+        const mailingState = row['Billing Address State'] || undefined
+        const mailingPostalCode = row['Billing Address Zip Code'] || undefined
         const absenteeOwner = Boolean(mailingStreet && mailingStreet.trim() && (mailingStreet !== street))
-        const {data: home} = await client.models.Home.create({
-            street,
-            city,
-            state,
-            postalCode,
-            unitNumber,
-            mailingStreet,
-            mailingCity,
-            mailingState,
-            mailingPostalCode,
-            absenteeOwner
-        })
-        homes++
-        const p1f = row['Owner First Name'] || row['Primary Owner First Name'] || row['Occupant First Name']
-        const p1l = row['Owner Last Name'] || row['Primary Owner Last Name'] || row['Occupant Last Name']
-        if (p1f || p1l) {
-            await client.models.Person.create({
-                homeId: home.id,
-                role: 'PRIMARY_OWNER',
-                firstName: p1f,
-                lastName: p1l,
-                email: row['Owner Email'] || row['Email'] || undefined,
-                mobilePhone: normalizePhone(row['Cell Phone'] || row['Mobile Phone'] || row['Unit Phone'])
-            } as any);
-            persons++
+        
+        const homeKey = `${street}|${city}|${state}`
+        
+        // Skip if home already exists in database
+        if (existingHomes.has(homeKey)) {
+            continue
         }
-        const p2f = row['Secondary Owner First Name'] || row['Co-Owner First Name']
-        const p2l = row['Secondary Owner Last Name'] || row['Co-Owner Last Name']
-        if (p2f || p2l) {
-            await client.models.Person.create({
-                homeId: home.id,
-                role: 'SECONDARY_OWNER',
-                firstName: p2f,
-                lastName: p2l,
-                email: row['Secondary Email'] || undefined,
-                mobilePhone: normalizePhone(row['Secondary Cell'] || undefined)
-            } as any);
-            persons++
+        
+        if (!homeMap.has(homeKey)) {
+            homeMap.set(homeKey, {
+                home: {
+                    street,
+                    city,
+                    state,
+                    postalCode,
+                    unitNumber: undefined,
+                    mailingStreet,
+                    mailingCity,
+                    mailingState,
+                    mailingPostalCode,
+                    absenteeOwner
+                },
+                people: []
+            })
         }
-        const rf = row['Renter First Name'] || row['Tenant First Name']
-        const rl = row['Renter Last Name'] || row['Tenant Last Name']
-        if (rf || rl) {
-            await client.models.Person.create({
-                homeId: home.id,
-                role: 'RENTER',
-                firstName: rf,
-                lastName: rl,
-                email: row['Renter Email'] || undefined,
-                mobilePhone: normalizePhone(row['Renter Cell'] || undefined)
-            } as any);
-            persons++
+        
+        // Add person to this home
+        const firstName = row['Occupant First Name']
+        const lastName = row['Occupant Last Name']
+        const occupantType = row['Occupant Type']
+        
+        if (firstName || lastName) {
+            let role: 'PRIMARY_OWNER' | 'SECONDARY_OWNER' | 'RENTER' | 'OTHER'
+            
+            if (occupantType === 'Official Owner') {
+                role = 'PRIMARY_OWNER'
+            } else if (occupantType === 'Official Co Owner') {
+                role = 'SECONDARY_OWNER'
+            } else if (occupantType && occupantType.toLowerCase().includes('renter')) {
+                role = 'RENTER'
+            } else {
+                role = 'OTHER'
+            }
+            
+            homeMap.get(homeKey)?.people.push({
+                role,
+                firstName,
+                lastName,
+                email: row['Contact Email'] || row['Additional Email'] || undefined,
+                mobilePhone: normalizePhone(row['Cell Phone'] || row['Unit Phone'] || row['Work Phone'])
+            })
         }
     }
-    console.log(`Imported ${homes} homes and ${persons} people.`)
+    
+    let homes = 0, persons = 0
+    const homeEntries = Array.from(homeMap.values())
+    const batchSize = 200
+    
+    console.log(`Skipped ${existingHomes.size} existing homes`)
+    console.log(`Processing ${homeEntries.length} new homes in batches of ${batchSize}`)
+    
+    // Create homes and their residents in batches
+    for (let i = 0; i < homeEntries.length; i += batchSize) {
+        const batch = homeEntries.slice(i, i + batchSize)
+        console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(homeEntries.length/batchSize)} (${batch.length} homes)`)
+        
+        for (const {home, people} of batch) {
+            try {
+                const {data: homeRecord} = await client.models.Home.create(home)
+                if (!homeRecord) {
+                    console.error('Failed to create home:', home.street)
+                    continue
+                }
+                homes++
+                
+                // Create all people for this home
+                for (const person of people) {
+                    await client.models.Person.create({
+                        homeId: homeRecord.id,
+                        ...person
+                    } as any);
+                    persons++
+                }
+            } catch (error) {
+                console.error('Failed to process home:', home.street, error)
+            }
+        }
+        
+        console.log(`Batch ${Math.floor(i/batchSize) + 1} complete. Running totals: ${homes} homes, ${persons} people`)
+    }
+    
+    console.log(`Import completed. Final totals: ${homes} homes and ${persons} people.`)
 }
 
 main().catch(err => {
