@@ -1,5 +1,7 @@
 import {Authenticator} from '@aws-amplify/ui-react'
 import {Route, Routes, Navigate} from 'react-router-dom'
+import {useEffect, useState} from 'react'
+import {getCurrentUser} from 'aws-amplify/auth'
 import Landing from './pages/Landing'
 import InternalHome from './pages/InternalHome'
 import SignUp from './pages/SignUp'
@@ -16,6 +18,32 @@ import RecordConsents from './pages/admin/RecordVotes'
 import Organize from './pages/organizer/Organize'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 
+function ProtectedHome() {
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+
+    useEffect(() => {
+        async function checkAuth() {
+            try {
+                await getCurrentUser()
+                setIsAuthenticated(true)
+            } catch {
+                setIsAuthenticated(false)
+            }
+        }
+        checkAuth()
+    }, [])
+
+    if (isAuthenticated === null) {
+        return <div>Loading...</div>
+    }
+
+    if (isAuthenticated) {
+        return <Authenticator><InternalHome/></Authenticator>
+    } else {
+        return <Landing/>
+    }
+}
+
 export default function App() {
     return (
         <Routes>
@@ -23,7 +51,7 @@ export default function App() {
             <Route path='/signup' element={<SignUp/>}/>
             <Route path='/verify' element={<VerifyEmail/>}/>
             <Route path='/reset' element={<ResetPassword/>}/>
-            <Route path='/' element={<Authenticator><InternalHome/></Authenticator>}/>
+            <Route path='/' element={<ProtectedHome/>}/>
             <Route path='/profile' element={
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Member', 'Canvasser', 'Organizer', 'Administrator']}>
@@ -39,7 +67,7 @@ export default function App() {
             <Route path='/admin/enroll' element={<Authenticator><EnrollMembers/></Authenticator>}/>
             <Route path='/admin/consents' element={<Authenticator><RecordConsents/></Authenticator>}/>
             <Route path='/organize' element={<Authenticator><Organize/></Authenticator>}/>
-            <Route path='*' element={<Navigate to='/landing' replace/>}/>
+            <Route path='*' element={<Navigate to='/' replace/>}/>
         </Routes>
     )
 }

@@ -52,22 +52,31 @@ export default function UserProfile() {
                     mobile: profile.mobile || ''
                 })
             } else {
-                // Create a basic user profile if it doesn't exist
+                // Create a basic user profile if it doesn't exist, using attributes from Cognito
+                const firstName = user.signInDetails?.loginId ? 
+                    (user.attributes?.given_name || '') : ''
+                const lastName = user.signInDetails?.loginId ? 
+                    (user.attributes?.family_name || '') : ''
+                const street = user.signInDetails?.loginId ? 
+                    (user.attributes?.address || '') : ''
+                const mobile = user.signInDetails?.loginId ? 
+                    (user.attributes?.phone_number || '') : ''
+                
                 const newProfile = await client.models.UserProfile.create({
                     sub: userSub,
                     email: user.username,
-                    firstName: '',
-                    lastName: '',
-                    street: '',
-                    mobile: '',
+                    firstName: firstName,
+                    lastName: lastName,
+                    street: street,
+                    mobile: mobile,
                     roleCache: 'Member'
                 })
                 setUserProfile(newProfile.data)
                 setEditForm({
-                    firstName: '',
-                    lastName: '',
-                    street: '',
-                    mobile: ''
+                    firstName: firstName,
+                    lastName: lastName,
+                    street: street,
+                    mobile: mobile
                 })
             }
             
