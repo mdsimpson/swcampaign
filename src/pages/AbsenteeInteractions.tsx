@@ -18,7 +18,9 @@ export default function AbsenteeInteractions() {
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1)
     const [totalCount, setTotalCount] = useState(0)
-    const pageSize = 20
+    const [nextToken, setNextToken] = useState<string | null>(null)
+    const [previousTokens, setPreviousTokens] = useState<string[]>([])
+    const pageSize = 50
     
     // Sorting state
     const [sortField, setSortField] = useState('street')
@@ -77,20 +79,47 @@ export default function AbsenteeInteractions() {
                 }
             }
             
-            const result = await client.models.Home.list({
-                filter: homeFilter,
-                limit: pageSize
+            // Different approach: Find homes that have residents AND are absentee
+            // This avoids the duplicate home issue
+            console.log('Finding homes with residents that are absentee...')
+            
+            // First get all people with their home info
+            const peopleResult = await client.models.Person.list({ limit: 1000 })
+            console.log(`Found ${peopleResult.data.length} people`)
+            
+            // Get unique homeIds that have residents
+            const homeIdsWithResidents = [...new Set(peopleResult.data.map(p => p.homeId))]
+            console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
+            
+            // Now get the home details for these homes and filter for absentee
+            const homesWithResidentsPromises = homeIdsWithResidents.slice(0, 200).map(async (homeId) => {
+                try {
+                    const homeResult = await client.models.Home.get({ id: homeId })
+                    if (homeResult.data) {
+                        const home = homeResult.data
+                        // Check if this home meets our filter criteria
+                        const isAbsentee = home.absenteeOwner === true
+                        const matchesSearch = !searchTerm.trim() || 
+                            home.street?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            home.mailingStreet?.toLowerCase().includes(searchTerm.toLowerCase())
+                        const matchesCity = !cityFilter || home.city === cityFilter
+                        
+                        if (isAbsentee && matchesSearch && matchesCity) {
+                            // Get residents for this home
+                            const residents = peopleResult.data.filter(p => p.homeId === homeId)
+                            return { ...home, residents }
+                        }
+                    }
+                } catch (error) {
+                    // Home might not exist, skip it
+                }
+                return null
             })
             
-            // Load residents for each home
-            const homesWithResidents = await Promise.all(
-                result.data.map(async (home) => {
-                    const residentsResult = await client.models.Person.list({
-                        filter: { homeId: { eq: home.id } }
-                    })
-                    return { ...home, residents: residentsResult.data }
-                })
-            )
+            const allHomesWithResidents = await Promise.all(homesWithResidentsPromises)
+            const homesWithResidents = allHomesWithResidents.filter(home => home !== null)
+            
+            console.log(`Found ${homesWithResidents.length} absentee homes with residents`)
             
             // Apply sorting
             homesWithResidents.sort((a, b) => {
