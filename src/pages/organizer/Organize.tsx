@@ -45,19 +45,14 @@ export default function Organize() {
             setLoading(true)
             
             // Build filter for homes - temporarily remove absentee filter for debugging
-            let homeFilter: any = {} // { absenteeOwner: { ne: true } }
+            let homeFilter: any = undefined // { absenteeOwner: { ne: true } }
             
             // Add search filter if applied
             if (searchTerm.trim()) {
                 homeFilter = {
-                    and: [
-                        homeFilter,
-                        {
-                            or: [
-                                { street: { contains: searchTerm.trim() } },
-                                { city: { contains: searchTerm.trim() } }
-                            ]
-                        }
+                    or: [
+                        { street: { contains: searchTerm.trim() } },
+                        { city: { contains: searchTerm.trim() } }
                     ]
                 }
             }
@@ -72,10 +67,9 @@ export default function Organize() {
                 let nextToken = null
                 let searchCount = 0
                 
-                // Search through homes using GraphQL (more efficient for search)
+                // Search through homes without GraphQL filter (do client-side filtering)
                 do {
                     const result = await client.models.Home.list({
-                        filter: homeFilter,
                         limit: 200,
                         nextToken
                     })
@@ -93,19 +87,46 @@ export default function Organize() {
                 
                 console.log(`Searched ${searchCount} homes, found ${searchResults.length} matches`)
                 
+                // Remove duplicates from search results (by home ID)
+                const uniqueSearchResults = searchResults.filter((home, index, self) => 
+                    index === self.findIndex(h => h.id === home.id)
+                )
+                console.log(`After removing duplicates: ${uniqueSearchResults.length} unique homes`)
+                
                 // For pagination on search results
                 const startIndex = (currentPage - 1) * pageSize
                 const endIndex = startIndex + pageSize
-                const currentPageHomes = searchResults.slice(startIndex, endIndex)
+                const currentPageHomes = uniqueSearchResults.slice(startIndex, endIndex)
                 
-                // Get people data for efficiency
-                const allPeopleResult = await client.models.Person.list({ limit: 1000 })
+                // Get ALL people data for efficiency (handle pagination)
+                let allPeople: any[] = []
+                let peopleNextToken = null
+                
+                do {
+                    const peopleResult = await client.models.Person.list({ 
+                        limit: 1000,
+                        nextToken: peopleNextToken
+                    })
+                    allPeople.push(...peopleResult.data)
+                    peopleNextToken = peopleResult.nextToken
+                } while (peopleNextToken)
+                
+                console.log(`Loaded ${allPeople.length} total people for search`)
+                const allPeopleResult = { data: allPeople }
                 
                 // Load details for search results
                 const searchDetailsPromises = currentPageHomes.map(async (home) => {
                     try {
-                        // Get residents for this home
-                        const residents = allPeopleResult.data.filter(p => p.homeId === home.id)
+                        // Get residents for this home and sort them (PRIMARY_OWNER first)
+                        const residents = allPeopleResult.data
+                            .filter(p => p.homeId === home.id)
+                            .sort((a, b) => {
+                                // PRIMARY_OWNER first, then SECONDARY_OWNER, then others
+                                const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
+                                const aOrder = roleOrder[a.role] || 5
+                                const bOrder = roleOrder[b.role] || 5
+                                return aOrder - bOrder
+                            })
                         
                         // Get consents and assignments
                         const [consentsResult, assignmentsResult] = await Promise.all([
@@ -136,18 +157,40 @@ export default function Organize() {
                 const searchDetailsResults = await Promise.all(searchDetailsPromises)
                 homesWithDetails = searchDetailsResults.filter(home => home !== null)
                 
+                console.log(`Search processing complete: ${homesWithDetails.length} homes with details`)
+                
+                // Check for duplicates in search results
+                const searchIds = homesWithDetails.map(h => h.id)
+                const uniqueSearchIds = [...new Set(searchIds)]
+                if (searchIds.length !== uniqueSearchIds.length) {
+                    console.log(`⚠️ Found ${searchIds.length - uniqueSearchIds.length} duplicate homes in search details`)
+                }
+                
                 // Update pagination for search results
-                setTotalCount(searchResults.length)
-                const hasMorePages = endIndex < searchResults.length
+                setTotalCount(uniqueSearchResults.length)
+                const hasMorePages = endIndex < uniqueSearchResults.length
                 setNextToken(hasMorePages ? 'more' : null)
+                console.log(`Search mode: found ${uniqueSearchResults.length} total matches, showing page ${currentPage}`)
                 
             } else {
                 // No search - use original logic (homes with residents only)
                 console.log('Finding homes with residents for Organize page...')
                 
-                // Get all people first
-                const allPeopleResult = await client.models.Person.list({ limit: 1000 })
-                console.log(`Found ${allPeopleResult.data.length} people total`)
+                // Get ALL people first (handle pagination)
+                let allPeople: any[] = []
+                let peopleNextToken = null
+                
+                do {
+                    const peopleResult = await client.models.Person.list({ 
+                        limit: 1000,
+                        nextToken: peopleNextToken
+                    })
+                    allPeople.push(...peopleResult.data)
+                    peopleNextToken = peopleResult.nextToken
+                } while (peopleNextToken)
+                
+                console.log(`Found ${allPeople.length} people total`)
+                const allPeopleResult = { data: allPeople }
                 
                 // Get unique homeIds that have residents
                 const homeIdsWithResidents = [...new Set(allPeopleResult.data.map(p => p.homeId))]
@@ -167,8 +210,16 @@ export default function Organize() {
                         if (homeResult.data) {
                             const home = homeResult.data
                             
-                            // Get residents for this home
-                            const residents = allPeopleResult.data.filter(p => p.homeId === homeId)
+                            // Get residents for this home and sort them (PRIMARY_OWNER first)
+                            const residents = allPeopleResult.data
+                                .filter(p => p.homeId === homeId)
+                                .sort((a, b) => {
+                                    // PRIMARY_OWNER first, then SECONDARY_OWNER, then others
+                                    const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
+                                    const aOrder = roleOrder[a.role] || 5
+                                    const bOrder = roleOrder[b.role] || 5
+                                    return aOrder - bOrder
+                                })
                             
                             // Get consents and assignments
                             const [consentsResult, assignmentsResult] = await Promise.all([
@@ -202,10 +253,11 @@ export default function Organize() {
                 
                 console.log(`Loaded ${homesWithDetails.length} homes with residents for page ${currentPage}`)
                 
-                // Update pagination info
+                // Update pagination info  
                 setTotalCount(homeIdsWithResidents.length)
                 const hasMorePages = endIndex < homeIdsWithResidents.length
                 setNextToken(hasMorePages ? 'more' : null)
+                console.log(`Browse mode: ${homeIdsWithResidents.length} total homes with residents, showing page ${currentPage} (${homesWithDetails.length} homes)`)
             }
             
             // Apply additional filters that can't be done at DB level
@@ -255,9 +307,17 @@ export default function Organize() {
                 return 0
             })
             
-            setHomes(filteredData)
-            // Update total count based on homes with residents
-            setTotalCount(homeIdsWithResidents.length)
+            // Final check for duplicates before setting state
+            const finalUniqueHomes = filteredData.filter((home, index, self) => 
+                index === self.findIndex(h => h.id === home.id)
+            )
+            
+            if (filteredData.length !== finalUniqueHomes.length) {
+                console.log(`⚠️ Removed ${filteredData.length - finalUniqueHomes.length} duplicate homes before setting state`)
+            }
+            
+            console.log(`Final: setting ${finalUniqueHomes.length} homes, totalCount should be ${totalCount}`)
+            setHomes(finalUniqueHomes)
             
             // Load volunteers if not already loaded
             if (volunteers.length === 0) {

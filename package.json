@@ -11,6 +11,7 @@
     "deploy": "echo 'Use Amplify Hosting connected to GitHub'",
     "import:homeowners": "tsx scripts/import-homeowners.ts",
     "fresh-import": "tsx scripts/fresh-import-homeowners.ts",
+    "safe-import": "tsx scripts/safe-import-homeowners.ts",
     "import:votes": "tsx scripts/import-votes.ts",
     "seed:admin": "tsx scripts/seed-admin.ts",
     "export:backup": "tsx scripts/export-backup.ts",
