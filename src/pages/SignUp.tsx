@@ -18,7 +18,9 @@ export default function SignUp() {
     const [submitted, setSubmitted] = useState(false)
     const [passwordErrors, setPasswordErrors] = useState<string[]>([])
     
-    const client = generateClient<Schema>()
+    const client = generateClient<Schema>({
+        authMode: 'apiKey'
+    })
 
     function handlePasswordChange(password: string) {
         setForm({...form, password})
@@ -27,22 +29,32 @@ export default function SignUp() {
 
     async function submit(e: React.FormEvent) {
         e.preventDefault()
+        console.log('Form submitted with data:', form)
+        
         const errors = validatePassword(form.password)
         if (errors.length > 0) {
+            console.log('Password validation errors:', errors)
             setPasswordErrors(errors)
             return
         }
         
-        await client.models.Registration.create({
-            email: form.email,
-            firstName: form.firstName,
-            lastName: form.lastName,
-            street: form.street,
-            mobile: form.mobile,
-            submittedAt: new Date().toISOString(),
-            status: 'SUBMITTED'
-        })
-        setSubmitted(true)
+        try {
+            console.log('Creating registration...')
+            const result = await client.models.Registration.create({
+                email: form.email,
+                firstName: form.firstName,
+                lastName: form.lastName,
+                street: form.street,
+                mobile: form.mobile,
+                submittedAt: new Date().toISOString(),
+                status: 'SUBMITTED'
+            })
+            console.log('Registration created successfully:', result)
+            setSubmitted(true)
+        } catch (error) {
+            console.error('Error creating registration:', error)
+            alert('Failed to submit registration. Please try again.')
+        }
     }
 
     if (submitted) return (
@@ -62,13 +74,27 @@ export default function SignUp() {
             <div>
                 <input required placeholder='Email *' type='email' value={form.email}
                        onChange={e => setForm({...form, email: e.target.value})}
-                       style={{borderColor: form.email ? '#28a745' : '#dc3545'}}/>
+                       style={{
+                           border: `2px solid ${form.email ? '#28a745' : '#dc3545'}`,
+                           width: '100%',
+                           padding: '12px 16px',
+                           fontSize: '16px',
+                           borderRadius: '6px',
+                           boxSizing: 'border-box'
+                       }}/>
             </div>
             
             <div>
                 <input required placeholder='Password (min 12 chars) *' type='password' value={form.password}
                        onChange={e => handlePasswordChange(e.target.value)} minLength={12}
-                       style={{borderColor: passwordErrors.length === 0 && form.password ? '#28a745' : '#dc3545'}}/>
+                       style={{
+                           border: `2px solid ${passwordErrors.length === 0 && form.password ? '#28a745' : '#dc3545'}`,
+                           width: '100%',
+                           padding: '12px 16px',
+                           fontSize: '16px',
+                           borderRadius: '6px',
+                           boxSizing: 'border-box'
+                       }}/>
                 {passwordErrors.length > 0 && (
                     <div style={{color: '#dc3545', fontSize: 14, marginTop: 4}}>
                         Password requirements:
@@ -82,28 +108,67 @@ export default function SignUp() {
             <div>
                 <input required placeholder='First Name *' value={form.firstName}
                        onChange={e => setForm({...form, firstName: e.target.value})}
-                       style={{borderColor: form.firstName ? '#28a745' : '#dc3545'}}/>
+                       style={{
+                           border: `2px solid ${form.firstName ? '#28a745' : '#dc3545'}`,
+                           width: '100%',
+                           padding: '12px 16px',
+                           fontSize: '16px',
+                           borderRadius: '6px',
+                           boxSizing: 'border-box'
+                       }}/>
             </div>
             
             <div>
                 <input required placeholder='Last Name *' value={form.lastName}
                        onChange={e => setForm({...form, lastName: e.target.value})}
-                       style={{borderColor: form.lastName ? '#28a745' : '#dc3545'}}/>
+                       style={{
+                           border: `2px solid ${form.lastName ? '#28a745' : '#dc3545'}`,
+                           width: '100%',
+                           padding: '12px 16px',
+                           fontSize: '16px',
+                           borderRadius: '6px',
+                           boxSizing: 'border-box'
+                       }}/>
             </div>
             
             <div>
                 <input required placeholder='Street Address *' value={form.street}
                        onChange={e => setForm({...form, street: e.target.value})}
-                       style={{borderColor: form.street ? '#28a745' : '#dc3545'}}/>
+                       style={{
+                           border: `2px solid ${form.street ? '#28a745' : '#dc3545'}`,
+                           width: '100%',
+                           padding: '12px 16px',
+                           fontSize: '16px',
+                           borderRadius: '6px',
+                           boxSizing: 'border-box'
+                       }}/>
             </div>
             
             <div>
                 <input required placeholder='Mobile Phone *' type='tel' value={form.mobile}
                        onChange={e => setForm({...form, mobile: e.target.value})}
-                       style={{borderColor: form.mobile ? '#28a745' : '#dc3545'}}/>
+                       style={{
+                           border: `2px solid ${form.mobile ? '#28a745' : '#dc3545'}`,
+                           width: '100%',
+                           padding: '12px 16px',
+                           fontSize: '16px',
+                           borderRadius: '6px',
+                           boxSizing: 'border-box'
+                       }}/>
             </div>
             
-            <button type='submit'>Submit Registration</button>
+            <button type='submit' style={{
+                width: '100%',
+                padding: '14px 20px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                marginTop: '8px'
+            }}>Submit Registration</button>
         </form>
     )
 }
