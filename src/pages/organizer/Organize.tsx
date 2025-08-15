@@ -2,25 +2,67 @@ import Header from '../../components/Header'
 import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function Organize() {
+    const location = useLocation()
+    const navigate = useNavigate()
+    
     const [homes, setHomes] = useState<any[]>([])
     const [volunteers, setVolunteers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedHomes, setSelectedHomes] = useState<Set<string>>(new Set())
     const [assignToVolunteer, setAssignToVolunteer] = useState('')
     
+    // Initialize filter state from URL params
+    const initializeFiltersFromURL = () => {
+        const params = new URLSearchParams(location.search)
+        return {
+            searchTerm: params.get('address') || '',
+            residentFilter: params.get('resident') || '',
+            statusFilter: params.get('status') || 'all',
+            assignmentFilter: params.get('assignment') || 'all',
+            page: parseInt(params.get('page') || '1')
+        }
+    }
+    
     // Filter state
-    const [searchTerm, setSearchTerm] = useState('')
-    const [statusFilter, setStatusFilter] = useState('all')
-    const [assignmentFilter, setAssignmentFilter] = useState('all')
+    const [searchTerm, setSearchTerm] = useState(() => initializeFiltersFromURL().searchTerm)
+    const [residentFilter, setResidentFilter] = useState(() => initializeFiltersFromURL().residentFilter)
+    const [statusFilter, setStatusFilter] = useState(() => initializeFiltersFromURL().statusFilter)
+    const [assignmentFilter, setAssignmentFilter] = useState(() => initializeFiltersFromURL().assignmentFilter)
     
     // Pagination state
-    const [currentPage, setCurrentPage] = useState(1)
+    const [currentPage, setCurrentPage] = useState(() => initializeFiltersFromURL().page)
     const [totalCount, setTotalCount] = useState(0)
     const [nextToken, setNextToken] = useState<string | null>(null)
     const [previousTokens, setPreviousTokens] = useState<string[]>([])
     const pageSize = 50
+    
+    // Update URL when filters change
+    const updateURL = (updates: Partial<{
+        address: string
+        resident: string
+        status: string
+        assignment: string
+        page: number
+    }>) => {
+        const params = new URLSearchParams(location.search)
+        
+        // Update params
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value && value !== 'all' && value !== 1) {
+                params.set(key, value.toString())
+            } else {
+                params.delete(key)
+            }
+        })
+        
+        // Navigate to new URL
+        const newSearch = params.toString()
+        const newPath = newSearch ? `${location.pathname}?${newSearch}` : location.pathname
+        navigate(newPath, { replace: true })
+    }
     
     // Sorting state
     const [sortField, setSortField] = useState('street')
@@ -59,13 +101,39 @@ export default function Organize() {
             
             let homesWithDetails: any[] = []
             
-            if (searchTerm.trim()) {
+            if (searchTerm.trim() || residentFilter.trim()) {
                 // When searching, search ALL homes first, then add resident info
-                console.log(`Searching all homes for: "${searchTerm}"`)
+                console.log(`Searching for address: "${searchTerm}" and resident: "${residentFilter}"`)
                 
                 let searchResults: any[] = []
                 let nextToken = null
                 let searchCount = 0
+                
+                // Get ALL people first for resident filtering
+                let allPeople: any[] = []
+                let peopleNextToken = null
+                
+                do {
+                    const peopleResult = await client.models.Person.list({ 
+                        limit: 1000,
+                        nextToken: peopleNextToken
+                    })
+                    allPeople.push(...peopleResult.data)
+                    peopleNextToken = peopleResult.nextToken
+                } while (peopleNextToken)
+                
+                // Find homes that match resident filter
+                let residentMatchingHomeIds: Set<string> = new Set()
+                if (residentFilter.trim()) {
+                    const residentFilterLower = residentFilter.toLowerCase()
+                    const matchingPeople = allPeople.filter(person => 
+                        (person.firstName?.toLowerCase().includes(residentFilterLower)) ||
+                        (person.lastName?.toLowerCase().includes(residentFilterLower)) ||
+                        (`${person.firstName} ${person.lastName}`.toLowerCase().includes(residentFilterLower))
+                    )
+                    residentMatchingHomeIds = new Set(matchingPeople.map(p => p.homeId))
+                    console.log(`Found ${matchingPeople.length} people matching "${residentFilter}" in ${residentMatchingHomeIds.size} homes`)
+                }
                 
                 // Search through homes without GraphQL filter (do client-side filtering)
                 do {
@@ -75,8 +143,23 @@ export default function Organize() {
                     })
                     
                     for (const home of result.data) {
-                        // Apply search filter
-                        if (home.street?.toLowerCase().includes(searchTerm.toLowerCase())) {
+                        let matches = true
+                        
+                        // Apply address filter
+                        if (searchTerm.trim()) {
+                            if (!home.street?.toLowerCase().includes(searchTerm.toLowerCase())) {
+                                matches = false
+                            }
+                        }
+                        
+                        // Apply resident filter
+                        if (residentFilter.trim()) {
+                            if (!residentMatchingHomeIds.has(home.id)) {
+                                matches = false
+                            }
+                        }
+                        
+                        if (matches) {
                             searchResults.push(home)
                         }
                     }
@@ -98,19 +181,7 @@ export default function Organize() {
                 const endIndex = startIndex + pageSize
                 const currentPageHomes = uniqueSearchResults.slice(startIndex, endIndex)
                 
-                // Get ALL people data for efficiency (handle pagination)
-                let allPeople: any[] = []
-                let peopleNextToken = null
-                
-                do {
-                    const peopleResult = await client.models.Person.list({ 
-                        limit: 1000,
-                        nextToken: peopleNextToken
-                    })
-                    allPeople.push(...peopleResult.data)
-                    peopleNextToken = peopleResult.nextToken
-                } while (peopleNextToken)
-                
+                // Use the already loaded people data
                 console.log(`Loaded ${allPeople.length} total people for search`)
                 const allPeopleResult = { data: allPeople }
                 
@@ -337,7 +408,124 @@ export default function Organize() {
         setSelectedHomes(new Set()) // Clear selections
         setPreviousTokens([]) // Clear pagination tokens
         setNextToken(null)
+        
+        // Update URL with current filters
+        updateURL({
+            address: searchTerm,
+            resident: residentFilter,
+            status: statusFilter,
+            assignment: assignmentFilter,
+            page: 1
+        })
+        
         loadData()
+    }
+    
+    async function clearFilters() {
+        // Clear all filter state
+        setSearchTerm('')
+        setResidentFilter('')
+        setStatusFilter('all')
+        setAssignmentFilter('all')
+        setCurrentPage(1)
+        setSelectedHomes(new Set())
+        setPreviousTokens([])
+        setNextToken(null)
+        
+        // Clear URL params
+        navigate(location.pathname, { replace: true })
+        
+        // Manually reload data with cleared filters
+        try {
+            setLoading(true)
+            
+            // Get ALL people first (handle pagination)
+            let allPeople: any[] = []
+            let peopleNextToken = null
+            
+            do {
+                const peopleResult = await client.models.Person.list({ 
+                    limit: 1000,
+                    nextToken: peopleNextToken
+                })
+                allPeople.push(...peopleResult.data)
+                peopleNextToken = peopleResult.nextToken
+            } while (peopleNextToken)
+            
+            console.log(`Found ${allPeople.length} people total`)
+            
+            // Get unique homeIds that have residents
+            const homeIdsWithResidents = [...new Set(allPeople.map(p => p.homeId))]
+            console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
+            
+            // For pagination, slice the homeIds (page 1, no filters)
+            const startIndex = 0 // First page
+            const endIndex = pageSize
+            const currentPageHomeIds = homeIdsWithResidents.slice(startIndex, endIndex)
+            
+            console.log(`Page 1: showing homes 1-${Math.min(endIndex, homeIdsWithResidents.length)} of ${homeIdsWithResidents.length}`)
+            
+            // Get home details for current page
+            const homesWithDetailsPromises = currentPageHomeIds.map(async (homeId) => {
+                try {
+                    const homeResult = await client.models.Home.get({ id: homeId })
+                    if (homeResult.data) {
+                        const home = homeResult.data
+                        
+                        // Get residents for this home and sort them (PRIMARY_OWNER first)
+                        const residents = allPeople
+                            .filter(p => p.homeId === homeId)
+                            .sort((a, b) => {
+                                const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
+                                const aOrder = roleOrder[a.role] || 5
+                                const bOrder = roleOrder[b.role] || 5
+                                return aOrder - bOrder
+                            })
+                        
+                        // Get consents and assignments
+                        const [consentsResult, assignmentsResult] = await Promise.all([
+                            client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
+                            client.models.Assignment.list({ filter: { homeId: { eq: home.id } } })
+                        ])
+                        
+                        const consents = consentsResult.data
+                        const assignments = assignmentsResult.data.filter(a => a.status !== 'DONE')
+                        
+                        // Determine consent status
+                        const allOwnersSigned = residents.length > 0 && 
+                            residents.every(resident => resident.hasSigned)
+                        
+                        return { 
+                            ...home, 
+                            residents, 
+                            consents,
+                            assignments,
+                            consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error loading home ${homeId}:`, error)
+                }
+                return null
+            })
+            
+            const allHomesWithDetails = await Promise.all(homesWithDetailsPromises)
+            const homesWithDetails = allHomesWithDetails.filter(home => home !== null)
+            
+            console.log(`Loaded ${homesWithDetails.length} homes with residents for page 1 (cleared filters)`)
+            
+            // Update pagination info  
+            setTotalCount(homeIdsWithResidents.length)
+            const hasMorePages = endIndex < homeIdsWithResidents.length
+            setNextToken(hasMorePages ? 'more' : null)
+            
+            setHomes(homesWithDetails)
+            
+        } catch (error) {
+            console.error('Failed to reload data after clearing filters:', error)
+        } finally {
+            setLoading(false)
+        }
     }
     
     function handleSort(field: string) {
@@ -429,7 +617,7 @@ export default function Organize() {
                     alignItems: 'end'
                 }}>
                     <div>
-                        <label style={{display: 'block', marginBottom: 4}}>Search:</label>
+                        <label style={{display: 'block', marginBottom: 4}}>Address:</label>
                         <input
                             type="text"
                             value={searchTerm}
@@ -440,6 +628,22 @@ export default function Organize() {
                                 }
                             }}
                             placeholder="Enter address to search..."
+                            style={{padding: 8, borderRadius: 4, border: '1px solid #ddd'}}
+                        />
+                    </div>
+                    
+                    <div>
+                        <label style={{display: 'block', marginBottom: 4}}>Resident Name:</label>
+                        <input
+                            type="text"
+                            value={residentFilter}
+                            onChange={(e) => setResidentFilter(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    applyFilters()
+                                }
+                            }}
+                            placeholder="Enter resident name..."
                             style={{padding: 8, borderRadius: 4, border: '1px solid #ddd'}}
                         />
                     </div>
@@ -482,6 +686,20 @@ export default function Organize() {
                         }}
                     >
                         Apply Filters
+                    </button>
+                    
+                    <button
+                        onClick={clearFilters}
+                        style={{
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: 4,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Clear Filters
                     </button>
                 </div>
 
@@ -560,8 +778,13 @@ export default function Organize() {
 
                 {/* Stats */}
                 <div style={{marginBottom: 16, fontSize: '0.9em', color: '#666'}}>
-                    {searchTerm.trim() ? (
-                        `Showing ${homes.length} homes on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Found ${totalCount} matches for "${searchTerm}")`
+                    {searchTerm.trim() || residentFilter.trim() ? (
+                        (() => {
+                            const filters = []
+                            if (searchTerm.trim()) filters.push(`address: "${searchTerm}"`)
+                            if (residentFilter.trim()) filters.push(`resident: "${residentFilter}"`)
+                            return `Showing ${homes.length} homes on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Found ${totalCount} matches for ${filters.join(' and ')})`
+                        })()
                     ) : (
                         `Showing ${homes.length} homes on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Total: ${totalCount} homes with residents)`
                     )}
@@ -704,7 +927,17 @@ export default function Organize() {
                         padding: 16
                     }}>
                         <button
-                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            onClick={() => {
+                                const newPage = Math.max(1, currentPage - 1)
+                                setCurrentPage(newPage)
+                                updateURL({
+                                    address: searchTerm,
+                                    resident: residentFilter,
+                                    status: statusFilter,
+                                    assignment: assignmentFilter,
+                                    page: newPage
+                                })
+                            }}
                             disabled={currentPage === 1}
                             style={{
                                 backgroundColor: currentPage === 1 ? '#6c757d' : '#007bff',
@@ -723,7 +956,17 @@ export default function Organize() {
                         </span>
                         
                         <button
-                            onClick={() => setCurrentPage(prev => prev + 1)}
+                            onClick={() => {
+                                const newPage = currentPage + 1
+                                setCurrentPage(newPage)
+                                updateURL({
+                                    address: searchTerm,
+                                    resident: residentFilter,
+                                    status: statusFilter,
+                                    assignment: assignmentFilter,
+                                    page: newPage
+                                })
+                            }}
                             disabled={currentPage >= Math.ceil(totalCount / pageSize)}
                             style={{
                                 backgroundColor: currentPage < Math.ceil(totalCount / pageSize) ? '#007bff' : '#6c757d',
