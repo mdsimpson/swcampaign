@@ -7,7 +7,7 @@ const schema = a.schema({
         firstName: a.string().required(),
         lastName: a.string().required(),
         street: a.string().required(),
-        mobile: a.string(),
+        mobile: a.string().required(),
         submittedAt: a.datetime().required(),
         status: a.enum(['SUBMITTED','VERIFIED','ACCEPTED','REJECTED']),
         notes: a.string(),

@@ -55,6 +55,9 @@ export default function SignUp() {
             <p style={{fontSize: 14, color: '#666', fontStyle: 'italic'}}>
                 <span style={{color: '#dc3545'}}>*</span> indicates required fields
             </p>
+            <p style={{fontSize: 14, color: '#666'}}>
+                Please provide your street address (e.g., "123 Main St") - city, state, and zip are not needed.
+            </p>
             
             <div>
                 <input required placeholder='Email *' type='email' value={form.email}
@@ -95,7 +98,7 @@ export default function SignUp() {
             </div>
             
             <div>
-                <input required placeholder='Mobile Phone *' value={form.mobile}
+                <input required placeholder='Mobile Phone *' type='tel' value={form.mobile}
                        onChange={e => setForm({...form, mobile: e.target.value})}
                        style={{borderColor: form.mobile ? '#28a745' : '#dc3545'}}/>
             </div>

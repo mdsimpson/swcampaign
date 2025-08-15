@@ -1,0 +1,254 @@
+# Generated GraphQL Schema from resource.ts
+# Auto-generated types and directives
+
+directive @model(
+  mutations: ModelMutationMap
+  queries: ModelQueryMap
+  subscriptions: ModelSubscriptionMap
+  timestamps: TimestampConfiguration
+) on OBJECT
+
+directive @key(fields: [String!]!, name: String, queryField: String) on OBJECT
+
+directive @auth(rules: [AuthRule!]!) on OBJECT | FIELD_DEFINITION
+
+directive @connection(keyName: String, fields: [String!]!) on FIELD_DEFINITION
+
+directive @hasOne(keyName: String, fields: [String!]!) on FIELD_DEFINITION
+
+directive @hasMany(keyName: String, fields: [String!]!) on FIELD_DEFINITION
+
+directive @belongsTo(keyName: String, fields: [String!]!) on FIELD_DEFINITION
+
+input AuthRule {
+  allow: AuthStrategy!
+  provider: AuthProvider
+  ownerField: String
+  identityClaim: String
+  groupClaim: String
+  groups: [String]
+  groupsField: String
+  operations: [ModelOperation]
+}
+
+enum AuthStrategy {
+  owner
+  groups
+  private
+  public
+}
+
+enum AuthProvider {
+  apiKey
+  iam
+  oidc
+  userPools
+}
+
+enum ModelOperation {
+  create
+  update
+  delete
+  read
+}
+
+input ModelMutationMap {
+  create: String
+  update: String
+  delete: String
+}
+
+input ModelQueryMap {
+  get: String
+  list: String
+}
+
+input ModelSubscriptionMap {
+  onCreate: [String]
+  onUpdate: [String]
+  onDelete: [String]
+  level: ModelSubscriptionLevel
+}
+
+enum ModelSubscriptionLevel {
+  off
+  public
+  on
+}
+
+input TimestampConfiguration {
+  createdAt: String
+  updatedAt: String
+}
+
+# Enums
+enum RegistrationStatus {
+  SUBMITTED
+  VERIFIED
+  ACCEPTED
+  REJECTED
+}
+
+enum PersonRole {
+  PRIMARY_OWNER
+  SECONDARY_OWNER
+  RENTER
+  OTHER
+}
+
+enum AssignmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+  DEFERRED
+}
+
+# Models
+type Registration @model @auth(rules: [
+  {allow: groups, groups: ["Administrator"], operations: [read, update, delete]},
+  {allow: public, provider: apiKey, operations: [create]}
+]) {
+  id: ID!
+  email: String!
+  firstName: String!
+  lastName: String!
+  street: String!
+  mobile: String
+  submittedAt: AWSDateTime!
+  status: RegistrationStatus
+  notes: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Home @model @auth(rules: [
+  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
+  {allow: groups, groups: ["Canvasser"], operations: [read, update]},
+  {allow: groups, groups: ["Member"], operations: [read]},
+  {allow: public, provider: apiKey, operations: [create, read]}
+]) {
+  id: ID!
+  unitNumber: String
+  street: String!
+  city: String!
+  state: String
+  postalCode: String
+  mailingStreet: String
+  mailingCity: String
+  mailingState: String
+  mailingPostalCode: String
+  absenteeOwner: Boolean
+  lat: Float
+  lng: Float
+  notes: String
+  residents: [Person] @hasMany(fields: ["id"])
+  assignments: [Assignment] @hasMany(fields: ["id"])
+  interactions: [InteractionRecord] @hasMany(fields: ["id"])
+  consents: [Consent] @hasMany(fields: ["id"])
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Person @model @auth(rules: [
+  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
+  {allow: groups, groups: ["Canvasser"], operations: [read, update]},
+  {allow: groups, groups: ["Member"], operations: [read]},
+  {allow: public, provider: apiKey, operations: [create, read]}
+]) {
+  id: ID!
+  homeId: ID!
+  home: Home @belongsTo(fields: ["homeId"])
+  role: PersonRole
+  firstName: String
+  lastName: String
+  email: String
+  mobilePhone: String
+  hasSigned: Boolean
+  signedAt: AWSDateTime
+  consents: [Consent] @hasMany(fields: ["id"])
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Consent @model @auth(rules: [
+  {allow: groups, groups: ["Administrator"], operations: [create, read, update, delete]},
+  {allow: groups, groups: ["Organizer"], operations: [read]}
+]) {
+  id: ID!
+  personId: ID!
+  person: Person @belongsTo(fields: ["personId"])
+  homeId: ID!
+  home: Home @belongsTo(fields: ["homeId"])
+  recordedBy: String
+  recordedAt: AWSDateTime!
+  source: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Volunteer @model @auth(rules: [
+  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
+  {allow: owner, operations: [read]}
+]) {
+  id: ID!
+  userSub: String!
+  displayName: String
+  email: String
+  assignments: [Assignment] @hasMany(fields: ["id"])
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Assignment @model @auth(rules: [
+  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
+  {allow: groups, groups: ["Canvasser"], operations: [create, read, update]}
+]) {
+  id: ID!
+  homeId: ID!
+  home: Home @belongsTo(fields: ["homeId"])
+  volunteerId: ID!
+  volunteer: Volunteer @belongsTo(fields: ["volunteerId"])
+  assignedAt: AWSDateTime
+  status: AssignmentStatus
+  lastContactAt: AWSDateTime
+  notes: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type InteractionRecord @model @auth(rules: [
+  {allow: groups, groups: ["Administrator", "Organizer", "Canvasser"], operations: [create, read, update]}
+]) {
+  id: ID!
+  homeId: ID!
+  home: Home @belongsTo(fields: ["homeId"])
+  participantPersonIds: String
+  spokeToHomeowner: Boolean
+  spokeToOther: Boolean
+  leftFlyer: Boolean
+  notes: String
+  lat: Float
+  lng: Float
+  createdAt: AWSDateTime
+  createdBy: String
+  updatedAt: AWSDateTime!
+}
+
+type UserProfile @model @auth(rules: [
+  {allow: owner, operations: [read, update]},
+  {allow: groups, groups: ["Administrator"], operations: [read, update, delete]}
+]) {
+  id: ID!
+  sub: String!
+  email: String
+  firstName: String
+  lastName: String
+  street: String
+  mobile: String
+  roleCache: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+# Scalar types
+scalar AWSDateTime
