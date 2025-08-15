@@ -62,37 +62,111 @@ export default function Organize() {
                 }
             }
             
-            // Use same approach as AbsenteeInteractions: start with residents to avoid duplicate homes
-            console.log('Finding homes with residents for Organize page...')
+            let homesWithDetails: any[] = []
             
-            // Get all people first
-            const allPeopleResult = await client.models.Person.list({ limit: 1000 })
-            console.log(`Found ${allPeopleResult.data.length} people total`)
-            
-            // Get unique homeIds that have residents
-            const homeIdsWithResidents = [...new Set(allPeopleResult.data.map(p => p.homeId))]
-            console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
-            
-            // For pagination, slice the homeIds
-            const startIndex = (currentPage - 1) * pageSize
-            const endIndex = startIndex + pageSize
-            const currentPageHomeIds = homeIdsWithResidents.slice(startIndex, endIndex)
-            
-            console.log(`Page ${currentPage}: showing homes ${startIndex + 1}-${Math.min(endIndex, homeIdsWithResidents.length)} of ${homeIdsWithResidents.length}`)
-            
-            // Get home details for current page and filter
-            const homesWithDetailsPromises = currentPageHomeIds.map(async (homeId) => {
-                try {
-                    const homeResult = await client.models.Home.get({ id: homeId })
-                    if (homeResult.data) {
-                        const home = homeResult.data
+            if (searchTerm.trim()) {
+                // When searching, search ALL homes first, then add resident info
+                console.log(`Searching all homes for: "${searchTerm}"`)
+                
+                let searchResults: any[] = []
+                let nextToken = null
+                let searchCount = 0
+                
+                // Search through homes using GraphQL (more efficient for search)
+                do {
+                    const result = await client.models.Home.list({
+                        filter: homeFilter,
+                        limit: 200,
+                        nextToken
+                    })
+                    
+                    for (const home of result.data) {
+                        // Apply search filter
+                        if (home.street?.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            searchResults.push(home)
+                        }
+                    }
+                    
+                    nextToken = result.nextToken
+                    searchCount += result.data.length
+                } while (nextToken && searchResults.length < 500)
+                
+                console.log(`Searched ${searchCount} homes, found ${searchResults.length} matches`)
+                
+                // For pagination on search results
+                const startIndex = (currentPage - 1) * pageSize
+                const endIndex = startIndex + pageSize
+                const currentPageHomes = searchResults.slice(startIndex, endIndex)
+                
+                // Get people data for efficiency
+                const allPeopleResult = await client.models.Person.list({ limit: 1000 })
+                
+                // Load details for search results
+                const searchDetailsPromises = currentPageHomes.map(async (home) => {
+                    try {
+                        // Get residents for this home
+                        const residents = allPeopleResult.data.filter(p => p.homeId === home.id)
                         
-                        // Apply filters
-                        const matchesSearch = !searchTerm.trim() || 
-                            home.street?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            home.city?.toLowerCase().includes(searchTerm.toLowerCase())
+                        // Get consents and assignments
+                        const [consentsResult, assignmentsResult] = await Promise.all([
+                            client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
+                            client.models.Assignment.list({ filter: { homeId: { eq: home.id } } })
+                        ])
                         
-                        if (matchesSearch) {
+                        const consents = consentsResult.data
+                        const assignments = assignmentsResult.data.filter(a => a.status !== 'DONE')
+                        
+                        // Determine consent status
+                        const allOwnersSigned = residents.length > 0 && 
+                            residents.every(resident => resident.hasSigned)
+                        
+                        return { 
+                            ...home, 
+                            residents, 
+                            consents,
+                            assignments,
+                            consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
+                        }
+                    } catch (error) {
+                        console.error(`Error loading home details:`, error)
+                        return null
+                    }
+                })
+                
+                const searchDetailsResults = await Promise.all(searchDetailsPromises)
+                homesWithDetails = searchDetailsResults.filter(home => home !== null)
+                
+                // Update pagination for search results
+                setTotalCount(searchResults.length)
+                const hasMorePages = endIndex < searchResults.length
+                setNextToken(hasMorePages ? 'more' : null)
+                
+            } else {
+                // No search - use original logic (homes with residents only)
+                console.log('Finding homes with residents for Organize page...')
+                
+                // Get all people first
+                const allPeopleResult = await client.models.Person.list({ limit: 1000 })
+                console.log(`Found ${allPeopleResult.data.length} people total`)
+                
+                // Get unique homeIds that have residents
+                const homeIdsWithResidents = [...new Set(allPeopleResult.data.map(p => p.homeId))]
+                console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
+                
+                // For pagination, slice the homeIds
+                const startIndex = (currentPage - 1) * pageSize
+                const endIndex = startIndex + pageSize
+                const currentPageHomeIds = homeIdsWithResidents.slice(startIndex, endIndex)
+                
+                console.log(`Page ${currentPage}: showing homes ${startIndex + 1}-${Math.min(endIndex, homeIdsWithResidents.length)} of ${homeIdsWithResidents.length}`)
+                
+                // Get home details for current page
+                const homesWithDetailsPromises = currentPageHomeIds.map(async (homeId) => {
+                    try {
+                        const homeResult = await client.models.Home.get({ id: homeId })
+                        if (homeResult.data) {
+                            const home = homeResult.data
+                            
                             // Get residents for this home
                             const residents = allPeopleResult.data.filter(p => p.homeId === homeId)
                             
@@ -117,23 +191,22 @@ export default function Organize() {
                                 consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
                             }
                         }
+                    } catch (error) {
+                        console.error(`Error loading home ${homeId}:`, error)
                     }
-                } catch (error) {
-                    console.error(`Error loading home ${homeId}:`, error)
-                }
-                return null
-            })
-            
-            const allHomesWithDetails = await Promise.all(homesWithDetailsPromises)
-            const loadedHomes = allHomesWithDetails.filter(home => home !== null)
-            
-            console.log(`Loaded ${loadedHomes.length} homes with residents for page ${currentPage}`)
-            
-            // Update pagination info
-            const hasMorePages = endIndex < homeIdsWithResidents.length
-            setNextToken(hasMorePages ? 'more' : null)
-            
-            const homesWithDetails = loadedHomes
+                    return null
+                })
+                
+                const allHomesWithDetails = await Promise.all(homesWithDetailsPromises)
+                homesWithDetails = allHomesWithDetails.filter(home => home !== null)
+                
+                console.log(`Loaded ${homesWithDetails.length} homes with residents for page ${currentPage}`)
+                
+                // Update pagination info
+                setTotalCount(homeIdsWithResidents.length)
+                const hasMorePages = endIndex < homeIdsWithResidents.length
+                setNextToken(hasMorePages ? 'more' : null)
+            }
             
             // Apply additional filters that can't be done at DB level
             let filteredData = homesWithDetails
@@ -301,7 +374,12 @@ export default function Organize() {
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Address or city..."
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    applyFilters()
+                                }
+                            }}
+                            placeholder="Enter address to search..."
                             style={{padding: 8, borderRadius: 4, border: '1px solid #ddd'}}
                         />
                     </div>
@@ -422,7 +500,11 @@ export default function Organize() {
 
                 {/* Stats */}
                 <div style={{marginBottom: 16, fontSize: '0.9em', color: '#666'}}>
-                    Showing {homes.length} homes on page {currentPage} of {Math.ceil(totalCount / pageSize)} (Total: {totalCount} homes with residents)
+                    {searchTerm.trim() ? (
+                        `Showing ${homes.length} homes on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Found ${totalCount} matches for "${searchTerm}")`
+                    ) : (
+                        `Showing ${homes.length} homes on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Total: ${totalCount} homes with residents)`
+                    )}
                 </div>
 
                 {/* Table */}
