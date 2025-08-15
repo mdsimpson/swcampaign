@@ -2,6 +2,7 @@ import {useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 import {Link} from 'react-router-dom'
+import outputs from '../../amplify_outputs.json'
 
 function validatePassword(password: string): string[] {
     const errors = []
@@ -50,6 +51,41 @@ export default function SignUp() {
                 status: 'SUBMITTED'
             })
             console.log('Registration created successfully:', result)
+            
+            // Send email notifications to administrators
+            try {
+                console.log('Sending admin notifications...')
+                // Use the Amplify function URL from amplify_outputs.json
+                const functionUrl = (outputs as any).custom?.notifyAdmins?.url
+                
+                if (functionUrl) {
+                    const notifyResponse = await fetch(functionUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            firstName: form.firstName,
+                            lastName: form.lastName,
+                            email: form.email,
+                            street: form.street,
+                            mobile: form.mobile
+                        })
+                    })
+                    
+                    if (notifyResponse.ok) {
+                        console.log('Admin notifications sent successfully')
+                    } else {
+                        console.warn('Failed to send admin notifications, but registration was successful')
+                    }
+                } else {
+                    console.warn('Notify admins function URL not found - email notifications disabled')
+                }
+            } catch (notifyError) {
+                console.warn('Failed to send admin notifications:', notifyError)
+                // Don't fail the registration if email notification fails
+            }
+            
             setSubmitted(true)
         } catch (error) {
             console.error('Error creating registration:', error)
