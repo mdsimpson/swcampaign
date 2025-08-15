@@ -3,6 +3,7 @@ import {
     AdminAddUserToGroupCommand,
     AdminRemoveUserFromGroupCommand,
     AdminDisableUserCommand,
+    AdminCreateUserCommand,
     ListUsersCommand
 } from '@aws-sdk/client-cognito-identity-provider'
 
@@ -15,7 +16,7 @@ export const handler = async (event: any) => {
     if (event.requestContext?.http?.method === 'OPTIONS') return {statusCode: 204, headers}
     try {
         const body = typeof event.body === 'string' ? JSON.parse(event.body) : (event.body || {})
-        const {action, username, group, userPoolId} = body
+        const {action, username, group, userPoolId, email, firstName, lastName, temporaryPassword} = body
         const client = new CognitoIdentityProviderClient({})
         if (!userPoolId) return {statusCode: 400, headers, body: 'Missing userPoolId'}
         if (action === 'addToGroup') {
@@ -37,6 +38,27 @@ export const handler = async (event: any) => {
         if (action === 'disableUser') {
             await client.send(new AdminDisableUserCommand({UserPoolId: userPoolId, Username: username}));
             return {statusCode: 200, headers, body: 'OK'}
+        }
+        if (action === 'createUser') {
+            if (!email) return {statusCode: 400, headers, body: 'Missing email'}
+            
+            const result = await client.send(new AdminCreateUserCommand({
+                UserPoolId: userPoolId,
+                Username: email,
+                UserAttributes: [
+                    { Name: 'email', Value: email },
+                    { Name: 'email_verified', Value: 'false' },
+                    ...(firstName ? [{ Name: 'given_name', Value: firstName }] : []),
+                    ...(lastName ? [{ Name: 'family_name', Value: lastName }] : [])
+                ],
+                TemporaryPassword: temporaryPassword || undefined,
+                MessageAction: 'SEND' // This sends the welcome email with temporary password
+            }));
+            
+            return {statusCode: 200, headers, body: JSON.stringify({
+                username: result.User?.Username,
+                userSub: result.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value
+            })}
         }
         if (action === 'listUsers') {
             const res = await client.send(new ListUsersCommand({UserPoolId: userPoolId, Limit: 60}));

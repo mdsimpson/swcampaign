@@ -2,6 +2,8 @@ import Header from '../../components/Header'
 import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
+import {fetchAuthSession} from 'aws-amplify/auth'
+import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand} from '@aws-sdk/client-cognito-identity-provider'
 
 export default function EnrollMembers() {
     const [registrations, setRegistrations] = useState<any[]>([])
@@ -29,13 +31,58 @@ export default function EnrollMembers() {
 
     async function handleAccept(registration: any) {
         try {
+            // Generate a temporary password
+            const tempPassword = generateTemporaryPassword()
+            
+            // Get current auth session for credentials
+            const session = await fetchAuthSession()
+            
+            // Create Cognito client with credentials from current session
+            const cognitoClient = new CognitoIdentityProviderClient({
+                region: 'us-east-1',
+                credentials: session.credentials
+            })
+            
+            const userPoolId = 'us-east-1_GrxwbZK9I'
+            
+            // Create Cognito user account
+            console.log(`Creating Cognito user for ${registration.email}`)
+            const createUserResult = await cognitoClient.send(new AdminCreateUserCommand({
+                UserPoolId: userPoolId,
+                Username: registration.email,
+                UserAttributes: [
+                    { Name: 'email', Value: registration.email },
+                    { Name: 'email_verified', Value: 'true' },
+                    { Name: 'given_name', Value: registration.firstName },
+                    { Name: 'family_name', Value: registration.lastName }
+                ],
+                TemporaryPassword: tempPassword,
+                MessageAction: 'SEND' // This sends the welcome email with temporary password
+            }))
+            
+            const userSub = createUserResult.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value
+            
+            if (!userSub) {
+                throw new Error('Failed to get user sub from created user')
+            }
+            
+            // Add user to Member group
+            console.log(`Adding user to Member group`)
+            await cognitoClient.send(new AdminAddUserToGroupCommand({
+                UserPoolId: userPoolId,
+                Username: registration.email,
+                GroupName: 'Member'
+            }))
+            
+            // Update registration status
             await client.models.Registration.update({
                 id: registration.id,
                 status: 'ACCEPTED'
             })
             
+            // Create user profile with actual user sub
             await client.models.UserProfile.create({
-                sub: `pending-${registration.id}`,
+                sub: userSub,
                 email: registration.email,
                 firstName: registration.firstName,
                 lastName: registration.lastName,
@@ -45,11 +92,41 @@ export default function EnrollMembers() {
             })
 
             setRegistrations(prev => prev.filter(r => r.id !== registration.id))
-            alert(`${registration.firstName} ${registration.lastName} has been accepted and will be notified by email.`)
+            alert(`${registration.firstName} ${registration.lastName} has been accepted! 
+
+✅ Cognito user account created successfully
+✅ Added to Member group  
+✅ Welcome email sent to ${registration.email}
+
+They will receive an email with a temporary password and can log in immediately.`)
         } catch (error) {
             console.error('Failed to accept registration:', error)
-            alert('Failed to accept registration')
+            alert(`Failed to accept registration: ${error.message}`)
         }
+    }
+    
+    function generateTemporaryPassword(): string {
+        // Generate a secure temporary password that meets Cognito requirements
+        const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+        const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        const numbers = '0123456789'
+        const symbols = '!@#$%^&*'
+        
+        // Ensure at least one character from each category
+        let password = ''
+        password += lowercase[Math.floor(Math.random() * lowercase.length)]
+        password += uppercase[Math.floor(Math.random() * uppercase.length)]
+        password += numbers[Math.floor(Math.random() * numbers.length)]
+        password += symbols[Math.floor(Math.random() * symbols.length)]
+        
+        // Fill remaining length with random characters
+        const allChars = lowercase + uppercase + numbers + symbols
+        for (let i = 4; i < 12; i++) {
+            password += allChars[Math.floor(Math.random() * allChars.length)]
+        }
+        
+        // Shuffle the password to randomize character positions
+        return password.split('').sort(() => Math.random() - 0.5).join('')
     }
 
     async function handleReject(registration: any) {

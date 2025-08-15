@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.0.9",
-    "@aws-sdk/client-cognito-identity-provider": "^3.620.0",
     "@react-google-maps/api": "^2.19.3",
     "aws-amplify": "^6.3.0",
     "csv-parse": "^5.5.6",
@@ -32,7 +31,7 @@
   "devDependencies": {
     "@aws-amplify/backend": "^1.16.1",
     "@aws-amplify/backend-cli": "^1.8.0",
-    "@aws-sdk/client-cognito-identity-provider": "^3.864.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.865.0",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^5.0.0",
