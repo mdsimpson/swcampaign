@@ -881,18 +881,6 @@ export default function Organize() {
         }
     }
 
-    if (loading) {
-        return (
-            <div>
-                <Header/>
-                <div style={{maxWidth: 1100, margin: '20px auto'}}>
-                    <h2>Organize Canvassing</h2>
-                    <p>Loading...</p>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div>
             <Header/>
@@ -1142,7 +1130,18 @@ export default function Organize() {
                             </tr>
                         </thead>
                         <tbody>
-                            {homes.map(home => (
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={6} style={{
+                                        border: '1px solid #ddd', 
+                                        padding: 40, 
+                                        textAlign: 'center',
+                                        color: '#666'
+                                    }}>
+                                        Loading homes...
+                                    </td>
+                                </tr>
+                            ) : homes.map(home => (
                                 <tr key={home.id} style={{backgroundColor: selectedHomes.has(home.id) ? '#e3f2fd' : 'white'}}>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         <input
