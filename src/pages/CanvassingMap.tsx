@@ -1,6 +1,6 @@
 import Header from '../components/Header'
-import {useEffect, useState} from 'react'
-import {GoogleMap, LoadScript, Marker, InfoWindow} from '@react-google-maps/api'
+import {useEffect, useState, useMemo, useCallback} from 'react'
+import {GoogleMap, LoadScript, Marker, OverlayView} from '@react-google-maps/api'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 import {useAuthenticator} from '@aws-amplify/ui-react'
@@ -11,9 +11,12 @@ const mapContainerStyle = {
 }
 
 const center = {
-    lat: 38.9637,
-    lng: -77.3967 // Broadlands, VA
+    lat: 38.9400,  // Adjusted to better center on Cloverleaf Ct area
+    lng: -77.4100  // Broadlands, VA
 }
+
+// Static libraries array to prevent LoadScript reloads
+const libraries = ['marker'] as const
 
 export default function CanvassingMap() {
     const {user} = useAuthenticator(ctx => [ctx.user])
@@ -23,6 +26,7 @@ export default function CanvassingMap() {
     const [selectedHome, setSelectedHome] = useState<any>(null)
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
     const [mapsLoaded, setMapsLoaded] = useState(false)
+    const [mapInstance, setMapInstance] = useState(null)
     
     const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
 
@@ -59,19 +63,19 @@ export default function CanvassingMap() {
     }
 
     async function loadAssignments() {
-        console.log('loadAssignments: Starting to load assignments...')
+        console.log('🔄 loadAssignments: Starting to load assignments...')
         try {
             // First, get all volunteers to find the current user's volunteer record
             const volunteersResult = await client.models.Volunteer.list()
-            console.log('All volunteers:', volunteersResult.data)
+            console.log('👥 All volunteers:', volunteersResult.data)
             
             // Find the volunteer record for the current user
             const currentUserVolunteer = volunteersResult.data.find(v => 
                 v.userSub === user?.userId || v.userSub === user?.username
             )
-            console.log('Current user volunteer record:', currentUserVolunteer)
-            console.log('Current user ID:', user?.userId)
-            console.log('Current user username:', user?.username)
+            console.log('👤 Current user volunteer record:', currentUserVolunteer)
+            console.log('🆔 Current user ID:', user?.userId)
+            console.log('📧 Current user username:', user?.username)
             
             if (!currentUserVolunteer) {
                 console.log('loadAssignments: No volunteer record found for current user')
@@ -148,25 +152,39 @@ export default function CanvassingMap() {
             return
         }
 
-        const homesWithoutCoords = homes.filter(h => !h.lat || !h.lng)
-        if (homesWithoutCoords.length === 0) {
-            alert('All homes already have coordinates!')
+        // Get ALL homes (assigned ones) to geocode
+        const homesToGeocode = homes
+        if (homesToGeocode.length === 0) {
+            alert('No homes to geocode!')
             return
         }
 
-        console.log(`Geocoding ${homesWithoutCoords.length} homes using Google Maps JavaScript API...`)
+        const confirmed = confirm(`This will geocode ALL ${homesToGeocode.length} homes using Google's API (including ones that already have coordinates). This may take several minutes. Continue?`)
+        if (!confirmed) return
+
+        console.log(`Geocoding ALL ${homesToGeocode.length} homes using Google Geocoding API...`)
         const geocoder = new window.google.maps.Geocoder()
         
-        for (let i = 0; i < homesWithoutCoords.length; i++) {
-            const home = homesWithoutCoords[i]
+        let successCount = 0
+        let errorCount = 0
+        let skippedCount = 0
+        
+        for (let i = 0; i < homesToGeocode.length; i++) {
+            const home = homesToGeocode[i]
             const address = `${home.street}, ${home.city}, ${home.state || 'VA'} ${home.postalCode || ''}`
             
             try {
-                console.log(`Geocoding ${i + 1}/${homesWithoutCoords.length}: ${address}`)
+                console.log(`Geocoding ${i + 1}/${homesToGeocode.length}: ${address}`)
                 
                 // Use Google Maps JavaScript API Geocoder
                 const geocodePromise = new Promise((resolve, reject) => {
-                    geocoder.geocode({ address: address }, (results, status) => {
+                    geocoder.geocode({ 
+                        address: address,
+                        componentRestrictions: {
+                            country: 'US',
+                            administrativeArea: home.state || 'VA'
+                        }
+                    }, (results, status) => {
                         if (status === 'OK' && results && results.length > 0) {
                             resolve(results[0])
                         } else {
@@ -180,7 +198,7 @@ export default function CanvassingMap() {
                 const lat = location.lat()
                 const lng = location.lng()
                 
-                console.log(`Found coordinates: ${lat}, ${lng}`)
+                console.log(`✅ Found coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`)
                 
                 // Update the home in the database
                 await client.models.Home.update({
@@ -189,7 +207,7 @@ export default function CanvassingMap() {
                     lng: lng
                 })
                 
-                // Update local state
+                // Update local state immediately
                 setHomes(prevHomes => 
                     prevHomes.map(h => 
                         h.id === home.id 
@@ -198,26 +216,56 @@ export default function CanvassingMap() {
                     )
                 )
                 
-                console.log(`Updated home ${home.id} with coordinates`)
+                successCount++
+                console.log(`✅ Updated ${home.street} with real coordinates`)
                 
-                // Add a small delay to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 300))
+                // Add a delay to respect API rate limits
+                await new Promise(resolve => setTimeout(resolve, 200))
                 
             } catch (error) {
-                console.error(`Error geocoding ${address}:`, error)
+                errorCount++
+                console.error(`❌ Error geocoding ${address}:`, error.message)
+                
+                // Add delay even on errors to avoid hitting rate limits
+                await new Promise(resolve => setTimeout(resolve, 500))
             }
         }
         
-        console.log('Geocoding complete!')
-        alert('Geocoding complete! The homes should now appear on the map.')
+        console.log(`🎉 Geocoding complete! Successfully geocoded ${successCount} homes, ${errorCount} failed.`)
+        alert(`Geocoding complete! Successfully geocoded ${successCount} out of ${homesToGeocode.length} homes. Refresh the page to see all markers.`)
     }
 
-    const displayHomes = showAll ? homes : homes.filter(h => 
-        assignments.some(a => a.homeId === h.id)
-    )
+    const displayHomes = useMemo(() => {
+        let filteredHomes = showAll ? homes : homes.filter(h => 
+            assignments.some(a => a.homeId === h.id)
+        )
+        
+        // Remove duplicates by home ID to prevent multiple markers at same location
+        const uniqueHomes = filteredHomes.filter((home, index, array) => 
+            array.findIndex(h => h.id === home.id) === index
+        )
+        
+        console.log('🏠 displayHomes stats:', {
+            total: filteredHomes.length,
+            unique: uniqueHomes.length,
+            duplicatesRemoved: filteredHomes.length - uniqueHomes.length
+        })
+        
+        return uniqueHomes
+    }, [showAll, homes, assignments])
 
     function handleHomeClick(home: any) {
-        setSelectedHome(home)
+        console.log('🖱️ Marker clicked:', home.street, 'id:', home.id)
+        console.log('🖱️ Currently selected:', selectedHome?.street, 'id:', selectedHome?.id)
+        
+        // Toggle selection - if clicking the same home, close the info window
+        if (selectedHome?.id === home.id) {
+            console.log('🖱️ Closing info window (same home clicked)')
+            setSelectedHome(null)
+        } else {
+            console.log('🖱️ Opening info window for new home')
+            setSelectedHome(home)
+        }
     }
 
     function openInteractionForm() {
@@ -251,6 +299,19 @@ export default function CanvassingMap() {
                         >
                             Reload Data
                         </button>
+                        <button 
+                            onClick={geocodeHomes}
+                            style={{
+                                backgroundColor: '#28a745',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: 4,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Geocode All Homes
+                        </button>
                     </div>
                     <div>
                         <label style={{display: 'flex', alignItems: 'center', gap: 8}}>
@@ -281,6 +342,32 @@ export default function CanvassingMap() {
                         mapContainerStyle={mapContainerStyle}
                         center={userLocation || center}
                         zoom={15}
+                        options={{
+                            disableDefaultUI: false,
+                            clickableIcons: false,
+                            disableDoubleClickZoom: false
+                        }}
+                        onClick={() => {
+                            console.log('🗺️ Map clicked - closing InfoWindows')
+                            setSelectedHome(null)
+                        }}
+                        onLoad={(map) => {
+                            console.log('🗺️ Map loaded, disabling default InfoWindow')
+                            setMapInstance(map)
+                            
+                            // Completely disable default InfoWindow
+                            const originalAddListener = map.addListener
+                            map.addListener = function(eventName, handler) {
+                                if (eventName === 'click') {
+                                    // Override click to prevent default InfoWindow
+                                    return originalAddListener.call(this, eventName, (e) => {
+                                        setSelectedHome(null)
+                                        handler(e)
+                                    })
+                                }
+                                return originalAddListener.call(this, eventName, handler)
+                            }
+                        }}
                     >
                         {userLocation && mapsLoaded && (
                             <Marker
@@ -297,61 +384,119 @@ export default function CanvassingMap() {
                             />
                         )}
 
-                        {mapsLoaded && displayHomes.map(home => home.lat && home.lng && (
-                            <Marker
-                                key={home.id}
-                                position={{lat: home.lat, lng: home.lng}}
-                                onClick={() => handleHomeClick(home)}
-                                icon={{
-                                    path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                                    scale: 6,
-                                    fillColor: assignments.some(a => a.homeId === home.id) ? '#ff6b6b' : '#4ecdc4',
-                                    fillOpacity: 0.8,
-                                    strokeWeight: 2,
-                                    strokeColor: 'white'
-                                }}
-                            />
-                        ))}
+                        {mapsLoaded && displayHomes.map(home => {
+                            console.log('🎯 Rendering marker for:', home.street, 'lat:', home.lat, 'lng:', home.lng, 'hasCoords:', !!(home.lat && home.lng))
+                            return home.lat && home.lng && (
+                                <Marker
+                                    key={home.id}
+                                    position={{lat: home.lat, lng: home.lng}}
+                                    onClick={() => {
+                                        console.log('🖱️ Marker clicked:', home.street)
+                                        handleHomeClick(home)
+                                    }}
+                                    icon={{
+                                        path: google.maps.SymbolPath.CIRCLE,
+                                        scale: 8,
+                                        fillColor: assignments.some(a => a.homeId === home.id) ? '#ff6b6b' : '#4ecdc4',
+                                        fillOpacity: 0.8,
+                                        strokeWeight: 2,
+                                        strokeColor: 'white'
+                                    }}
+                                />
+                            )
+                        })}
 
-                        {selectedHome && (
-                            <InfoWindow
+                        {selectedHome && selectedHome.lat && selectedHome.lng && (
+                            <OverlayView
                                 position={{lat: selectedHome.lat, lng: selectedHome.lng}}
-                                onCloseClick={() => setSelectedHome(null)}
+                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
-                                <div style={{padding: 8}}>
-                                    <h4>{selectedHome.street}</h4>
-                                    <p>{selectedHome.city}, {selectedHome.state}</p>
-                                    <div style={{marginTop: 8}}>
-                                        <button 
-                                            onClick={openInteractionForm}
-                                            style={{
-                                                backgroundColor: '#007bff',
-                                                color: 'white',
-                                                border: 'none',
-                                                padding: '8px 16px',
-                                                borderRadius: 4,
-                                                cursor: 'pointer',
-                                                marginRight: 8
-                                            }}
-                                        >
-                                            Record Interaction
-                                        </button>
-                                        <button 
-                                            onClick={() => window.open(`/history?address=${encodeURIComponent(selectedHome.street)}`, '_blank')}
-                                            style={{
-                                                backgroundColor: '#6c757d',
-                                                color: 'white',
-                                                border: 'none',
-                                                padding: '8px 16px',
-                                                borderRadius: 4,
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            View History
-                                        </button>
+                                <div style={{
+                                    position: 'relative',
+                                    backgroundColor: 'white',
+                                    border: '1px solid #ccc',
+                                    borderRadius: '8px',
+                                    padding: '12px',
+                                    minWidth: '250px',
+                                    maxWidth: '300px',
+                                    boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                                    transform: 'translate(-50%, -100%)',
+                                    marginTop: '-10px',
+                                    zIndex: 1000
+                                }}>
+                                    {/* Close button */}
+                                    <button
+                                        onClick={() => {
+                                            console.log('🖱️ Custom overlay close clicked')
+                                            setSelectedHome(null)
+                                        }}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '4px',
+                                            right: '4px',
+                                            background: 'none',
+                                            border: 'none',
+                                            fontSize: '18px',
+                                            cursor: 'pointer',
+                                            padding: '4px',
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        ×
+                                    </button>
+                                    
+                                    {/* Content */}
+                                    <div style={{paddingRight: '20px'}}>
+                                        <h4 style={{margin: '0 0 8px 0', fontSize: '16px'}}>{selectedHome.street}</h4>
+                                        <p style={{margin: '0 0 12px 0', color: '#666', fontSize: '14px'}}>
+                                            {selectedHome.city}, {selectedHome.state}
+                                        </p>
+                                        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+                                            <button 
+                                                onClick={openInteractionForm}
+                                                style={{
+                                                    backgroundColor: '#007bff',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '8px 12px',
+                                                    borderRadius: 4,
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                Record Interaction
+                                            </button>
+                                            <button 
+                                                onClick={() => window.open(`/history?address=${encodeURIComponent(selectedHome.street)}`, '_blank')}
+                                                style={{
+                                                    backgroundColor: '#6c757d',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '8px 12px',
+                                                    borderRadius: 4,
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                View History
+                                            </button>
+                                        </div>
                                     </div>
+                                    
+                                    {/* Arrow pointing down to marker */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: '-8px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '8px solid transparent',
+                                        borderRight: '8px solid transparent',
+                                        borderTop: '8px solid white'
+                                    }}></div>
                                 </div>
-                            </InfoWindow>
+                            </OverlayView>
                         )}
                     </GoogleMap>
                 </LoadScript>
