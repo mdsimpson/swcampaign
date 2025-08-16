@@ -80,7 +80,8 @@ const schema = a.schema({
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read']),  // Allow canvassers to read volunteer records
-        allow.owner().to(['read'])
+        allow.owner().to(['read']),
+        allow.publicApiKey().to(['create','read']) // Allow import scripts and testing
     ]),
 
     Assignment: a.model({
@@ -94,7 +95,8 @@ const schema = a.schema({
         notes: a.string(),
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
-        allow.groups(['Canvasser']).to(['create','read','update'])
+        allow.groups(['Canvasser']).to(['create','read','update']),
+        allow.publicApiKey().to(['create','read']) // Allow import scripts and testing
     ]),
 
     InteractionRecord: a.model({
