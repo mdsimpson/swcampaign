@@ -29,21 +29,28 @@ export default function UserProfile() {
             
             // Get current user info from Cognito
             const user = await getCurrentUser()
+            console.log('Current user:', user)
             setCurrentUser(user)
             
             // Get auth session to get user sub
             const session = await fetchAuthSession()
             const userSub = session.userSub
+            console.log('User sub:', userSub)
             
             if (!userSub) {
                 throw new Error('Unable to get user ID')
             }
             
             // Find user profile by sub
-            const profiles = await client.models.UserProfile.list()
-            const profile = profiles.data.find(p => p.sub === userSub)
+            console.log('Querying UserProfile with sub:', userSub)
+            const profiles = await client.models.UserProfile.list({
+                filter: { sub: { eq: userSub } }
+            })
+            console.log('Found profiles:', profiles.data)
+            const profile = profiles.data[0]
             
             if (profile) {
+                console.log('Profile found:', profile)
                 setUserProfile(profile)
                 setEditForm({
                     firstName: profile.firstName || '',
@@ -52,16 +59,30 @@ export default function UserProfile() {
                     mobile: profile.mobile || ''
                 })
             } else {
+                console.log('No profile found, creating new one...')
                 // Create a basic user profile if it doesn't exist, using attributes from Cognito
-                const firstName = user.signInDetails?.loginId ? 
-                    (user.attributes?.given_name || '') : ''
-                const lastName = user.signInDetails?.loginId ? 
-                    (user.attributes?.family_name || '') : ''
-                const street = user.signInDetails?.loginId ? 
-                    (user.attributes?.address || '') : ''
-                const mobile = user.signInDetails?.loginId ? 
-                    (user.attributes?.phone_number || '') : ''
+                const firstName = user.attributes?.given_name || ''
+                const lastName = user.attributes?.family_name || ''
+                const street = user.attributes?.address || ''
+                const mobile = user.attributes?.phone_number || ''
                 
+                // Determine role - if user is in Administrator group, set as Administrator
+                let roleCache = 'Member' // default
+                try {
+                    const session = await fetchAuthSession()
+                    const groups = session.tokens?.accessToken?.payload['cognito:groups'] as string[] || []
+                    if (groups.includes('Administrator')) {
+                        roleCache = 'Administrator'
+                    } else if (groups.includes('Organizer')) {
+                        roleCache = 'Organizer'
+                    } else if (groups.includes('Canvasser')) {
+                        roleCache = 'Canvasser'
+                    }
+                } catch (groupError) {
+                    console.warn('Could not determine user groups:', groupError)
+                }
+                
+                console.log('Creating profile with role:', roleCache)
                 const newProfile = await client.models.UserProfile.create({
                     sub: userSub,
                     email: user.username,
@@ -69,8 +90,9 @@ export default function UserProfile() {
                     lastName: lastName,
                     street: street,
                     mobile: mobile,
-                    roleCache: 'Member'
+                    roleCache: roleCache
                 })
+                console.log('Created new profile:', newProfile.data)
                 setUserProfile(newProfile.data)
                 setEditForm({
                     firstName: firstName,

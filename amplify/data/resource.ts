@@ -121,8 +121,8 @@ const schema = a.schema({
         mobile: a.string(),
         roleCache: a.string(),
     }).authorization(allow => [
-        allow.owner().to(['read','update']),
-        allow.groups(['Administrator']).to(['read','update','delete'])
+        allow.ownerDefinedIn('sub').to(['read','update']),
+        allow.groups(['Administrator']).to(['read','update','delete','create'])
     ]),
 })
 

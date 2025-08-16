@@ -86,6 +86,8 @@ export default function EnrollMembers() {
             })
             
             // Create user profile with actual user sub
+            // Note: We create this as admin, so the owner field will be set to the admin user
+            // The new user will be able to read it because of the owner authorization rule  
             await client.models.UserProfile.create({
                 sub: userSub,
                 email: registration.email,
