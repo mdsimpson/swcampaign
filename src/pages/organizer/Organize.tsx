@@ -706,6 +706,47 @@ export default function Organize() {
         setSelectedHomes(new Set())
     }
 
+    async function unassignSelectedHomes() {
+        if (selectedHomes.size === 0) {
+            alert('Please select homes to unassign')
+            return
+        }
+
+        if (!confirm(`Are you sure you want to unassign ${selectedHomes.size} homes?`)) {
+            return
+        }
+
+        try {
+            // For each selected home, find and delete its assignments
+            const deletePromises = []
+            
+            for (const homeId of selectedHomes) {
+                const home = homes.find(h => h.id === homeId)
+                if (home && home.assignments) {
+                    for (const assignment of home.assignments) {
+                        deletePromises.push(
+                            client.models.Assignment.delete({ id: assignment.id })
+                        )
+                    }
+                }
+            }
+
+            if (deletePromises.length === 0) {
+                alert('No assignments found for selected homes')
+                return
+            }
+
+            await Promise.all(deletePromises)
+
+            alert(`Unassigned ${selectedHomes.size} homes successfully`)
+            setSelectedHomes(new Set())
+            loadData() // Refresh data
+        } catch (error) {
+            console.error('Failed to unassign homes:', error)
+            alert('Failed to unassign homes')
+        }
+    }
+
     async function assignSelectedHomes() {
         if (!assignToVolunteer || selectedHomes.size === 0) {
             alert('Please select homes and a volunteer')
@@ -972,6 +1013,21 @@ export default function Organize() {
                             }}
                         >
                             Assign Selected
+                        </button>
+                        
+                        <button
+                            onClick={unassignSelectedHomes}
+                            disabled={selectedHomes.size === 0}
+                            style={{
+                                backgroundColor: selectedHomes.size > 0 ? '#dc3545' : '#6c757d',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: 4,
+                                cursor: selectedHomes.size > 0 ? 'pointer' : 'not-allowed'
+                            }}
+                        >
+                            Unassign Selected
                         </button>
                     </div>
                 </div>
