@@ -30,6 +30,9 @@ export default function UserProfile() {
             // Get current user info from Cognito
             const user = await getCurrentUser()
             console.log('Current user:', user)
+            const userEmail = user.signInDetails?.loginId || user.username
+            console.log('User email:', userEmail)
+            console.log('User username:', user.username)
             setCurrentUser(user)
             
             // Get auth session to get user sub
@@ -51,7 +54,26 @@ export default function UserProfile() {
             
             if (profile) {
                 console.log('Profile found:', profile)
-                setUserProfile(profile)
+                console.log('Profile email field:', profile.email)
+                console.log('User sub:', userSub)
+                console.log('User email:', userEmail)
+                console.log('Does email equal sub?', profile.email === userSub)
+                console.log('Does email equal userEmail?', profile.email === userEmail)
+                
+                // Check if the email field contains the sub instead of email (data corruption fix)
+                if (profile.email === userSub && profile.email !== userEmail) {
+                    console.log('Fixing corrupted email field in profile...')
+                    const updatedProfile = await client.models.UserProfile.update({
+                        id: profile.id,
+                        email: userEmail
+                    })
+                    console.log('Fixed profile email:', updatedProfile.data)
+                    setUserProfile(updatedProfile.data)
+                } else {
+                    console.log('Email field appears correct, no fix needed')
+                    setUserProfile(profile)
+                }
+                
                 setEditForm({
                     firstName: profile.firstName || '',
                     lastName: profile.lastName || '',
@@ -85,7 +107,7 @@ export default function UserProfile() {
                 console.log('Creating profile with role:', roleCache)
                 const newProfile = await client.models.UserProfile.create({
                     sub: userSub,
-                    email: user.username,
+                    email: userEmail,
                     firstName: firstName,
                     lastName: lastName,
                     street: street,

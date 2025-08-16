@@ -3,19 +3,34 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 import {fetchAuthSession} from 'aws-amplify/auth'
-import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand} from '@aws-sdk/client-cognito-identity-provider'
+import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand, ListUsersCommand, AdminDeleteUserCommand, AdminGetUserCommand} from '@aws-sdk/client-cognito-identity-provider'
+import {getCurrentUser} from 'aws-amplify/auth'
 
 export default function EnrollMembers() {
     const [registrations, setRegistrations] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [sortField, setSortField] = useState<string>('submittedAt')
     const [sortAsc, setSortAsc] = useState(false)
+    const [users, setUsers] = useState<any[]>([])
+    const [usersLoading, setUsersLoading] = useState(true)
+    const [currentUserEmail, setCurrentUserEmail] = useState<string>('')
     
     const client = generateClient<Schema>()
 
     useEffect(() => {
         loadRegistrations()
+        loadUsers()
+        getCurrentUserEmail()
     }, [])
+    
+    async function getCurrentUserEmail() {
+        try {
+            const user = await getCurrentUser()
+            setCurrentUserEmail(user.username)
+        } catch (error) {
+            console.error('Failed to get current user:', error)
+        }
+    }
 
     async function loadRegistrations() {
         try {
@@ -30,6 +45,99 @@ export default function EnrollMembers() {
             alert(`Failed to load registrations: ${error.message}. Make sure you are logged in as an Administrator.`)
         } finally {
             setLoading(false)
+        }
+    }
+
+    async function loadUsers() {
+        try {
+            setUsersLoading(true)
+            const session = await fetchAuthSession()
+            const cognitoClient = new CognitoIdentityProviderClient({
+                region: 'us-east-1',
+                credentials: session.credentials
+            })
+            
+            const userPoolId = 'us-east-1_GrxwbZK9I'
+            
+            // Get all users from Cognito
+            const listUsersResult = await cognitoClient.send(new ListUsersCommand({
+                UserPoolId: userPoolId,
+                Limit: 60
+            }))
+            
+            // Get UserProfiles to match with Cognito users
+            const userProfiles = await client.models.UserProfile.list()
+            
+            // Combine Cognito user data with UserProfile data
+            const usersWithProfiles = listUsersResult.Users?.map(cognitoUser => {
+                const email = cognitoUser.Attributes?.find(attr => attr.Name === 'email')?.Value
+                const sub = cognitoUser.Attributes?.find(attr => attr.Name === 'sub')?.Value
+                const profile = userProfiles.data.find(p => p.sub === sub)
+                
+                return {
+                    ...cognitoUser,
+                    email: email,
+                    sub: sub,
+                    profile: profile,
+                    enabled: cognitoUser.Enabled,
+                    status: cognitoUser.UserStatus,
+                    created: cognitoUser.UserCreateDate
+                }
+            }) || []
+            
+            setUsers(usersWithProfiles)
+        } catch (error) {
+            console.error('Failed to load users:', error)
+            alert('Failed to load users')
+        } finally {
+            setUsersLoading(false)
+        }
+    }
+
+    async function handleDeleteUser(user: any) {
+        if (!user.email) {
+            alert('Cannot delete user without email')
+            return
+        }
+        
+        if (user.email === currentUserEmail) {
+            alert('You cannot delete your own account')
+            return
+        }
+        
+        if (!confirm(`Are you sure you want to permanently delete user ${user.email}? This will completely remove their account and they will be able to re-register fresh.`)) {
+            return
+        }
+
+        try {
+            const session = await fetchAuthSession()
+            const cognitoClient = new CognitoIdentityProviderClient({
+                region: 'us-east-1',
+                credentials: session.credentials
+            })
+            
+            const userPoolId = 'us-east-1_GrxwbZK9I'
+            
+            // Delete from Cognito
+            await cognitoClient.send(new AdminDeleteUserCommand({
+                UserPoolId: userPoolId,
+                Username: user.email
+            }))
+            
+            // Delete UserProfile if it exists
+            if (user.profile?.id) {
+                await client.models.UserProfile.delete({
+                    id: user.profile.id
+                })
+            }
+            
+            // Remove from local state
+            setUsers(prev => prev.filter(u => u.email !== user.email))
+            
+            alert(`User ${user.email} has been successfully deleted`)
+        } catch (error) {
+            console.error('Failed to delete user:', error)
+            alert(`Failed to delete user: ${error.message}`)
         }
     }
 
@@ -259,6 +367,87 @@ Please provide these credentials to the user so they can log in and set their pe
                         </table>
                     </div>
                 )}
+
+                {/* User Management Section */}
+                <div style={{marginTop: 48, borderTop: '2px solid #e9ecef', paddingTop: 24}}>
+                    <h2>User Management</h2>
+                    <p>Manage existing user accounts. You can delete users to completely remove their access.</p>
+                    
+                    {usersLoading ? (
+                        <p>Loading users...</p>
+                    ) : (
+                        <div style={{overflowX: 'auto'}}>
+                            <table style={{width: '100%', borderCollapse: 'collapse', border: '1px solid #ddd'}}>
+                                <thead>
+                                    <tr style={{backgroundColor: '#f5f5f5'}}>
+                                        <th style={{padding: 12, border: '1px solid #ddd', textAlign: 'left'}}>Email</th>
+                                        <th style={{padding: 12, border: '1px solid #ddd', textAlign: 'left'}}>Name</th>
+                                        <th style={{padding: 12, border: '1px solid #ddd', textAlign: 'left'}}>Role</th>
+                                        <th style={{padding: 12, border: '1px solid #ddd', textAlign: 'left'}}>Status</th>
+                                        <th style={{padding: 12, border: '1px solid #ddd', textAlign: 'left'}}>Created</th>
+                                        <th style={{padding: 12, border: '1px solid #ddd', textAlign: 'left'}}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {users.map(user => (
+                                        <tr key={user.sub} style={{
+                                            backgroundColor: user.email === currentUserEmail ? '#fff3cd' : 'transparent'
+                                        }}>
+                                            <td style={{padding: 12, border: '1px solid #ddd'}}>
+                                                {user.email}
+                                                {user.email === currentUserEmail && <span style={{color: '#856404', fontSize: '0.8em'}}> (You)</span>}
+                                            </td>
+                                            <td style={{padding: 12, border: '1px solid #ddd'}}>
+                                                {user.profile ? `${user.profile.firstName || ''} ${user.profile.lastName || ''}`.trim() : '-'}
+                                            </td>
+                                            <td style={{padding: 12, border: '1px solid #ddd'}}>
+                                                {user.profile?.roleCache || 'Member'}
+                                            </td>
+                                            <td style={{padding: 12, border: '1px solid #ddd'}}>
+                                                <span style={{
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4,
+                                                    fontSize: '0.8em',
+                                                    backgroundColor: user.enabled ? '#d4edda' : '#f8d7da',
+                                                    color: user.enabled ? '#155724' : '#721c24'
+                                                }}>
+                                                    {user.enabled ? 'Active' : 'Disabled'}
+                                                </span>
+                                            </td>
+                                            <td style={{padding: 12, border: '1px solid #ddd', fontSize: 14}}>
+                                                {user.created ? new Date(user.created).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td style={{padding: 12, border: '1px solid #ddd'}}>
+                                                {user.email === currentUserEmail ? (
+                                                    <span style={{color: '#6c757d', fontSize: '0.9em'}}>Cannot delete own account</span>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => handleDeleteUser(user)}
+                                                        style={{
+                                                            backgroundColor: '#dc3545', 
+                                                            color: 'white', 
+                                                            border: 'none', 
+                                                            padding: '4px 8px', 
+                                                            borderRadius: 4, 
+                                                            cursor: 'pointer',
+                                                            fontSize: '0.9em'
+                                                        }}
+                                                    >
+                                                        Delete User
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            
+                            {users.length === 0 && (
+                                <p style={{textAlign: 'center', padding: 20, color: '#666'}}>No users found</p>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )
