@@ -26,7 +26,9 @@ export default function EnrollMembers() {
     async function getCurrentUserEmail() {
         try {
             const user = await getCurrentUser()
-            setCurrentUserEmail(user.username)
+            const userEmail = user.signInDetails?.loginId || user.username
+            console.log('Current user email for comparison:', userEmail)
+            setCurrentUserEmail(userEmail)
         } catch (error) {
             console.error('Failed to get current user:', error)
         }
@@ -418,24 +420,27 @@ Please provide these credentials to the user so they can log in and set their pe
                                                 {user.created ? new Date(user.created).toLocaleDateString() : '-'}
                                             </td>
                                             <td style={{padding: 12, border: '1px solid #ddd'}}>
-                                                {user.email === currentUserEmail ? (
-                                                    <span style={{color: '#6c757d', fontSize: '0.9em'}}>Cannot delete own account</span>
-                                                ) : (
-                                                    <button 
-                                                        onClick={() => handleDeleteUser(user)}
-                                                        style={{
-                                                            backgroundColor: '#dc3545', 
-                                                            color: 'white', 
-                                                            border: 'none', 
-                                                            padding: '4px 8px', 
-                                                            borderRadius: 4, 
-                                                            cursor: 'pointer',
-                                                            fontSize: '0.9em'
-                                                        }}
-                                                    >
-                                                        Delete User
-                                                    </button>
-                                                )}
+                                                <button 
+                                                    onClick={() => {
+                                                        console.log('Button clicked for user:', user.email)
+                                                        console.log('Current user email:', currentUserEmail)
+                                                        console.log('Are they equal?', user.email === currentUserEmail)
+                                                        handleDeleteUser(user)
+                                                    }}
+                                                    disabled={user.email === currentUserEmail}
+                                                    style={{
+                                                        backgroundColor: user.email === currentUserEmail ? '#6c757d' : '#dc3545', 
+                                                        color: 'white', 
+                                                        border: 'none', 
+                                                        padding: '4px 8px', 
+                                                        borderRadius: 4, 
+                                                        cursor: user.email === currentUserEmail ? 'not-allowed' : 'pointer',
+                                                        fontSize: '0.9em',
+                                                        opacity: user.email === currentUserEmail ? 0.6 : 1
+                                                    }}
+                                                >
+                                                    Delete User
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
