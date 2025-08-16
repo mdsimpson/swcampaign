@@ -42,6 +42,7 @@ export default function EnrollMembers() {
             const session = await fetchAuthSession()
             
             // Create Cognito client with credentials from current session
+            // The key change: use the credentials that include the Administrator group permissions
             const cognitoClient = new CognitoIdentityProviderClient({
                 region: 'us-east-1',
                 credentials: session.credentials
@@ -61,7 +62,7 @@ export default function EnrollMembers() {
                     { Name: 'family_name', Value: registration.lastName }
                 ],
                 TemporaryPassword: tempPassword,
-                MessageAction: 'SEND' // This sends the welcome email with temporary password
+                MessageAction: 'SUPPRESS' // Don't send the default email, we'll handle communication separately
             }))
             
             const userSub = createUserResult.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value
@@ -100,9 +101,13 @@ export default function EnrollMembers() {
 
 ✅ Cognito user account created successfully
 ✅ Added to Member group  
-✅ Welcome email sent to ${registration.email}
+✅ User profile created
 
-They will receive an email with a temporary password and can log in immediately.`)
+Login Details:
+• Email: ${registration.email}
+• Temporary Password: ${tempPassword}
+
+Please provide these credentials to the user so they can log in and set their permanent password.`)
         } catch (error) {
             console.error('Failed to accept registration:', error)
             alert(`Failed to accept registration: ${error.message}`)

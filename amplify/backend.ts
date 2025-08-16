@@ -5,9 +5,22 @@ import {adminApi} from './functions/admin-api/resource'
 import {notifyAdmins} from './functions/notify-admins/resource'
 import {PolicyStatement} from 'aws-cdk-lib/aws-iam'
 
-export const backend = defineBackend({auth, data, adminApi, notifyAdmins})
+const backend = defineBackend({auth, data, adminApi, notifyAdmins})
 
-// Grant Administrator group permissions to manage Cognito users
+// Add Function URL to Lambda function for HTTP access
+backend.notifyAdmins.resources.lambda.addFunctionUrl({
+  authType: 'NONE', // Allow public access (function will validate internally)
+  cors: {
+    allowCredentials: false,
+    allowedHeaders: ['*'],
+    allowedMethods: ['POST'],
+    allowedOrigins: ['*']
+  }
+})
+
+export { backend }
+
+// Grant Administrator group permissions to manage Cognito users directly
 backend.auth.resources.groups["Administrator"]?.attachInlinePolicy({
   "cognitoAdminPolicy": new PolicyStatement({
     actions: [
@@ -23,8 +36,23 @@ backend.auth.resources.groups["Administrator"]?.attachInlinePolicy({
   })
 })
 
+// Grant authenticated user role permission to perform Cognito admin actions
+// This adds the permissions directly to the authenticated identity pool role
+backend.auth.resources.authenticatedUserIamRole?.addToPolicy(new PolicyStatement({
+  actions: [
+    "cognito-idp:AdminCreateUser",
+    "cognito-idp:AdminAddUserToGroup", 
+    "cognito-idp:AdminRemoveUserFromGroup",
+    "cognito-idp:AdminDisableUser",
+    "cognito-idp:AdminEnableUser",
+    "cognito-idp:ListUsers",
+    "cognito-idp:AdminGetUser"
+  ],
+  resources: [backend.auth.resources.userPool.userPoolArn]
+}))
+
 // Grant notifyAdmins function permissions to read Cognito users and send emails
-backend.notifyAdmins.addToRolePolicy(new PolicyStatement({
+backend.notifyAdmins.resources.lambda.addToRolePolicy(new PolicyStatement({
   actions: [
     "cognito-idp:ListUsersInGroup",
     "ses:SendEmail",
