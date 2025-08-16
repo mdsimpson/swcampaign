@@ -53,7 +53,8 @@ backend.auth.resources.authenticatedUserIamRole?.addToPolicy(new PolicyStatement
     "cognito-idp:AdminEnableUser",
     "cognito-idp:ListUsers",
     "cognito-idp:AdminGetUser",
-    "cognito-idp:AdminDeleteUser"
+    "cognito-idp:AdminDeleteUser",
+    "cognito-idp:AdminListGroupsForUser"
   ],
   resources: [backend.auth.resources.userPool.userPoolArn]
 }))

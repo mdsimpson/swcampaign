@@ -3,6 +3,8 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 import { useLocation, useNavigate } from 'react-router-dom'
+import {fetchAuthSession} from 'aws-amplify/auth'
+import {CognitoIdentityProviderClient, ListUsersCommand, AdminListGroupsForUserCommand} from '@aws-sdk/client-cognito-identity-provider'
 
 export default function Organize() {
     const location = useLocation()
@@ -51,7 +53,9 @@ export default function Organize() {
         
         // Update params
         Object.entries(updates).forEach(([key, value]) => {
-            if (value && value !== 'all' && value !== 1) {
+            // Only set params if they have meaningful values
+            // Empty strings, 'all', 1 (default page), null, undefined should be removed
+            if (value && value !== '' && value !== 'all' && value !== 1) {
                 params.set(key, value.toString())
             } else {
                 params.delete(key)
@@ -68,11 +72,28 @@ export default function Organize() {
     const [sortField, setSortField] = useState('street')
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
-    const client = generateClient<Schema>({
-        authMode: 'apiKey'
-    })
+    const client = generateClient<Schema>()  // Use default auth (userPool) instead of apiKey
 
     useEffect(() => {
+        // Clean up empty filters on mount
+        const params = new URLSearchParams(location.search)
+        let hasChanges = false
+        
+        if (params.get('address') === '') {
+            params.delete('address')
+            hasChanges = true
+        }
+        if (params.get('resident') === '') {
+            params.delete('resident')
+            hasChanges = true
+        }
+        
+        if (hasChanges) {
+            const newSearch = params.toString()
+            const newPath = newSearch ? `${location.pathname}?${newSearch}` : location.pathname
+            navigate(newPath, { replace: true })
+        }
+        
         loadData()
     }, [currentPage, sortField, sortDirection])
     
@@ -89,12 +110,13 @@ export default function Organize() {
             // Build filter for homes - temporarily remove absentee filter for debugging
             let homeFilter: any = undefined // { absenteeOwner: { ne: true } }
             
-            // Add search filter if applied
-            if (searchTerm.trim()) {
+            // Add search filter if applied - only if there's actual content
+            const trimmedSearch = searchTerm.trim()
+            if (trimmedSearch) {
                 homeFilter = {
                     or: [
-                        { street: { contains: searchTerm.trim() } },
-                        { city: { contains: searchTerm.trim() } }
+                        { street: { contains: trimmedSearch } },
+                        { city: { contains: trimmedSearch } }
                     ]
                 }
             }
@@ -103,7 +125,7 @@ export default function Organize() {
             
             if (searchTerm.trim() || residentFilter.trim()) {
                 // When searching, search ALL homes first, then add resident info
-                console.log(`Searching for address: "${searchTerm}" and resident: "${residentFilter}"`)
+                console.log(`Searching for address: "${searchTerm.trim()}" and resident: "${residentFilter.trim()}"`)
                 
                 let searchResults: any[] = []
                 let nextToken = null
@@ -145,14 +167,14 @@ export default function Organize() {
                     for (const home of result.data) {
                         let matches = true
                         
-                        // Apply address filter
+                        // Apply address filter only if searchTerm has content
                         if (searchTerm.trim()) {
-                            if (!home.street?.toLowerCase().includes(searchTerm.toLowerCase())) {
+                            if (!home.street?.toLowerCase().includes(searchTerm.trim().toLowerCase())) {
                                 matches = false
                             }
                         }
                         
-                        // Apply resident filter
+                        // Apply resident filter only if residentFilter has content
                         if (residentFilter.trim()) {
                             if (!residentMatchingHomeIds.has(home.id)) {
                                 matches = false
@@ -439,10 +461,89 @@ export default function Organize() {
             console.log(`Final: setting ${finalUniqueHomes.length} homes, totalCount should be ${totalCount}`)
             setHomes(finalUniqueHomes)
             
-            // Load volunteers if not already loaded
+            // Load volunteers and eligible users
             if (volunteers.length === 0) {
-                const volunteersResult = await client.models.Volunteer.list()
-                setVolunteers(volunteersResult.data)
+                try {
+                    // First, load existing Volunteer records
+                    const existingVolunteers = await client.models.Volunteer.list()
+                    const volunteerMap = new Map()
+                    
+                    // Add existing volunteers to map
+                    existingVolunteers.data.forEach(v => {
+                        volunteerMap.set(v.userSub, {
+                            id: v.id,  // This is the Volunteer model ID
+                            userSub: v.userSub,
+                            email: v.email,
+                            displayName: v.displayName || v.email,
+                            role: 'Volunteer'
+                        })
+                    })
+                    
+                    // Then load users from Cognito who can be assigned work
+                    const session = await fetchAuthSession()
+                    const cognitoClient = new CognitoIdentityProviderClient({
+                        region: 'us-east-1',
+                        credentials: session.credentials
+                    })
+                    
+                    const userPoolId = 'us-east-1_GrxwbZK9I'
+                    
+                    // Get all users from Cognito
+                    const listUsersResult = await cognitoClient.send(new ListUsersCommand({
+                        UserPoolId: userPoolId,
+                        Limit: 60
+                    }))
+                    
+                    // Filter users who are in relevant groups
+                    for (const user of listUsersResult.Users || []) {
+                        const email = user.Attributes?.find(attr => attr.Name === 'email')?.Value
+                        const firstName = user.Attributes?.find(attr => attr.Name === 'given_name')?.Value
+                        const lastName = user.Attributes?.find(attr => attr.Name === 'family_name')?.Value
+                        
+                        // Get user's groups
+                        try {
+                            const groupsResult = await cognitoClient.send(new AdminListGroupsForUserCommand({
+                                UserPoolId: userPoolId,
+                                Username: user.Username!
+                            }))
+                            
+                            const groups = groupsResult.Groups?.map(g => g.GroupName!) || []
+                            
+                            // Check if user is in any of the relevant groups
+                            if (groups.includes('Administrator') || groups.includes('Organizer') || groups.includes('Canvasser')) {
+                                const displayName = `${firstName || ''} ${lastName || ''}`.trim() || email
+                                const role = groups.includes('Administrator') ? 'Administrator' : 
+                                           groups.includes('Organizer') ? 'Organizer' : 'Canvasser'
+                                
+                                // Check if this user already has a Volunteer record
+                                const existing = volunteerMap.get(user.Username)
+                                if (existing) {
+                                    // Update with latest info from Cognito
+                                    existing.displayName = displayName
+                                    existing.email = email
+                                    existing.role = role
+                                } else {
+                                    // Add as potential volunteer (will create Volunteer record when assigned)
+                                    volunteerMap.set(user.Username, {
+                                        id: user.Username,  // Use Username as ID for now
+                                        userSub: user.Username,
+                                        email: email,
+                                        displayName: displayName,
+                                        role: role
+                                    })
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Failed to get groups for user ${email}:`, error)
+                        }
+                    }
+                    
+                    const allVolunteers = Array.from(volunteerMap.values())
+                    console.log(`Found ${allVolunteers.length} volunteers/eligible users`)
+                    setVolunteers(allVolunteers)
+                } catch (error) {
+                    console.error('Failed to load volunteers:', error)
+                }
             }
             
         } catch (error) {
@@ -612,9 +713,59 @@ export default function Organize() {
         }
 
         try {
+            // First, ensure the volunteer exists in the Volunteer model
+            const selectedVolunteer = volunteers.find(v => v.id === assignToVolunteer)
+            if (!selectedVolunteer) {
+                alert('Selected volunteer not found')
+                return
+            }
+            
+            // Check if Volunteer record exists for this user
+            const existingVolunteers = await client.models.Volunteer.list({
+                filter: { userSub: { eq: assignToVolunteer } }
+            })
+            
+            let volunteerId = existingVolunteers.data[0]?.id
+            
+            // Create Volunteer record if it doesn't exist
+            if (!volunteerId) {
+                console.log('Creating new Volunteer record for:', {
+                    userSub: assignToVolunteer,
+                    displayName: selectedVolunteer.displayName,
+                    email: selectedVolunteer.email
+                })
+                
+                try {
+                    const newVolunteer = await client.models.Volunteer.create({
+                        userSub: assignToVolunteer,
+                        displayName: selectedVolunteer.displayName,
+                        email: selectedVolunteer.email
+                    })
+                    console.log('Created volunteer:', newVolunteer)
+                    
+                    if (newVolunteer.data) {
+                        volunteerId = newVolunteer.data.id
+                    } else if (newVolunteer.errors) {
+                        console.error('Errors creating volunteer:', newVolunteer.errors)
+                        alert(`Failed to create volunteer record: ${newVolunteer.errors.map(e => e.message).join(', ')}`)
+                        return
+                    }
+                } catch (error) {
+                    console.error('Exception creating volunteer:', error)
+                    alert(`Failed to create volunteer record: ${error.message}`)
+                    return
+                }
+            }
+            
+            if (!volunteerId) {
+                console.error('No volunteer ID after creation attempt')
+                alert('Failed to create volunteer record - no ID returned')
+                return
+            }
+
             const assignments = Array.from(selectedHomes).map(homeId => ({
                 homeId,
-                volunteerId: assignToVolunteer,
+                volunteerId: volunteerId, // Use the Volunteer model ID, not the user ID
                 assignedAt: new Date().toISOString(),
                 status: 'NOT_STARTED'
             }))
@@ -803,7 +954,7 @@ export default function Organize() {
                             <option value="">Select volunteer...</option>
                             {volunteers.map(volunteer => (
                                 <option key={volunteer.id} value={volunteer.id}>
-                                    {volunteer.displayName || volunteer.email}
+                                    {volunteer.displayName || volunteer.email} ({volunteer.role})
                                 </option>
                             ))}
                         </select>
