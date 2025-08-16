@@ -3,7 +3,7 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 import {fetchAuthSession} from 'aws-amplify/auth'
-import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand, ListUsersCommand, AdminDeleteUserCommand, AdminGetUserCommand} from '@aws-sdk/client-cognito-identity-provider'
+import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand, ListUsersCommand, AdminDeleteUserCommand, AdminGetUserCommand, AdminListGroupsForUserCommand, AdminRemoveUserFromGroupCommand} from '@aws-sdk/client-cognito-identity-provider'
 import {getCurrentUser} from 'aws-amplify/auth'
 
 export default function EnrollMembers() {
@@ -14,6 +14,7 @@ export default function EnrollMembers() {
     const [users, setUsers] = useState<any[]>([])
     const [usersLoading, setUsersLoading] = useState(true)
     const [currentUserEmail, setCurrentUserEmail] = useState<string>('')
+    const [selectedRoles, setSelectedRoles] = useState<{[key: string]: string}>({})
     
     const client = generateClient<Schema>()
 
@@ -70,11 +71,50 @@ export default function EnrollMembers() {
             // Get UserProfiles to match with Cognito users
             const userProfiles = await client.models.UserProfile.list()
             
-            // Combine Cognito user data with UserProfile data
-            const usersWithProfiles = listUsersResult.Users?.map(cognitoUser => {
+            // Combine Cognito user data with UserProfile data and get groups
+            const usersWithProfiles = await Promise.all(listUsersResult.Users?.map(async cognitoUser => {
                 const email = cognitoUser.Attributes?.find(attr => attr.Name === 'email')?.Value
                 const sub = cognitoUser.Attributes?.find(attr => attr.Name === 'sub')?.Value
                 const profile = userProfiles.data.find(p => p.sub === sub)
+                
+                // Get user's groups - try with Username first, then email
+                let groups: string[] = []
+                try {
+                    const groupsResult = await cognitoClient.send(new AdminListGroupsForUserCommand({
+                        UserPoolId: userPoolId,
+                        Username: cognitoUser.Username!
+                    }))
+                    groups = groupsResult.Groups?.map(g => g.GroupName!) || []
+                    console.log(`Groups for ${email || cognitoUser.Username}:`, groups)
+                } catch (error) {
+                    // If Username fails, try with email
+                    if (email) {
+                        try {
+                            const groupsResult = await cognitoClient.send(new AdminListGroupsForUserCommand({
+                                UserPoolId: userPoolId,
+                                Username: email
+                            }))
+                            groups = groupsResult.Groups?.map(g => g.GroupName!) || []
+                            console.log(`Groups for ${email} (using email):`, groups)
+                        } catch (emailError) {
+                            console.error(`Failed to get groups for user ${email}:`, emailError)
+                        }
+                    } else {
+                        console.error(`Failed to get groups for user ${cognitoUser.Username}:`, error)
+                    }
+                }
+                
+                // Determine the highest role (Administrator > Organizer > Canvasser > Member)
+                let role = 'Member'
+                if (groups.includes('Administrator')) role = 'Administrator'
+                else if (groups.includes('Organizer')) role = 'Organizer'
+                else if (groups.includes('Canvasser')) role = 'Canvasser'
+                
+                // If no groups found but we have a roleCache, use that as fallback
+                if (groups.length === 0 && profile?.roleCache) {
+                    console.log(`No groups found for ${email}, using roleCache: ${profile.roleCache}`)
+                    role = profile.roleCache
+                }
                 
                 return {
                     ...cognitoUser,
@@ -83,9 +123,11 @@ export default function EnrollMembers() {
                     profile: profile,
                     enabled: cognitoUser.Enabled,
                     status: cognitoUser.UserStatus,
-                    created: cognitoUser.UserCreateDate
+                    created: cognitoUser.UserCreateDate,
+                    groups: groups,
+                    role: role
                 }
-            }) || []
+            }) || [])
             
             setUsers(usersWithProfiles)
         } catch (error) {
@@ -93,6 +135,69 @@ export default function EnrollMembers() {
             alert('Failed to load users')
         } finally {
             setUsersLoading(false)
+        }
+    }
+
+    async function handleRoleChange(user: any, newRole: string) {
+        if (!user.email) {
+            alert('Cannot change role for user without email')
+            return
+        }
+        
+        if (user.email === currentUserEmail) {
+            alert('You cannot change your own role')
+            return
+        }
+        
+        try {
+            const session = await fetchAuthSession()
+            const cognitoClient = new CognitoIdentityProviderClient({
+                region: 'us-east-1',
+                credentials: session.credentials
+            })
+            
+            const userPoolId = 'us-east-1_GrxwbZK9I'
+            const allRoles = ['Administrator', 'Organizer', 'Canvasser', 'Member']
+            
+            // Remove user from all groups first
+            for (const role of user.groups || []) {
+                try {
+                    await cognitoClient.send(new AdminRemoveUserFromGroupCommand({
+                        UserPoolId: userPoolId,
+                        Username: user.email,
+                        GroupName: role
+                    }))
+                } catch (error) {
+                    console.error(`Failed to remove user from group ${role}:`, error)
+                }
+            }
+            
+            // Add user to new group
+            await cognitoClient.send(new AdminAddUserToGroupCommand({
+                UserPoolId: userPoolId,
+                Username: user.email,
+                GroupName: newRole
+            }))
+            
+            // Update UserProfile roleCache if it exists
+            if (user.profile?.id) {
+                await client.models.UserProfile.update({
+                    id: user.profile.id,
+                    roleCache: newRole
+                })
+            }
+            
+            // Update local state
+            setUsers(prev => prev.map(u => 
+                u.email === user.email 
+                    ? {...u, role: newRole, groups: [newRole]} 
+                    : u
+            ))
+            
+            alert(`${user.email}'s role has been changed to ${newRole}`)
+        } catch (error) {
+            console.error('Failed to change user role:', error)
+            alert(`Failed to change user role: ${error.message}`)
         }
     }
 
@@ -145,6 +250,9 @@ export default function EnrollMembers() {
 
     async function handleAccept(registration: any) {
         try {
+            // Get the selected role for this registration, default to Member
+            const selectedRole = selectedRoles[registration.id] || 'Member'
+            
             // Generate a temporary password
             const tempPassword = generateTemporaryPassword()
             
@@ -175,15 +283,15 @@ export default function EnrollMembers() {
                 userAlreadyExists = true
                 console.log(`User ${registration.email} already exists with sub: ${userSub}`)
                 
-                // If user exists, make sure they're in the Member group
-                console.log(`Adding existing user to Member group`)
+                // If user exists, make sure they're in the selected group
+                console.log(`Adding existing user to ${selectedRole} group`)
                 await cognitoClient.send(new AdminAddUserToGroupCommand({
                     UserPoolId: userPoolId,
                     Username: registration.email,
-                    GroupName: 'Member'
+                    GroupName: selectedRole
                 })).catch(err => {
                     // Group assignment might fail if already in group, that's ok
-                    console.log('User might already be in Member group:', err.message)
+                    console.log(`User might already be in ${selectedRole} group:`, err.message)
                 })
                 
             } catch (userNotFoundError: any) {
@@ -205,12 +313,12 @@ export default function EnrollMembers() {
                     
                     userSub = createUserResult.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value
                     
-                    // Add new user to Member group
-                    console.log(`Adding new user to Member group`)
+                    // Add new user to selected group
+                    console.log(`Adding new user to ${selectedRole} group`)
                     await cognitoClient.send(new AdminAddUserToGroupCommand({
                         UserPoolId: userPoolId,
                         Username: registration.email,
-                        GroupName: 'Member'
+                        GroupName: selectedRole
                     }))
                 } else {
                     throw userNotFoundError
@@ -242,7 +350,7 @@ export default function EnrollMembers() {
                     lastName: registration.lastName,
                     street: registration.street,
                     mobile: registration.mobile,
-                    roleCache: 'Member'
+                    roleCache: selectedRole
                 })
             } else {
                 // Create new profile
@@ -254,7 +362,7 @@ export default function EnrollMembers() {
                     lastName: registration.lastName,
                     street: registration.street,
                     mobile: registration.mobile,
-                    roleCache: 'Member'
+                    roleCache: selectedRole
                 })
             }
 
@@ -309,7 +417,7 @@ export default function EnrollMembers() {
                 message += `✅ Cognito user account created successfully\n`
             }
             
-            message += `✅ Added to Member group\n`
+            message += `✅ Added to ${selectedRole} group\n`
             message += `✅ User profile ${existingProfiles.data.length > 0 ? 'updated' : 'created'}\n`
             
             if (emailSent) {
@@ -470,7 +578,22 @@ Note: The user will be required to change their password on first login.`
                                         <td style={{padding: 12, border: '1px solid #ddd'}}>{reg.street}</td>
                                         <td style={{padding: 12, border: '1px solid #ddd'}}>{reg.mobile || '-'}</td>
                                         <td style={{padding: 12, border: '1px solid #ddd'}}>
-                                            <div style={{display: 'flex', gap: 8}}>
+                                            <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+                                                <select 
+                                                    value={selectedRoles[reg.id] || 'Member'}
+                                                    onChange={(e) => setSelectedRoles(prev => ({...prev, [reg.id]: e.target.value}))}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: 4,
+                                                        border: '1px solid #ddd',
+                                                        fontSize: '0.9em'
+                                                    }}
+                                                >
+                                                    <option value="Member">Member</option>
+                                                    <option value="Canvasser">Canvasser</option>
+                                                    <option value="Organizer">Organizer</option>
+                                                    <option value="Administrator">Administrator</option>
+                                                </select>
                                                 <button 
                                                     onClick={() => handleAccept(reg)}
                                                     style={{backgroundColor: '#28a745', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 4, cursor: 'pointer'}}
@@ -525,7 +648,24 @@ Note: The user will be required to change their password on first login.`
                                                 {user.profile ? `${user.profile.firstName || ''} ${user.profile.lastName || ''}`.trim() : '-'}
                                             </td>
                                             <td style={{padding: 12, border: '1px solid #ddd'}}>
-                                                {user.profile?.roleCache || 'Member'}
+                                                <select 
+                                                    value={user.role || 'Member'}
+                                                    onChange={(e) => handleRoleChange(user, e.target.value)}
+                                                    disabled={user.email === currentUserEmail}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: 4,
+                                                        border: '1px solid #ddd',
+                                                        backgroundColor: user.email === currentUserEmail ? '#f5f5f5' : 'white',
+                                                        cursor: user.email === currentUserEmail ? 'not-allowed' : 'pointer',
+                                                        fontSize: '0.9em'
+                                                    }}
+                                                >
+                                                    <option value="Member">Member</option>
+                                                    <option value="Canvasser">Canvasser</option>
+                                                    <option value="Organizer">Organizer</option>
+                                                    <option value="Administrator">Administrator</option>
+                                                </select>
                                             </td>
                                             <td style={{padding: 12, border: '1px solid #ddd'}}>
                                                 <span style={{
