@@ -341,7 +341,7 @@ export default function AbsenteeInteractions() {
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
                                             {home.residents?.map((person: any, i: number) => (
                                                 <div key={person.id} style={{fontSize: '0.9em'}}>
-                                                    {person.email && <div>📧 {person.email}</div>}
+                                                    {person.email && <div>📧 <a href={`mailto:${person.email}`} style={{color: '#007bff', textDecoration: 'none'}}>{person.email}</a></div>}
                                                     {person.mobilePhone && <div>📱 {person.mobilePhone}</div>}
                                                     {i < home.residents.length - 1 && <br/>}
                                                 </div>
