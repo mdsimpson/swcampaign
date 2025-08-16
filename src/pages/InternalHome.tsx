@@ -134,8 +134,8 @@ export default function InternalHome() {
     }
 
     const consentProgressPercent = stats.totalHomes > 0 ? (stats.homesWithAllConsents / stats.totalHomes) * 100 : 0
-    const targetConsentsNeeded = Math.ceil(stats.totalHomes * 0.8)
-    const progressToTarget = stats.totalHomes > 0 ? (stats.homesWithAllConsents / targetConsentsNeeded) * 100 : 0
+    const targetConsentsNeeded = stats.totalHomes  // Show total homes instead of 80%
+    const progressToTarget = stats.totalHomes > 0 ? (stats.homesWithAllConsents / stats.totalHomes) * 100 : 0
 
     const hasRole = (role: string) => userGroups.includes(role)
     const isCanvasser = hasRole('Canvasser') || hasRole('Organizer') || hasRole('Administrator')
@@ -152,8 +152,8 @@ export default function InternalHome() {
                     <h3>Consent Form Progress</h3>
                     <div style={{marginBottom: 12}}>
                         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 4}}>
-                            <span>Homes with All Consents Signed (Need 80%)</span>
-                            <span>{stats.homesWithAllConsents} / {targetConsentsNeeded} ({consentProgressPercent.toFixed(1)}%)</span>
+                            <span>Homes with All Consents Signed</span>
+                            <span>{statsLoaded ? `${stats.homesWithAllConsents} / ${targetConsentsNeeded} (${consentProgressPercent.toFixed(1)}%)` : ''}</span>
                         </div>
                         <div style={{backgroundColor: '#e0e0e0', borderRadius: 4, height: 20}}>
                             <div style={{
