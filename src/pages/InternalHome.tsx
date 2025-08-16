@@ -12,6 +12,7 @@ export default function InternalHome() {
     const [pendingRegistrations, setPendingRegistrations] = useState(0)
     const [outstandingAssignments, setOutstandingAssignments] = useState(0)
     const [userGroups, setUserGroups] = useState<string[]>([])
+    const [statsLoaded, setStatsLoaded] = useState(false)
     
     const client = generateClient<Schema>({
         authMode: 'apiKey'
@@ -105,8 +106,10 @@ export default function InternalHome() {
             }
             
             setStats({totalPeople, consentsRecorded, totalHomes, homesWithAllConsents})
+            setStatsLoaded(true)
         } catch (error) {
             console.error('Failed to load stats:', error)
+            setStatsLoaded(true)
         }
     }
 
@@ -164,9 +167,9 @@ export default function InternalHome() {
                     </div>
 
                     <div style={{display: 'flex', gap: 20, fontSize: 14}}>
-                        <span>Total Homes: {stats.totalHomes}</span>
-                        <span>Individual Consents: {stats.consentsRecorded}</span>
-                        <span>Progress to 80%: {progressToTarget.toFixed(1)}%</span>
+                        <span>Total Homes: {statsLoaded ? stats.totalHomes : ''}</span>
+                        <span>Individual Consents: {statsLoaded ? stats.consentsRecorded : ''}</span>
+                        <span>Progress to 80%: {statsLoaded ? progressToTarget.toFixed(1) + '%' : ''}</span>
                     </div>
                 </div>
 
