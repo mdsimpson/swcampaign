@@ -38,7 +38,7 @@ const schema = a.schema({
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
         allow.groups(['Member']).to(['read']),
-        allow.publicApiKey().to(['create','read']) // Allow import scripts and UI access
+        allow.publicApiKey().to(['create','read','update']) // Allow import scripts and coordinate updates
     ]),
 
     Person: a.model({
@@ -79,6 +79,7 @@ const schema = a.schema({
         assignments: a.hasMany('Assignment','volunteerId'),
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
+        allow.groups(['Canvasser']).to(['read']),  // Allow canvassers to read volunteer records
         allow.owner().to(['read'])
     ]),
 

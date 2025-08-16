@@ -468,14 +468,14 @@ export default function Organize() {
                     const existingVolunteers = await client.models.Volunteer.list()
                     const volunteerMap = new Map()
                     
-                    // Add existing volunteers to map (we'll update their role from Cognito)
+                    // Add existing volunteers to map (role will be set from Cognito groups)
                     existingVolunteers.data.forEach(v => {
                         volunteerMap.set(v.userSub, {
                             id: v.id,  // This is the Volunteer model ID
                             userSub: v.userSub,
                             email: v.email,
                             displayName: v.displayName || v.email,
-                            role: 'Member'  // Default, will be updated from Cognito groups
+                            role: null  // Will be set from Cognito groups
                         })
                     })
                     
@@ -512,13 +512,17 @@ export default function Organize() {
                             // Check if user is in any of the relevant groups
                             if (groups.includes('Administrator') || groups.includes('Organizer') || groups.includes('Canvasser')) {
                                 const displayName = `${firstName || ''} ${lastName || ''}`.trim() || email
+                                // Determine the highest role (Administrator > Organizer > Canvasser > Member)
                                 const role = groups.includes('Administrator') ? 'Administrator' : 
-                                           groups.includes('Organizer') ? 'Organizer' : 'Canvasser'
+                                           groups.includes('Organizer') ? 'Organizer' : 
+                                           groups.includes('Canvasser') ? 'Canvasser' : 'Member'
                                 
                                 // Always update or add the user (this ensures no duplicates)
-                                volunteerMap.set(user.Username, {
-                                    id: volunteerMap.get(user.Username)?.id || user.Username,  // Keep existing Volunteer ID if exists
-                                    userSub: user.Username,
+                                // Use userSub as the consistent key (user.Username is the userSub in Cognito)
+                                const userSub = user.Username
+                                volunteerMap.set(userSub, {
+                                    id: volunteerMap.get(userSub)?.id || userSub,  // Keep existing Volunteer ID if exists
+                                    userSub: userSub,
                                     email: email,
                                     displayName: displayName,
                                     role: role
@@ -529,8 +533,16 @@ export default function Organize() {
                         }
                     }
                     
-                    const allVolunteers = Array.from(volunteerMap.values())
+                    // Filter out entries without roles (Volunteer records not found in Cognito)
+                    const allVolunteers = Array.from(volunteerMap.values()).filter(v => v.role !== null)
                     console.log(`Found ${allVolunteers.length} volunteers/eligible users`)
+                    console.log('Volunteers:', allVolunteers.map(v => ({ 
+                        displayName: v.displayName, 
+                        email: v.email, 
+                        role: v.role, 
+                        userSub: v.userSub,
+                        id: v.id 
+                    })))
                     setVolunteers(allVolunteers)
                 } catch (error) {
                     console.error('Failed to load volunteers:', error)
@@ -763,16 +775,17 @@ export default function Organize() {
         }
 
         try {
-            // First, ensure the volunteer exists in the Volunteer model
-            const selectedVolunteer = volunteers.find(v => v.id === assignToVolunteer)
+            // First, ensure the volunteer exists in the volunteers list
+            const selectedVolunteer = volunteers.find(v => v.userSub === assignToVolunteer || v.id === assignToVolunteer)
             if (!selectedVolunteer) {
                 alert('Selected volunteer not found')
                 return
             }
             
             // Check if Volunteer record exists for this user
+            const userSubToFind = selectedVolunteer.userSub || assignToVolunteer
             const existingVolunteers = await client.models.Volunteer.list({
-                filter: { userSub: { eq: assignToVolunteer } }
+                filter: { userSub: { eq: userSubToFind } }
             })
             
             let volunteerId = existingVolunteers.data[0]?.id
@@ -780,14 +793,14 @@ export default function Organize() {
             // Create Volunteer record if it doesn't exist
             if (!volunteerId) {
                 console.log('Creating new Volunteer record for:', {
-                    userSub: assignToVolunteer,
+                    userSub: userSubToFind,
                     displayName: selectedVolunteer.displayName,
                     email: selectedVolunteer.email
                 })
                 
                 try {
                     const newVolunteer = await client.models.Volunteer.create({
-                        userSub: assignToVolunteer,
+                        userSub: userSubToFind,
                         displayName: selectedVolunteer.displayName,
                         email: selectedVolunteer.email
                     })
@@ -1027,7 +1040,7 @@ export default function Organize() {
                         >
                             <option value="">Select volunteer...</option>
                             {volunteers.map(volunteer => (
-                                <option key={volunteer.id} value={volunteer.id}>
+                                <option key={volunteer.id} value={volunteer.userSub || volunteer.id}>
                                     {volunteer.displayName || volunteer.email} ({volunteer.role})
                                 </option>
                             ))}
