@@ -6,6 +6,10 @@ import {
     AdminCreateUserCommand,
     ListUsersCommand
 } from '@aws-sdk/client-cognito-identity-provider'
+import {
+    SESClient,
+    SendEmailCommand
+} from '@aws-sdk/client-ses'
 
 export const handler = async (event: any) => {
     const headers = {
@@ -63,6 +67,67 @@ export const handler = async (event: any) => {
         if (action === 'listUsers') {
             const res = await client.send(new ListUsersCommand({UserPoolId: userPoolId, Limit: 60}));
             return {statusCode: 200, headers, body: JSON.stringify(res.Users || [])}
+        }
+        if (action === 'sendWelcomeEmail') {
+            const {email, firstName, lastName, tempPassword} = body
+            
+            if (!email || !firstName || !lastName || !tempPassword) {
+                return {statusCode: 400, headers, body: 'Missing required fields for welcome email'}
+            }
+            
+            const sesClient = new SESClient({})
+            const fromEmail = 'mike@michael-simpson.com'
+            
+            const emailSubject = `Welcome to SWHOA Dissolution Campaign - Account Created`
+            const emailBody = `
+Dear ${firstName} ${lastName},
+
+Welcome to the SWHOA dissolution campaign! Your account has been approved and created.
+
+Login Details:
+• Website: https://your-app-domain.com
+• Email: ${email}
+• Temporary Password: ${tempPassword}
+
+IMPORTANT: You will be required to change your password on your first login for security purposes.
+
+Next Steps:
+1. Visit the website and log in with the credentials above
+2. Change your temporary password to a secure password of your choice
+3. Complete your profile information if needed
+4. Start participating in the dissolution campaign
+
+If you have any questions or need assistance, please contact an administrator.
+
+Thank you for joining our campaign!
+
+---
+SWHOA Dissolution Campaign Team
+            `.trim()
+            
+            await sesClient.send(new SendEmailCommand({
+                Source: fromEmail,
+                Destination: {
+                    ToAddresses: [email]
+                },
+                Message: {
+                    Subject: {
+                        Data: emailSubject,
+                        Charset: 'UTF-8'
+                    },
+                    Body: {
+                        Text: {
+                            Data: emailBody,
+                            Charset: 'UTF-8'
+                        }
+                    }
+                }
+            }))
+            
+            return {statusCode: 200, headers, body: JSON.stringify({
+                message: `Welcome email sent to ${email}`,
+                email: email
+            })}
         }
         return {statusCode: 400, headers, body: 'Unknown action'}
     } catch (e: any) {

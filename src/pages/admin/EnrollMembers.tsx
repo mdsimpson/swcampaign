@@ -160,34 +160,66 @@ export default function EnrollMembers() {
             
             const userPoolId = 'us-east-1_GrxwbZK9I'
             
-            // Create Cognito user account
-            console.log(`Creating Cognito user for ${registration.email}`)
-            const createUserResult = await cognitoClient.send(new AdminCreateUserCommand({
-                UserPoolId: userPoolId,
-                Username: registration.email,
-                UserAttributes: [
-                    { Name: 'email', Value: registration.email },
-                    { Name: 'email_verified', Value: 'true' },
-                    { Name: 'given_name', Value: registration.firstName },
-                    { Name: 'family_name', Value: registration.lastName }
-                ],
-                TemporaryPassword: tempPassword,
-                MessageAction: 'SUPPRESS' // Don't send the default email, we'll handle communication separately
-            }))
+            let userSub: string | undefined
+            let userAlreadyExists = false
             
-            const userSub = createUserResult.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value
+            // First, check if user already exists
+            try {
+                console.log(`Checking if user ${registration.email} already exists...`)
+                const existingUser = await cognitoClient.send(new AdminGetUserCommand({
+                    UserPoolId: userPoolId,
+                    Username: registration.email
+                }))
+                
+                userSub = existingUser.UserAttributes?.find(attr => attr.Name === 'sub')?.Value
+                userAlreadyExists = true
+                console.log(`User ${registration.email} already exists with sub: ${userSub}`)
+                
+                // If user exists, make sure they're in the Member group
+                console.log(`Adding existing user to Member group`)
+                await cognitoClient.send(new AdminAddUserToGroupCommand({
+                    UserPoolId: userPoolId,
+                    Username: registration.email,
+                    GroupName: 'Member'
+                })).catch(err => {
+                    // Group assignment might fail if already in group, that's ok
+                    console.log('User might already be in Member group:', err.message)
+                })
+                
+            } catch (userNotFoundError: any) {
+                if (userNotFoundError.name === 'UserNotFoundException') {
+                    // User doesn't exist, create them
+                    console.log(`User ${registration.email} does not exist, creating new user`)
+                    const createUserResult = await cognitoClient.send(new AdminCreateUserCommand({
+                        UserPoolId: userPoolId,
+                        Username: registration.email,
+                        UserAttributes: [
+                            { Name: 'email', Value: registration.email },
+                            { Name: 'email_verified', Value: 'true' },
+                            { Name: 'given_name', Value: registration.firstName },
+                            { Name: 'family_name', Value: registration.lastName }
+                        ],
+                        TemporaryPassword: tempPassword,
+                        MessageAction: 'SUPPRESS' // Don't send the default email, we'll handle communication separately
+                    }))
+                    
+                    userSub = createUserResult.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value
+                    
+                    // Add new user to Member group
+                    console.log(`Adding new user to Member group`)
+                    await cognitoClient.send(new AdminAddUserToGroupCommand({
+                        UserPoolId: userPoolId,
+                        Username: registration.email,
+                        GroupName: 'Member'
+                    }))
+                } else {
+                    throw userNotFoundError
+                }
+            }
             
             if (!userSub) {
                 throw new Error('Failed to get user sub from created user')
             }
-            
-            // Add user to Member group
-            console.log(`Adding user to Member group`)
-            await cognitoClient.send(new AdminAddUserToGroupCommand({
-                UserPoolId: userPoolId,
-                Username: registration.email,
-                GroupName: 'Member'
-            }))
             
             // Update registration status
             await client.models.Registration.update({
@@ -195,31 +227,121 @@ export default function EnrollMembers() {
                 status: 'ACCEPTED'
             })
             
-            // Create user profile with actual user sub
-            // Note: We create this as admin, so the owner field will be set to the admin user
-            // The new user will be able to read it because of the owner authorization rule  
-            await client.models.UserProfile.create({
-                sub: userSub,
-                email: registration.email,
-                firstName: registration.firstName,
-                lastName: registration.lastName,
-                street: registration.street,
-                mobile: registration.mobile,
-                roleCache: 'Member'
+            // Check if UserProfile already exists for this user
+            const existingProfiles = await client.models.UserProfile.list({
+                filter: { sub: { eq: userSub } }
             })
+            
+            if (existingProfiles.data.length > 0) {
+                // Update existing profile
+                console.log(`Updating existing UserProfile for ${registration.email}`)
+                await client.models.UserProfile.update({
+                    id: existingProfiles.data[0].id,
+                    email: registration.email,
+                    firstName: registration.firstName,
+                    lastName: registration.lastName,
+                    street: registration.street,
+                    mobile: registration.mobile,
+                    roleCache: 'Member'
+                })
+            } else {
+                // Create new profile
+                console.log(`Creating new UserProfile for ${registration.email}`)
+                await client.models.UserProfile.create({
+                    sub: userSub,
+                    email: registration.email,
+                    firstName: registration.firstName,
+                    lastName: registration.lastName,
+                    street: registration.street,
+                    mobile: registration.mobile,
+                    roleCache: 'Member'
+                })
+            }
+
+            // Send welcome email with login credentials using notify-admins function
+            let emailSent = false
+            let emailError = null
+            try {
+                console.log('Sending welcome email to:', registration.email)
+                
+                const functionUrl = 'https://iztw3vy5oc7pxbe2fqlvtqchne0hzfcn.lambda-url.us-east-1.on.aws/'
+                const welcomeResponse = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'sendWelcomeEmail',
+                        email: registration.email,
+                        firstName: registration.firstName,
+                        lastName: registration.lastName,
+                        tempPassword: tempPassword
+                    })
+                })
+                
+                console.log('Welcome email response status:', welcomeResponse.status)
+                const responseText = await welcomeResponse.text()
+                console.log('Welcome email response:', responseText)
+                
+                if (welcomeResponse.ok) {
+                    console.log('✅ Welcome email sent successfully')
+                    emailSent = true
+                } else {
+                    console.error('❌ Failed to send welcome email:', responseText)
+                    // Check if it's a verification error
+                    if (responseText.includes('Email address is not verified')) {
+                        emailError = 'unverified'
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error sending welcome email:', error)
+                emailError = 'failed'
+            }
 
             setRegistrations(prev => prev.filter(r => r.id !== registration.id))
-            alert(`${registration.firstName} ${registration.lastName} has been accepted! 
+            
+            // Build the appropriate success message based on what happened
+            let message = `${registration.firstName} ${registration.lastName} has been accepted!\n\n`
+            
+            if (userAlreadyExists) {
+                message += `✅ User account already existed\n`
+            } else {
+                message += `✅ Cognito user account created successfully\n`
+            }
+            
+            message += `✅ Added to Member group\n`
+            message += `✅ User profile ${existingProfiles.data.length > 0 ? 'updated' : 'created'}\n`
+            
+            if (emailSent) {
+                message += `✅ Welcome email sent with login credentials\n\n`
+                message += `The user will receive an email at ${registration.email} with their login credentials and instructions.`
+                alert(message)
+            } else if (emailError === 'unverified' || emailError === 'failed') {
+                // For failed emails, copy credentials to clipboard and show in a prompt
+                const credentials = `Login Credentials for ${registration.firstName} ${registration.lastName}:
+Email: ${registration.email}
+Temporary Password: ${tempPassword}
+Login URL: ${window.location.origin}/landing
 
-✅ Cognito user account created successfully
-✅ Added to Member group  
-✅ User profile created
-
-Login Details:
-• Email: ${registration.email}
-• Temporary Password: ${tempPassword}
-
-Please provide these credentials to the user so they can log in and set their permanent password.`)
+Note: The user will be required to change their password on first login.`
+                
+                // Try to copy to clipboard
+                try {
+                    await navigator.clipboard.writeText(credentials)
+                    message += `⚠️ Welcome email could not be sent${emailError === 'unverified' ? ' (recipient email not verified in AWS SES)' : ''}\n\n`
+                    message += `✅ Login credentials have been copied to your clipboard!\n\n`
+                    message += `Paste them into an email to send to the user.`
+                    alert(message)
+                } catch (clipboardError) {
+                    // If clipboard fails, use prompt so user can copy manually
+                    message += `⚠️ Welcome email could not be sent${emailError === 'unverified' ? ' (recipient email not verified in AWS SES)' : ''}\n\n`
+                    message += `Please copy the credentials from the next dialog.`
+                    alert(message)
+                    
+                    // Show credentials in a prompt dialog where text can be selected
+                    prompt('Copy these login credentials to send to the user:', credentials)
+                }
+            }
         } catch (error) {
             console.error('Failed to accept registration:', error)
             alert(`Failed to accept registration: ${error.message}`)

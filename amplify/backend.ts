@@ -3,19 +3,24 @@ import {auth} from './auth/resource'
 import {data} from './data/resource'
 import {adminApi} from './functions/admin-api/resource'
 import {notifyAdmins} from './functions/notify-admins/resource'
+import {sendWelcomeEmail} from './functions/send-welcome-email/resource'
 import {PolicyStatement} from 'aws-cdk-lib/aws-iam'
 
-const backend = defineBackend({auth, data, adminApi, notifyAdmins})
+const backend = defineBackend({auth, data, adminApi, notifyAdmins, sendWelcomeEmail})
 
 // Add Function URL to Lambda function for HTTP access
 backend.notifyAdmins.resources.lambda.addFunctionUrl({
-  authType: 'NONE', // Allow public access (function will validate internally)
-  cors: {
-    allowCredentials: false,
-    allowedHeaders: ['*'],
-    allowedMethods: ['POST'],
-    allowedOrigins: ['*']
-  }
+  authType: 'NONE' // Allow public access (function will handle CORS internally)
+})
+
+// Add Function URL to admin API for HTTP access
+backend.adminApi.resources.lambda.addFunctionUrl({
+  authType: 'NONE' // Allow public access (function will handle CORS internally)
+})
+
+// Add Function URL to welcome email Lambda function for HTTP access
+backend.sendWelcomeEmail.resources.lambda.addFunctionUrl({
+  authType: 'NONE' // Allow public access (function will handle CORS internally)
 })
 
 export { backend }
@@ -62,6 +67,28 @@ backend.notifyAdmins.resources.lambda.addToRolePolicy(new PolicyStatement({
   ],
   resources: [
     backend.auth.resources.userPool.userPoolArn,
+    "*" // SES resources
+  ]
+}))
+
+// Grant sendWelcomeEmail function permissions to send emails
+backend.sendWelcomeEmail.resources.lambda.addToRolePolicy(new PolicyStatement({
+  actions: [
+    "ses:SendEmail",
+    "ses:SendRawEmail"
+  ],
+  resources: [
+    "*" // SES resources
+  ]
+}))
+
+// Grant admin API function permissions to send emails (for welcome emails)
+backend.adminApi.resources.lambda.addToRolePolicy(new PolicyStatement({
+  actions: [
+    "ses:SendEmail",
+    "ses:SendRawEmail"
+  ],
+  resources: [
     "*" // SES resources
   ]
 }))
