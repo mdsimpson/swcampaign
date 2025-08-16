@@ -46,14 +46,52 @@ export default function InternalHome() {
         try {
             const consents = await client.models.Consent.list()
             const people = await client.models.Person.list()
-            const homes = await client.models.Home.list()
+            
+            // Check if we're hitting pagination limits
+            let allHomes = []
+            let nextToken = null
+            let totalCount = 0
+            
+            do {
+                const homesQuery = await client.models.Home.list({
+                    limit: 1000,
+                    nextToken: nextToken
+                })
+                allHomes.push(...homesQuery.data)
+                nextToken = homesQuery.nextToken
+                totalCount += homesQuery.data.length
+                console.log(`Batch loaded: ${homesQuery.data.length} homes, total so far: ${totalCount}`)
+            } while (nextToken)
+            
+            console.log('Final total homes found:', totalCount)
+            console.log('Sample home addresses:', allHomes.slice(0, 5).map(h => h.street))
+            
+            // Check for duplicates by address
+            const addressMap = new Map()
+            allHomes.forEach(home => {
+                const address = `${home.street}, ${home.city}`.toLowerCase()
+                if (addressMap.has(address)) {
+                    addressMap.set(address, addressMap.get(address) + 1)
+                } else {
+                    addressMap.set(address, 1)
+                }
+            })
+            
+            const duplicates = Array.from(addressMap.entries()).filter(([address, count]) => count > 1)
+            console.log(`Found ${duplicates.length} addresses with duplicates:`)
+            console.log('Top 10 duplicate addresses:', duplicates.slice(0, 10))
+            
+            const uniqueAddresses = addressMap.size
+            console.log(`Unique addresses: ${uniqueAddresses}, Total records: ${totalCount}`)
+            
+            // For now, let's use the unique address count for the display
+            const totalHomes = uniqueAddresses
             
             const totalPeople = people.data.length
             const consentsRecorded = consents.data.length
-            const totalHomes = homes.data.length
             
             // Calculate homes where ALL owners have signed
-            const homeIds = new Set(homes.data.map(h => h.id))
+            const homeIds = new Set(allHomes.map(h => h.id))
             let homesWithAllConsents = 0
             
             for (const homeId of homeIds) {
