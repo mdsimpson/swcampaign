@@ -468,14 +468,14 @@ export default function Organize() {
                     const existingVolunteers = await client.models.Volunteer.list()
                     const volunteerMap = new Map()
                     
-                    // Add existing volunteers to map
+                    // Add existing volunteers to map (we'll update their role from Cognito)
                     existingVolunteers.data.forEach(v => {
                         volunteerMap.set(v.userSub, {
                             id: v.id,  // This is the Volunteer model ID
                             userSub: v.userSub,
                             email: v.email,
                             displayName: v.displayName || v.email,
-                            role: 'Volunteer'
+                            role: 'Member'  // Default, will be updated from Cognito groups
                         })
                     })
                     
@@ -515,23 +515,14 @@ export default function Organize() {
                                 const role = groups.includes('Administrator') ? 'Administrator' : 
                                            groups.includes('Organizer') ? 'Organizer' : 'Canvasser'
                                 
-                                // Check if this user already has a Volunteer record
-                                const existing = volunteerMap.get(user.Username)
-                                if (existing) {
-                                    // Update with latest info from Cognito
-                                    existing.displayName = displayName
-                                    existing.email = email
-                                    existing.role = role
-                                } else {
-                                    // Add as potential volunteer (will create Volunteer record when assigned)
-                                    volunteerMap.set(user.Username, {
-                                        id: user.Username,  // Use Username as ID for now
-                                        userSub: user.Username,
-                                        email: email,
-                                        displayName: displayName,
-                                        role: role
-                                    })
-                                }
+                                // Always update or add the user (this ensures no duplicates)
+                                volunteerMap.set(user.Username, {
+                                    id: volunteerMap.get(user.Username)?.id || user.Username,  // Keep existing Volunteer ID if exists
+                                    userSub: user.Username,
+                                    email: email,
+                                    displayName: displayName,
+                                    role: role
+                                })
                             }
                         } catch (error) {
                             console.error(`Failed to get groups for user ${email}:`, error)
