@@ -719,11 +719,13 @@ export default function Organize() {
         try {
             // For each selected home, find and delete its assignments
             const deletePromises = []
+            const assignmentIdsToDelete = new Set<string>()
             
             for (const homeId of selectedHomes) {
                 const home = homes.find(h => h.id === homeId)
                 if (home && home.assignments) {
                     for (const assignment of home.assignments) {
+                        assignmentIdsToDelete.add(assignment.id)
                         deletePromises.push(
                             client.models.Assignment.delete({ id: assignment.id })
                         )
@@ -738,9 +740,25 @@ export default function Organize() {
 
             await Promise.all(deletePromises)
 
+            // Update homes state to remove assignments without reloading
+            setHomes(prevHomes => 
+                prevHomes.map(home => {
+                    if (selectedHomes.has(home.id)) {
+                        // Remove assignments for this home
+                        return {
+                            ...home,
+                            assignments: home.assignments?.filter(
+                                a => !assignmentIdsToDelete.has(a.id)
+                            ) || []
+                        }
+                    }
+                    return home
+                })
+            )
+
             alert(`Unassigned ${selectedHomes.size} homes successfully`)
             setSelectedHomes(new Set())
-            loadData() // Refresh data
+            // Don't call loadData() - we've updated the state directly
         } catch (error) {
             console.error('Failed to unassign homes:', error)
             alert('Failed to unassign homes')
@@ -811,16 +829,52 @@ export default function Organize() {
                 status: 'NOT_STARTED'
             }))
 
-            await Promise.all(
+            const createdAssignments = await Promise.all(
                 assignments.map(assignment => 
                     client.models.Assignment.create(assignment)
                 )
             )
 
+            // Update the volunteer list to include the new Volunteer record if it was created
+            if (!existingVolunteers.data[0]) {
+                // A new volunteer was created, add it to the volunteers list
+                setVolunteers(prev => {
+                    const updated = [...prev]
+                    const index = updated.findIndex(v => v.id === assignToVolunteer || v.userSub === assignToVolunteer)
+                    if (index >= 0) {
+                        // Update the existing entry with the new Volunteer ID
+                        updated[index] = {
+                            ...updated[index],
+                            id: volunteerId,  // Update with the actual Volunteer model ID
+                        }
+                    }
+                    return updated
+                })
+            }
+
+            // Update homes state with new assignments without reloading
+            setHomes(prevHomes => 
+                prevHomes.map(home => {
+                    // Check if this home was assigned
+                    const newAssignment = createdAssignments.find(
+                        result => result.data && result.data.homeId === home.id
+                    )
+                    
+                    if (newAssignment && newAssignment.data) {
+                        // Add the new assignment to this home
+                        return {
+                            ...home,
+                            assignments: [...(home.assignments || []), newAssignment.data]
+                        }
+                    }
+                    return home
+                })
+            )
+
             alert(`Assigned ${selectedHomes.size} homes successfully`)
             setSelectedHomes(new Set())
             setAssignToVolunteer('')
-            loadData() // Refresh data
+            // Don't call loadData() - we've updated the state directly
         } catch (error) {
             console.error('Failed to assign homes:', error)
             alert('Failed to assign homes')
