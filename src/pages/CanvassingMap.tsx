@@ -20,10 +20,10 @@ const libraries = ['marker'] as const
 
 export default function CanvassingMap() {
     const {user} = useAuthenticator(ctx => [ctx.user])
-    const [homes, setHomes] = useState<any[]>([])
+    const [addresses, setAddresses] = useState<any[]>([])
     const [assignments, setAssignments] = useState<any[]>([])
     const [showAll, setShowAll] = useState(false)
-    const [selectedHome, setSelectedHome] = useState<any>(null)
+    const [selectedAddress, setSelectedAddress] = useState<any>(null)
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
     const [mapsLoaded, setMapsLoaded] = useState(false)
     const [mapInstance, setMapInstance] = useState(null)
@@ -41,24 +41,24 @@ export default function CanvassingMap() {
         }
     }, [user])
 
-    async function loadHomes() {
-        console.log('loadHomes: Starting to load homes...')
+    async function loadAddresses() {
+        console.log('loadAddresses: Starting to load addresses...')
         try {
-            // Load all homes (including absentee owners for now)
-            const result = await client.models.Home.list()
-            console.log('loadHomes: Raw homes result:', result.data.length)
-            console.log('loadHomes: First home sample:', result.data[0])
+            // Load all addresses (including absentee owners for now)
+            const result = await client.models.Address.list()
+            console.log('loadAddresses: Raw addresses result:', result.data.length)
+            console.log('loadAddresses: First address sample:', result.data[0])
             if (result.errors) {
-                console.error('loadHomes: GraphQL errors:', result.errors)
+                console.error('loadAddresses: GraphQL errors:', result.errors)
             }
-            // Don't filter out absentee owners yet - let's see all homes
-            const allHomes = result.data
-            console.log('loadHomes: All homes (including absentee):', allHomes.length)
-            setHomes(allHomes)
-            console.log('loadHomes: Set homes state to', allHomes.length, 'homes')
+            // Don't filter out absentee owners yet - let's see all addresses
+            const allAddresses = result.data
+            console.log('loadAddresses: All addresses (including absentee):', allAddresses.length)
+            setAddresses(allAddresses)
+            console.log('loadAddresses: Set addresses state to', allAddresses.length, 'addresses')
         } catch (error) {
-            console.error('loadHomes: Failed to load homes:', error)
-            console.error('loadHomes: Error details:', error.message, error.stack)
+            console.error('loadAddresses: Failed to load addresses:', error)
+            console.error('loadAddresses: Error details:', error.message, error.stack)
         }
     }
 
@@ -71,12 +71,12 @@ export default function CanvassingMap() {
             let peopleNextToken = null
             
             do {
-                const peopleResult = await client.models.Person.list({ 
+                const residentsResult = await client.models.Resident.list({ 
                     limit: 1000,
                     nextToken: peopleNextToken
                 })
-                allPeople.push(...peopleResult.data)
-                peopleNextToken = peopleResult.nextToken
+                allPeople.push(...residentsResult.data)
+                peopleNextToken = residentsResult.nextToken
             } while (peopleNextToken)
             
             console.log(`✅ Loaded ${allPeople.length} total residents`)
@@ -94,7 +94,7 @@ export default function CanvassingMap() {
             if (!currentUserVolunteer) {
                 console.log('❌ No volunteer record found for current user')
                 setAssignments([])
-                setHomes([])
+                setAddresses([])
                 return
             }
             
@@ -109,20 +109,20 @@ export default function CanvassingMap() {
             
             // Step 4: Load homes for assignments (same pattern as Organize page)
             if (activeAssignments.length > 0) {
-                const homeIds = activeAssignments.map(a => a.homeId)
-                console.log(`🏠 Loading homes for ${homeIds.length} assignments...`)
+                const addressIds = activeAssignments.map(a => a.addressId)
+                console.log(`🏠 Loading addresses for ${addressIds.length} assignments...`)
                 
-                const homesWithDetailsPromises = homeIds.map(async (homeId) => {
+                const addressesWithDetailsPromises = addressIds.map(async (addressId) => {
                     try {
-                        const homeResult = await client.models.Home.get({ id: homeId })
-                        if (homeResult.data) {
-                            const home = homeResult.data
+                        const addressResult = await client.models.Address.get({ id: addressId })
+                        if (addressResult.data) {
+                            const address = addressResult.data
                             
-                            // Get residents for this home from pre-loaded list (Organize page approach)
-                            const allResidentsForHome = allPeople.filter(p => p.homeId === homeId)
+                            // Get residents for this address from pre-loaded list (Organize page approach)
+                            const allResidentsForAddress = allPeople.filter(p => p.addressId === addressId)
                             
                             // Filter out test/fake residents (enhanced to catch all variations)
-                            const realResidents = allResidentsForHome.filter(person => {
+                            const realResidents = allResidentsForAddress.filter(person => {
                                 const fullName = `${person.firstName || ''} ${person.lastName || ''}`.toLowerCase();
                                 const testPatterns = ['test', 'manual', 'debug', 'sample', 'fake', 'demo', 'resident'];
                                 const specificFakes = ['test resident', 'manual resident', 'manual test', 'joe smith (test)', 'jane doe', 'john doe', 'bob smith'];
@@ -150,11 +150,11 @@ export default function CanvassingMap() {
                                 return aOrder - bOrder
                             })
                             
-                            if (allResidentsForHome.length !== residents.length) {
-                                console.log(`🧹 ${home.street}: Removed ${allResidentsForHome.length - residents.length} duplicate residents`)
+                            if (allResidentsForAddress.length !== residents.length) {
+                                console.log(`🧹 ${address.street}: Removed ${allResidentsForAddress.length - residents.length} duplicate residents`)
                             }
                             
-                            console.log(`🏠 ${home.street}: ${residents.length} unique residents`)
+                            console.log(`🏠 ${address.street}: ${residents.length} unique residents`)
                             if (residents.length > 0) {
                                 residents.forEach(r => {
                                     console.log(`   👤 ${r.firstName} ${r.lastName} (${r.role})`)
@@ -162,25 +162,25 @@ export default function CanvassingMap() {
                             }
                             
                             return {
-                                ...home,
+                                ...address,
                                 residents: residents
                             }
                         }
                     } catch (error) {
-                        console.error(`❌ Failed to load home ${homeId}:`, error)
+                        console.error(`❌ Failed to load address ${addressId}:`, error)
                     }
                     return null
                 })
                 
-                const allHomesWithDetails = await Promise.all(homesWithDetailsPromises)
-                const validHomes = allHomesWithDetails.filter(home => home !== null)
+                const allAddressesWithDetails = await Promise.all(addressesWithDetailsPromises)
+                const validAddresses = allAddressesWithDetails.filter(address => address !== null)
                 
-                console.log(`✅ Successfully loaded ${validHomes.length} homes with resident data`)
-                setHomes(validHomes)
+                console.log(`✅ Successfully loaded ${validAddresses.length} addresses with resident data`)
+                setAddresses(validAddresses)
                 setAssignments(activeAssignments)
             } else {
                 console.log('❌ No active assignments found')
-                setHomes([])
+                setAddresses([])
                 setAssignments([])
             }
             
@@ -211,36 +211,36 @@ export default function CanvassingMap() {
         }
 
         // Get ALL homes (assigned ones) to geocode
-        const homesToGeocode = homes
-        if (homesToGeocode.length === 0) {
+        const addressesToGeocode = addresses
+        if (addressesToGeocode.length === 0) {
             alert('No homes to geocode!')
             return
         }
 
-        const confirmed = confirm(`This will geocode ALL ${homesToGeocode.length} homes using Google's API (including ones that already have coordinates). This may take several minutes. Continue?`)
+        const confirmed = confirm(`This will geocode ALL ${addressesToGeocode.length} addresses using Google's API (including ones that already have coordinates). This may take several minutes. Continue?`)
         if (!confirmed) return
 
-        console.log(`Geocoding ALL ${homesToGeocode.length} homes using Google Geocoding API...`)
+        console.log(`Geocoding ALL ${addressesToGeocode.length} addresses using Google Geocoding API...`)
         const geocoder = new window.google.maps.Geocoder()
         
         let successCount = 0
         let errorCount = 0
         let skippedCount = 0
         
-        for (let i = 0; i < homesToGeocode.length; i++) {
-            const home = homesToGeocode[i]
-            const address = `${home.street}, ${home.city}, ${home.state || 'VA'} ${home.postalCode || ''}`
+        for (let i = 0; i < addressesToGeocode.length; i++) {
+            const address = addressesToGeocode[i]
+            const addressStr = `${address.street}, ${address.city}, ${address.state || 'VA'} ${address.zip || ''}`
             
             try {
-                console.log(`Geocoding ${i + 1}/${homesToGeocode.length}: ${address}`)
+                console.log(`Geocoding ${i + 1}/${addressesToGeocode.length}: ${addressStr}`)
                 
                 // Use Google Maps JavaScript API Geocoder
                 const geocodePromise = new Promise((resolve, reject) => {
                     geocoder.geocode({ 
-                        address: address,
+                        address: addressStr,
                         componentRestrictions: {
                             country: 'US',
-                            administrativeArea: home.state || 'VA'
+                            administrativeArea: address.state || 'VA'
                         }
                     }, (results, status) => {
                         if (status === 'OK' && results && results.length > 0) {
@@ -258,24 +258,24 @@ export default function CanvassingMap() {
                 
                 console.log(`✅ Found coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`)
                 
-                // Update the home in the database
-                await client.models.Home.update({
-                    id: home.id,
+                // Update the address in the database
+                await client.models.Address.update({
+                    id: address.id,
                     lat: lat,
                     lng: lng
                 })
                 
                 // Update local state immediately
-                setHomes(prevHomes => 
-                    prevHomes.map(h => 
-                        h.id === home.id 
+                setAddresses(prevAddresses => 
+                    prevAddresses.map(h => 
+                        h.id === address.id 
                             ? { ...h, lat: lat, lng: lng }
                             : h
                     )
                 )
                 
                 successCount++
-                console.log(`✅ Updated ${home.street} with real coordinates`)
+                console.log(`✅ Updated ${address.street} with real coordinates`)
                 
                 // Add a delay to respect API rate limits
                 await new Promise(resolve => setTimeout(resolve, 200))
@@ -290,43 +290,43 @@ export default function CanvassingMap() {
         }
         
         console.log(`🎉 Geocoding complete! Successfully geocoded ${successCount} homes, ${errorCount} failed.`)
-        alert(`Geocoding complete! Successfully geocoded ${successCount} out of ${homesToGeocode.length} homes. Refresh the page to see all markers.`)
+        alert(`Geocoding complete! Successfully geocoded ${successCount} out of ${addressesToGeocode.length} addresses. Refresh the page to see all markers.`)
     }
 
-    const displayHomes = useMemo(() => {
-        let filteredHomes = showAll ? homes : homes.filter(h => 
-            assignments.some(a => a.homeId === h.id)
+    const displayAddresses = useMemo(() => {
+        let filteredAddresses = showAll ? addresses : addresses.filter(h => 
+            assignments.some(a => a.addressId === h.id)
         )
         
-        // Remove duplicates by home ID to prevent multiple markers at same location
-        const uniqueHomes = filteredHomes.filter((home, index, array) => 
-            array.findIndex(h => h.id === home.id) === index
+        // Remove duplicates by address ID to prevent multiple markers at same location
+        const uniqueAddresses = filteredAddresses.filter((address, index, array) => 
+            array.findIndex(h => h.id === address.id) === index
         )
         
-        console.log('🏠 displayHomes stats:', {
-            total: filteredHomes.length,
-            unique: uniqueHomes.length,
-            duplicatesRemoved: filteredHomes.length - uniqueHomes.length
+        console.log('🏠 displayAddresses stats:', {
+            total: filteredAddresses.length,
+            unique: uniqueAddresses.length,
+            duplicatesRemoved: filteredAddresses.length - uniqueAddresses.length
         })
         
-        return uniqueHomes
-    }, [showAll, homes, assignments])
+        return uniqueAddresses
+    }, [showAll, addresses, assignments])
 
-    function handleHomeClick(home: any) {
-        console.log('🖱️ Marker clicked:', home.street, `(${home.residents?.length || 0} residents)`)
+    function handleAddressClick(address: any) {
+        console.log('🖱️ Marker clicked:', address.street, `(${address.residents?.length || 0} residents)`)
         
-        // Toggle selection - if clicking the same home, close the info window
-        if (selectedHome?.id === home.id) {
-            setSelectedHome(null)
+        // Toggle selection - if clicking the same address, close the info window
+        if (selectedAddress?.id === address.id) {
+            setSelectedAddress(null)
         } else {
-            setSelectedHome(home)
+            setSelectedAddress(address)
         }
     }
 
     function openInteractionForm() {
         const params = new URLSearchParams({
-            homeId: selectedHome.id,
-            address: `${selectedHome.street}, ${selectedHome.city}, ${selectedHome.state}`
+            addressId: selectedAddress.id,
+            address: `${selectedAddress.street}, ${selectedAddress.city}, ${selectedAddress.state}`
         })
         window.open(`/interact?${params}`, '_blank')
     }
@@ -370,8 +370,8 @@ export default function CanvassingMap() {
                 <div style={{marginBottom: 16}}>
                     <p>
                         {showAll ? 
-                            `Showing ${displayHomes.length} homes without signed consents` : 
-                            `Showing ${displayHomes.length} of your assigned homes`
+                            `Showing ${displayAddresses.length} addresses without signed consents` : 
+                            `Showing ${displayAddresses.length} of your assigned addresses`
                         }
                     </p>
                 </div>
@@ -426,20 +426,20 @@ export default function CanvassingMap() {
                             />
                         )}
 
-                        {mapsLoaded && displayHomes.map(home => {
-                            console.log('🎯 Rendering marker for:', home.street, 'lat:', home.lat, 'lng:', home.lng, 'hasCoords:', !!(home.lat && home.lng))
-                            return home.lat && home.lng && (
+                        {mapsLoaded && displayAddresses.map(address => {
+                            console.log('🎯 Rendering marker for:', address.street, 'lat:', address.lat, 'lng:', address.lng, 'hasCoords:', !!(address.lat && address.lng))
+                            return address.lat && address.lng && (
                                 <Marker
-                                    key={home.id}
-                                    position={{lat: home.lat, lng: home.lng}}
+                                    key={address.id}
+                                    position={{lat: address.lat, lng: address.lng}}
                                     onClick={() => {
-                                        console.log('🖱️ Marker clicked:', home.street)
-                                        handleHomeClick(home)
+                                        console.log('🖱️ Marker clicked:', address.street)
+                                        handleAddressClick(address)
                                     }}
                                     icon={{
                                         path: google.maps.SymbolPath.CIRCLE,
                                         scale: 8,
-                                        fillColor: assignments.some(a => a.homeId === home.id) ? '#ff6b6b' : '#4ecdc4',
+                                        fillColor: assignments.some(a => a.addressId === address.id) ? '#ff6b6b' : '#4ecdc4',
                                         fillOpacity: 0.8,
                                         strokeWeight: 2,
                                         strokeColor: 'white'
@@ -448,9 +448,9 @@ export default function CanvassingMap() {
                             )
                         })}
 
-                        {selectedHome && selectedHome.lat && selectedHome.lng && (
+                        {selectedAddress && selectedAddress.lat && selectedAddress.lng && (
                             <OverlayView
-                                position={{lat: selectedHome.lat, lng: selectedHome.lng}}
+                                position={{lat: selectedAddress.lat, lng: selectedAddress.lng}}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
                                 <div style={{
@@ -489,12 +489,12 @@ export default function CanvassingMap() {
                                     
                                     {/* Content */}
                                     <div style={{paddingRight: '20px'}}>
-                                        <h4 style={{margin: '0 0 8px 0', fontSize: '16px'}}>{selectedHome.street}</h4>
+                                        <h4 style={{margin: '0 0 8px 0', fontSize: '16px'}}>{selectedAddress.street}</h4>
                                         
                                         {/* Show ALL residents and their consent status */}
                                         <div style={{margin: '0 0 12px 0', fontSize: '13px'}}>
-                                            {selectedHome.residents && selectedHome.residents.length > 0 ? (
-                                                selectedHome.residents.map((resident, index) => {
+                                            {selectedAddress.residents && selectedAddress.residents.length > 0 ? (
+                                                selectedAddress.residents.map((resident, index) => {
                                                     // Determine if this person can sign (owners vs renters)
                                                     const isOwner = resident.role === 'PRIMARY_OWNER' || resident.role === 'SECONDARY_OWNER'
                                                     const roleDisplay = resident.role ? resident.role.replace('_', ' ').toLowerCase() : 'resident'
@@ -505,7 +505,7 @@ export default function CanvassingMap() {
                                                             justifyContent: 'space-between', 
                                                             alignItems: 'center',
                                                             padding: '4px 0',
-                                                            borderBottom: index < selectedHome.residents.length - 1 ? '1px solid #eee' : 'none'
+                                                            borderBottom: index < selectedAddress.residents.length - 1 ? '1px solid #eee' : 'none'
                                                         }}>
                                                             <div style={{flex: 1}}>
                                                                 <div style={{color: '#333', fontWeight: 'bold'}}>
@@ -569,7 +569,7 @@ export default function CanvassingMap() {
                                                 Record Interaction
                                             </button>
                                             <button 
-                                                onClick={() => window.open(`/history?address=${encodeURIComponent(selectedHome.street)}`, '_blank')}
+                                                onClick={() => window.open(`/history?address=${encodeURIComponent(selectedAddress.street)}`, '_blank')}
                                                 style={{
                                                     backgroundColor: '#6c757d',
                                                     color: 'white',
@@ -608,7 +608,7 @@ export default function CanvassingMap() {
                     <p>🔵 Your current location</p>
                     <p>🔴 Your assigned homes</p>
                     <p>🔵 Other homes without consent forms (when "Show All" is enabled)</p>
-                    <p>Click on any home marker to record an interaction or view history.</p>
+                    <p>Click on any address marker to record an interaction or view history.</p>
                 </div>
 
             </div>
