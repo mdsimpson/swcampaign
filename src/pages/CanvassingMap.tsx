@@ -92,7 +92,21 @@ export default function CanvassingMap() {
 
     async function loadAssignments() {
         try {
-            // Step 1: Load ALL residents first (same as Organize page)
+            // Step 1: Load ALL addresses and residents first (same as Organize page)
+            let allAddresses: any[] = []
+            let addressesNextToken = null
+            
+            do {
+                const addressesResult = await client.models.Address.list({ 
+                    limit: 1000,
+                    nextToken: addressesNextToken
+                })
+                allAddresses.push(...addressesResult.data)
+                addressesNextToken = addressesResult.nextToken
+            } while (addressesNextToken)
+            
+            console.log(`📍 Loaded ${allAddresses.length} total addresses`)
+            
             let allResidents: any[] = []
             let residentsNextToken = null
             
@@ -105,6 +119,7 @@ export default function CanvassingMap() {
                 residentsNextToken = residentsResult.nextToken
             } while (residentsNextToken)
             
+            console.log(`👥 Loaded ${allResidents.length} total residents`)
             
             // Step 2: Get all volunteers to find the current user's volunteer record
             const volunteersResult = await client.models.Volunteer.list()
@@ -128,7 +143,7 @@ export default function CanvassingMap() {
             
             const activeAssignments = assignmentsResult.data.filter(a => a.status === 'NOT_STARTED')
             
-            // Step 4: Load addresses for assignments (same pattern as Organize page)
+            // Step 4: Load addresses for assignments with duplicate handling (EXACTLY like Organize page)
             if (activeAssignments.length > 0) {
                 const addressIds = activeAssignments.map(a => a.addressId)
                 
@@ -137,15 +152,29 @@ export default function CanvassingMap() {
                         const addressResult = await client.models.Address.get({ id: addressId })
                         if (addressResult.data) {
                             const address = addressResult.data
+                            const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
                             
-                            // Get residents for this address from pre-loaded list (Organize page approach)
-                            const allResidentsForAddress = allResidents.filter(p => p.addressId === addressId)
-                            console.log(`🔍 Address ${address.street}: Found ${allResidentsForAddress.length} total residents for addressId ${addressId}`)
+                            // Find ALL address IDs with the same street address (handling duplicates)
+                            const sameAddressIds = allAddresses
+                                .filter(a => {
+                                    const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
+                                    return aAddress === addressKey
+                                })
+                                .map(a => a.id)
+                            
+                            if (sameAddressIds.length > 1) {
+                                console.log(`🔄 Found ${sameAddressIds.length} duplicate address records for ${address.street}`)
+                            }
+                            
+                            // Get residents from ALL address records with this address
+                            const allResidentsForAddress = allResidents.filter(r => sameAddressIds.includes(r.addressId))
+                            
+                            console.log(`🔍 Address ${address.street}: Found ${allResidentsForAddress.length} total residents across ${sameAddressIds.length} address records`)
+                            
                             if (address.street && address.street.includes('Cloverleaf')) {
                                 console.log(`🌿 CLOVERLEAF DEBUG: Address details:`, address)
+                                console.log(`🌿 CLOVERLEAF DEBUG: Duplicate address IDs:`, sameAddressIds)
                                 console.log(`🌿 CLOVERLEAF DEBUG: All residents for this address:`, allResidentsForAddress)
-                                console.log(`🌿 CLOVERLEAF DEBUG: Total residents loaded:`, allResidents.length)
-                                console.log(`🌿 CLOVERLEAF DEBUG: Sample resident addressIds:`, allResidents.slice(0, 5).map(r => ({ addressId: r.addressId, name: `${r.firstName} ${r.lastName}` })))
                             }
                             
                             // Remove duplicate residents (same name at same address) - copied from Organize page
@@ -158,9 +187,11 @@ export default function CanvassingMap() {
                             
                             // Sort residents (PRIMARY_OWNER first) - same as Organize page
                             const residents = uniqueResidents.sort((a, b) => {
-                                const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
-                                const aOrder = roleOrder[a.role] || 5
-                                const bOrder = roleOrder[b.role] || 5
+                                const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'Owner': 1, 'RENTER': 3, 'OTHER': 4 }
+                                const aRole = a.role || a.occupantType || 'OTHER'
+                                const bRole = b.role || b.occupantType || 'OTHER'
+                                const aOrder = roleOrder[aRole] || 5
+                                const bOrder = roleOrder[bRole] || 5
                                 return aOrder - bOrder
                             })
                             
@@ -171,7 +202,8 @@ export default function CanvassingMap() {
                             console.log(`🏠 ${address.street}: ${residents.length} unique residents`)
                             if (residents.length > 0) {
                                 residents.forEach(r => {
-                                    console.log(`   👤 ${r.firstName} ${r.lastName} (${r.role})`)
+                                    const displayRole = r.role || r.occupantType || 'Unknown'
+                                    console.log(`   👤 ${r.firstName} ${r.lastName} (${displayRole})`)
                                 })
                             }
                             
@@ -399,9 +431,10 @@ export default function CanvassingMap() {
                                         <div style={{margin: '0 0 12px 0', fontSize: '13px'}}>
                                             {selectedAddress.residents && selectedAddress.residents.length > 0 ? (
                                                 selectedAddress.residents.map((resident, index) => {
-                                                    // Determine if this person can sign (owners vs renters)
-                                                    const isOwner = resident.role === 'PRIMARY_OWNER' || resident.role === 'SECONDARY_OWNER'
-                                                    const roleDisplay = resident.role ? resident.role.replace('_', ' ').toLowerCase() : 'resident'
+                                                    // Use occupantType from CSV or role field, map to proper display
+                                                    const roleValue = resident.role || resident.occupantType || 'resident'
+                                                    const isOwner = roleValue === 'PRIMARY_OWNER' || roleValue === 'SECONDARY_OWNER' || roleValue === 'Owner'
+                                                    const roleDisplay = roleValue.replace('_', ' ').toLowerCase()
                                                     
                                                     return (
                                                         <div key={resident.id || index} style={{
