@@ -32,35 +32,120 @@ export default function Reports() {
 
     async function loadReportData() {
         try {
-            const [addressesResult, residentsResult, consentsResult, assignmentsResult, interactionsResult, volunteersResult] = await Promise.all([
-                client.models.Address.list(),
-                client.models.Resident.list(),
-                client.models.Consent.list(),
-                client.models.Assignment.list(),
-                client.models.InteractionRecord.list(),
-                client.models.Volunteer.list()
-            ])
+            // Load all addresses with pagination
+            let allAddresses: any[] = []
+            let addressesNextToken = null
+            do {
+                const result = await client.models.Address.list({ 
+                    limit: 1000,
+                    nextToken: addressesNextToken 
+                })
+                allAddresses.push(...result.data)
+                addressesNextToken = result.nextToken
+            } while (addressesNextToken)
 
-            const addresses = addressesResult.data
-            const residents = residentsResult.data
-            const consents = consentsResult.data
-            const assignments = assignmentsResult.data
-            const interactions = interactionsResult.data
+            // Load all residents with pagination
+            let allResidents: any[] = []
+            let residentsNextToken = null
+            do {
+                const result = await client.models.Resident.list({ 
+                    limit: 1000,
+                    nextToken: residentsNextToken 
+                })
+                allResidents.push(...result.data)
+                residentsNextToken = result.nextToken
+            } while (residentsNextToken)
+
+            // Load all consents with pagination
+            let allConsents: any[] = []
+            let consentsNextToken = null
+            do {
+                const result = await client.models.Consent.list({ 
+                    limit: 1000,
+                    nextToken: consentsNextToken 
+                })
+                allConsents.push(...result.data)
+                consentsNextToken = result.nextToken
+            } while (consentsNextToken)
+
+            // Load all assignments with pagination
+            let allAssignments: any[] = []
+            let assignmentsNextToken = null
+            do {
+                const result = await client.models.Assignment.list({ 
+                    limit: 1000,
+                    nextToken: assignmentsNextToken 
+                })
+                allAssignments.push(...result.data)
+                assignmentsNextToken = result.nextToken
+            } while (assignmentsNextToken)
+
+            // Load all interactions with pagination
+            let allInteractions: any[] = []
+            let interactionsNextToken = null
+            do {
+                const result = await client.models.InteractionRecord.list({ 
+                    limit: 1000,
+                    nextToken: interactionsNextToken 
+                })
+                allInteractions.push(...result.data)
+                interactionsNextToken = result.nextToken
+            } while (interactionsNextToken)
+
+            // Load all volunteers
+            const volunteersResult = await client.models.Volunteer.list({ limit: 100 })
+            
+            // Deduplicate addresses by street address (handle duplicate imports)
+            const uniqueAddressMap = new Map()
+            allAddresses.forEach(addr => {
+                const key = `${addr.street?.toLowerCase().trim()}, ${addr.city?.toLowerCase().trim()}`
+                if (!uniqueAddressMap.has(key)) {
+                    uniqueAddressMap.set(key, addr)
+                }
+            })
+            const addresses = Array.from(uniqueAddressMap.values())
+            
+            const residents = allResidents
+            const consents = allConsents
+            const assignments = allAssignments
+            const interactions = allInteractions
             const volunteers = volunteersResult.data
+
+            console.log(`Loaded ${allAddresses.length} total address records, ${addresses.length} unique addresses`)
 
             // Calculate key metrics
             const absenteeAddresses = addresses.filter(addr => 
                 residents.some(r => r.addressId === addr.id && r.isAbsentee)
             ).length
             
-            // Calculate addresses with all consents
-            const addressIds = [...new Set(addresses.map(a => a.id))]
+            // Calculate addresses with all consents (group by physical address)
             let addressesWithAllConsents = 0
             
-            for (const addressId of addressIds) {
-                const addressResidents = residents.filter(r => r.addressId === addressId)
-                const addressConsents = consents.filter(c => c.addressId === addressId)
-                if (addressResidents.length > 0 && addressConsents.length >= addressResidents.length) {
+            // Group all address IDs by physical address
+            const addressGroups = new Map()
+            allAddresses.forEach(addr => {
+                const key = `${addr.street?.toLowerCase().trim()}, ${addr.city?.toLowerCase().trim()}`
+                if (!addressGroups.has(key)) {
+                    addressGroups.set(key, [])
+                }
+                addressGroups.get(key).push(addr.id)
+            })
+            
+            // Check each unique physical address
+            for (const [addressKey, addressIdList] of addressGroups) {
+                // Get all residents at this physical address (across all duplicate IDs)
+                const addressResidents = residents.filter(r => addressIdList.includes(r.addressId))
+                const addressConsents = consents.filter(c => addressIdList.includes(c.addressId))
+                
+                // Deduplicate residents by name
+                const uniqueResidents = addressResidents.filter((resident, index, self) => 
+                    index === self.findIndex(r => 
+                        r.firstName === resident.firstName && 
+                        r.lastName === resident.lastName
+                    )
+                )
+                
+                if (uniqueResidents.length > 0 && addressConsents.length >= uniqueResidents.length) {
                     addressesWithAllConsents++
                 }
             }
