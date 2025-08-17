@@ -671,7 +671,7 @@ export default function Organize() {
             const hasMorePages = endIndex < homeIdsWithResidents.length
             setNextToken(hasMorePages ? 'more' : null)
             
-            setHomes(homesWithDetails)
+            setAddresses(homesWithDetails)
             
         } catch (error) {
             console.error('Failed to reload data after clearing filters:', error)
@@ -855,26 +855,26 @@ export default function Organize() {
                 })
             }
 
-            // Update homes state with new assignments without reloading
-            setHomes(prevHomes => 
-                prevHomes.map(home => {
-                    // Check if this home was assigned
+            // Update addresses state with new assignments without reloading
+            setAddresses(prevAddresses => 
+                prevAddresses.map(address => {
+                    // Check if this address was assigned
                     const newAssignment = createdAssignments.find(
-                        result => result.data && result.data.homeId === home.id
+                        result => result.data && result.data.addressId === address.id
                     )
                     
                     if (newAssignment && newAssignment.data) {
-                        // Add the new assignment to this home
+                        // Add the new assignment to this address
                         return {
-                            ...home,
-                            assignments: [...(home.assignments || []), newAssignment.data]
+                            ...address,
+                            assignments: [...(address.assignments || []), newAssignment.data]
                         }
                     }
-                    return home
+                    return address
                 })
             )
 
-            alert(`Assigned ${selectedHomes.size} homes successfully`)
+            alert(`Assigned ${selectedAddresses.size} addresses successfully`)
             setSelectedAddresses(new Set())
             setAssignToVolunteer('')
             // Don't call loadData() - we've updated the state directly
