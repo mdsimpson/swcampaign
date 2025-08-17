@@ -30,16 +30,84 @@ export default function CanvassingMap() {
     
     const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
 
+    // Calculate which addresses to display based on filters
+    const displayAddresses = useMemo(() => {
+        let filteredAddresses = showAll ? addresses : addresses.filter(h => 
+            assignments.some(a => a.addressId === h.id)
+        )
+        
+        // Remove duplicates by address ID to prevent multiple markers at same location
+        const uniqueAddresses = filteredAddresses.filter((address, index, array) => 
+            array.findIndex(h => h.id === address.id) === index
+        )
+        
+        console.log('🏠 displayAddresses stats:', {
+            total: filteredAddresses.length,
+            unique: uniqueAddresses.length,
+            duplicatesRemoved: filteredAddresses.length - uniqueAddresses.length
+        })
+        
+        // Debug: Check if addresses have residents
+        const cloverleafAddresses = uniqueAddresses.filter(addr => addr.street && addr.street.includes('Cloverleaf'))
+        if (cloverleafAddresses.length > 0) {
+            console.log('🌿 DISPLAYADDRESSES DEBUG: Cloverleaf addresses found:', cloverleafAddresses.length)
+            cloverleafAddresses.forEach(addr => {
+                console.log(`🌿 ${addr.street}: has ${addr.residents ? addr.residents.length : 'NO'} residents property`)
+            })
+        }
+        
+        return uniqueAddresses
+    }, [showAll, addresses, assignments])
+
     useEffect(() => {
         console.log('useEffect triggered with user:', user?.userId)
         if (user?.userId) {
             console.log('User authenticated, loading data...')
-            loadAssignments() // This now loads both assignments and their homes
+            loadAssignments() // This now loads both assignments and their addresses
             getUserLocation()
         } else {
             console.log('User not authenticated yet, skipping data load')
         }
     }, [user])
+
+    // Auto-fit map bounds to show all markers
+    useEffect(() => {
+        if (mapInstance && mapsLoaded && displayAddresses.length > 0) {
+            console.log('🗺️ Fitting map bounds to show all markers...')
+            
+            const bounds = new google.maps.LatLngBounds()
+            let hasValidMarkers = false
+            
+            // Add all address markers to bounds
+            displayAddresses.forEach(address => {
+                if (address.lat && address.lng) {
+                    bounds.extend(new google.maps.LatLng(address.lat, address.lng))
+                    hasValidMarkers = true
+                }
+            })
+            
+            // Add user location if available
+            if (userLocation) {
+                bounds.extend(new google.maps.LatLng(userLocation.lat, userLocation.lng))
+                hasValidMarkers = true
+            }
+            
+            // Only fit bounds if we have at least one valid marker
+            if (hasValidMarkers) {
+                mapInstance.fitBounds(bounds)
+                
+                // Add a listener to prevent over-zooming on single markers
+                const listener = google.maps.event.addListenerOnce(mapInstance, 'bounds_changed', () => {
+                    const currentZoom = mapInstance.getZoom()
+                    if (currentZoom && currentZoom > 18) {
+                        mapInstance.setZoom(18) // Max zoom level to prevent too close zoom
+                    }
+                })
+                
+                console.log('🗺️ Map bounds fitted successfully')
+            }
+        }
+    }, [mapInstance, mapsLoaded, displayAddresses, userLocation])
 
     async function loadAddresses() {
         console.log('loadAddresses: Starting to load addresses...')
@@ -64,22 +132,23 @@ export default function CanvassingMap() {
 
     async function loadAssignments() {
         console.log('🔄 loadAssignments: Starting to load assignments...')
+        console.log('🔄 Current user ID:', user?.userId)
         try {
-            // Step 1: Load ALL people first (same as Organize page)
+            // Step 1: Load ALL residents first (same as Organize page)
             console.log('Loading all residents first (Organize page approach)...')
-            let allPeople: any[] = []
-            let peopleNextToken = null
+            let allResidents: any[] = []
+            let residentsNextToken = null
             
             do {
                 const residentsResult = await client.models.Resident.list({ 
                     limit: 1000,
-                    nextToken: peopleNextToken
+                    nextToken: residentsNextToken
                 })
-                allPeople.push(...residentsResult.data)
-                peopleNextToken = residentsResult.nextToken
-            } while (peopleNextToken)
+                allResidents.push(...residentsResult.data)
+                residentsNextToken = residentsResult.nextToken
+            } while (residentsNextToken)
             
-            console.log(`✅ Loaded ${allPeople.length} total residents`)
+            console.log(`✅ Loaded ${allResidents.length} total residents`)
             
             // Step 2: Get all volunteers to find the current user's volunteer record
             const volunteersResult = await client.models.Volunteer.list()
@@ -107,7 +176,7 @@ export default function CanvassingMap() {
             const activeAssignments = assignmentsResult.data.filter(a => a.status === 'NOT_STARTED')
             console.log(`📋 Active assignments: ${activeAssignments.length}`)
             
-            // Step 4: Load homes for assignments (same pattern as Organize page)
+            // Step 4: Load addresses for assignments (same pattern as Organize page)
             if (activeAssignments.length > 0) {
                 const addressIds = activeAssignments.map(a => a.addressId)
                 console.log(`🏠 Loading addresses for ${addressIds.length} assignments...`)
@@ -119,23 +188,17 @@ export default function CanvassingMap() {
                             const address = addressResult.data
                             
                             // Get residents for this address from pre-loaded list (Organize page approach)
-                            const allResidentsForAddress = allPeople.filter(p => p.addressId === addressId)
-                            
-                            // Filter out test/fake residents (enhanced to catch all variations)
-                            const realResidents = allResidentsForAddress.filter(person => {
-                                const fullName = `${person.firstName || ''} ${person.lastName || ''}`.toLowerCase();
-                                const testPatterns = ['test', 'manual', 'debug', 'sample', 'fake', 'demo', 'resident'];
-                                const specificFakes = ['test resident', 'manual resident', 'manual test', 'joe smith (test)', 'jane doe', 'john doe', 'bob smith'];
-                                
-                                // Filter by patterns and specific fake names
-                                const hasTestPattern = testPatterns.some(pattern => fullName.includes(pattern));
-                                const isSpecificFake = specificFakes.some(fake => fullName.includes(fake));
-                                
-                                return !hasTestPattern && !isSpecificFake;
-                            });
+                            const allResidentsForAddress = allResidents.filter(p => p.addressId === addressId)
+                            console.log(`🔍 Address ${address.street}: Found ${allResidentsForAddress.length} total residents for addressId ${addressId}`)
+                            if (address.street && address.street.includes('Cloverleaf')) {
+                                console.log(`🌿 CLOVERLEAF DEBUG: Address details:`, address)
+                                console.log(`🌿 CLOVERLEAF DEBUG: All residents for this address:`, allResidentsForAddress)
+                                console.log(`🌿 CLOVERLEAF DEBUG: Total residents loaded:`, allResidents.length)
+                                console.log(`🌿 CLOVERLEAF DEBUG: Sample resident addressIds:`, allResidents.slice(0, 5).map(r => ({ addressId: r.addressId, name: `${r.firstName} ${r.lastName}` })))
+                            }
                             
                             // Remove duplicate residents (same name at same address) - copied from Organize page
-                            const uniqueResidents = realResidents.filter((person, index, self) => {
+                            const uniqueResidents = allResidentsForAddress.filter((person, index, self) => {
                                 return index === self.findIndex(p => 
                                     p.firstName === person.firstName && 
                                     p.lastName === person.lastName
@@ -161,10 +224,14 @@ export default function CanvassingMap() {
                                 })
                             }
                             
-                            return {
+                            const result = {
                                 ...address,
                                 residents: residents
                             }
+                            if (address.street && address.street.includes('Cloverleaf')) {
+                                console.log(`🌿 CLOVERLEAF FINAL: Final address object:`, result)
+                            }
+                            return result
                         }
                     } catch (error) {
                         console.error(`❌ Failed to load address ${addressId}:`, error)
@@ -210,10 +277,10 @@ export default function CanvassingMap() {
             return
         }
 
-        // Get ALL homes (assigned ones) to geocode
+        // Get ALL addresses (assigned ones) to geocode
         const addressesToGeocode = addresses
         if (addressesToGeocode.length === 0) {
-            alert('No homes to geocode!')
+            alert('No addresses to geocode!')
             return
         }
 
@@ -289,28 +356,9 @@ export default function CanvassingMap() {
             }
         }
         
-        console.log(`🎉 Geocoding complete! Successfully geocoded ${successCount} homes, ${errorCount} failed.`)
+        console.log(`🎉 Geocoding complete! Successfully geocoded ${successCount} addresses, ${errorCount} failed.`)
         alert(`Geocoding complete! Successfully geocoded ${successCount} out of ${addressesToGeocode.length} addresses. Refresh the page to see all markers.`)
     }
-
-    const displayAddresses = useMemo(() => {
-        let filteredAddresses = showAll ? addresses : addresses.filter(h => 
-            assignments.some(a => a.addressId === h.id)
-        )
-        
-        // Remove duplicates by address ID to prevent multiple markers at same location
-        const uniqueAddresses = filteredAddresses.filter((address, index, array) => 
-            array.findIndex(h => h.id === address.id) === index
-        )
-        
-        console.log('🏠 displayAddresses stats:', {
-            total: filteredAddresses.length,
-            unique: uniqueAddresses.length,
-            duplicatesRemoved: filteredAddresses.length - uniqueAddresses.length
-        })
-        
-        return uniqueAddresses
-    }, [showAll, addresses, assignments])
 
     function handleAddressClick(address: any) {
         console.log('🖱️ Marker clicked:', address.street, `(${address.residents?.length || 0} residents)`)
@@ -383,7 +431,7 @@ export default function CanvassingMap() {
                     <GoogleMap
                         mapContainerStyle={mapContainerStyle}
                         center={userLocation || center}
-                        zoom={15}
+                        zoom={12}
                         options={{
                             disableDefaultUI: false,
                             clickableIcons: false,
@@ -391,7 +439,7 @@ export default function CanvassingMap() {
                         }}
                         onClick={() => {
                             console.log('🗺️ Map clicked - closing InfoWindows')
-                            setSelectedHome(null)
+                            setSelectedAddress(null)
                         }}
                         onLoad={(map) => {
                             console.log('🗺️ Map loaded, disabling default InfoWindow')
@@ -403,7 +451,7 @@ export default function CanvassingMap() {
                                 if (eventName === 'click') {
                                     // Override click to prevent default InfoWindow
                                     return originalAddListener.call(this, eventName, (e) => {
-                                        setSelectedHome(null)
+                                        setSelectedAddress(null)
                                         handler(e)
                                     })
                                 }
@@ -470,7 +518,7 @@ export default function CanvassingMap() {
                                     <button
                                         onClick={() => {
                                             console.log('🖱️ Custom overlay close clicked')
-                                            setSelectedHome(null)
+                                            setSelectedAddress(null)
                                         }}
                                         style={{
                                             position: 'absolute',
@@ -606,8 +654,8 @@ export default function CanvassingMap() {
                 <div style={{marginTop: 16, fontSize: 14, color: '#666'}}>
                     <p><strong>Legend:</strong></p>
                     <p>🔵 Your current location</p>
-                    <p>🔴 Your assigned homes</p>
-                    <p>🔵 Other homes without consent forms (when "Show All" is enabled)</p>
+                    <p>🔴 Your assigned addresses</p>
+                    <p>🔵 Other addresses without consent forms (when "Show All" is enabled)</p>
                     <p>Click on any address marker to record an interaction or view history.</p>
                 </div>
 

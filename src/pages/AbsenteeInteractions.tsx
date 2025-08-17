@@ -6,7 +6,7 @@ import type {Schema} from '../../amplify/data/resource'
 export default function AbsenteeInteractions() {
     const [absenteeAddresses, setAbsenteeAddresses] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
-    const [selectedHome, setSelectedHome] = useState<any>(null)
+    const [selectedAddress, setSelectedAddress] = useState<any>(null)
     const [contactMethod, setContactMethod] = useState('')
     const [notes, setNotes] = useState('')
     
@@ -155,7 +155,7 @@ export default function AbsenteeInteractions() {
         }
     }
 
-    async function recordContact(homeId: string) {
+    async function recordContact(addressId: string) {
         if (!contactMethod || !notes.trim()) {
             alert('Please select a contact method and enter notes')
             return
@@ -163,7 +163,7 @@ export default function AbsenteeInteractions() {
 
         try {
             await client.models.InteractionRecord.create({
-                homeId,
+                addressId,
                 spokeToHomeowner: contactMethod === 'phone' || contactMethod === 'email',
                 spokeToOther: false,
                 leftFlyer: contactMethod === 'mail',
@@ -172,7 +172,7 @@ export default function AbsenteeInteractions() {
             })
             
             alert('Contact recorded successfully')
-            setSelectedHome(null)
+            setSelectedAddress(null)
             setContactMethod('')
             setNotes('')
         } catch (error) {
@@ -325,7 +325,7 @@ export default function AbsenteeInteractions() {
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
                                             <button 
-                                                onClick={() => setSelectedHome(address)}
+                                                onClick={() => setSelectedAddress(address)}
                                                 style={{
                                                     backgroundColor: '#007bff',
                                                     color: 'white',
@@ -391,7 +391,7 @@ export default function AbsenteeInteractions() {
                     </div>
                 )}
 
-                {selectedHome && (
+                {selectedAddress && (
                     <div style={{
                         position: 'fixed',
                         top: 0,
@@ -411,7 +411,7 @@ export default function AbsenteeInteractions() {
                             maxWidth: 500,
                             width: '90%'
                         }}>
-                            <h3>Record Contact: {selectedHome.street}</h3>
+                            <h3>Record Contact: {selectedAddress.street}</h3>
                             
                             <div style={{marginBottom: 16}}>
                                 <label style={{display: 'block', marginBottom: 8}}>Contact Method:</label>
@@ -448,7 +448,7 @@ export default function AbsenteeInteractions() {
                             <div style={{display: 'flex', gap: 8, justifyContent: 'flex-end'}}>
                                 <button
                                     onClick={() => {
-                                        setSelectedHome(null)
+                                        setSelectedAddress(null)
                                         setContactMethod('')
                                         setNotes('')
                                     }}
@@ -464,7 +464,7 @@ export default function AbsenteeInteractions() {
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => recordContact(selectedHome.id)}
+                                    onClick={() => recordContact(selectedAddress.id)}
                                     style={{
                                         backgroundColor: '#28a745',
                                         color: 'white',

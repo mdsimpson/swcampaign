@@ -107,7 +107,7 @@ export default function Organize() {
         try {
             setLoading(true)
             
-            // Build filter for homes - temporarily remove absentee filter for debugging
+            // Build filter for addresses - temporarily remove absentee filter for debugging
             let homeFilter: any = undefined // { absenteeOwner: { ne: true } }
             
             // Add search filter if applied - only if there's actual content
@@ -591,42 +591,42 @@ export default function Organize() {
         try {
             setLoading(true)
             
-            // Get ALL people first (handle pagination)
-            let allPeople: any[] = []
-            let peopleNextToken = null
+            // Get ALL residents first (handle pagination)
+            let allResidents: any[] = []
+            let residentsNextToken = null
             
             do {
-                const peopleResult = await client.models.Person.list({ 
+                const residentsResult = await client.models.Resident.list({ 
                     limit: 1000,
-                    nextToken: peopleNextToken
+                    nextToken: residentsNextToken
                 })
-                allPeople.push(...peopleResult.data)
-                peopleNextToken = peopleResult.nextToken
-            } while (peopleNextToken)
+                allResidents.push(...residentsResult.data)
+                residentsNextToken = residentsResult.nextToken
+            } while (residentsNextToken)
             
-            console.log(`Found ${allPeople.length} people total`)
+            console.log(`Found ${allResidents.length} residents total`)
             
-            // Get unique homeIds that have residents
-            const homeIdsWithResidents = [...new Set(allPeople.map(p => p.homeId))]
-            console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
+            // Get unique addressIds that have residents
+            const addressIdsWithResidents = [...new Set(allResidents.map(r => r.addressId))]
+            console.log(`Found ${addressIdsWithResidents.length} unique addresses with residents`)
             
-            // For pagination, slice the homeIds (page 1, no filters)
+            // For pagination, slice the addressIds (page 1, no filters)
             const startIndex = 0 // First page
             const endIndex = pageSize
-            const currentPageHomeIds = homeIdsWithResidents.slice(startIndex, endIndex)
+            const currentPageAddressIds = addressIdsWithResidents.slice(startIndex, endIndex)
             
-            console.log(`Page 1: showing homes 1-${Math.min(endIndex, homeIdsWithResidents.length)} of ${homeIdsWithResidents.length}`)
+            console.log(`Page 1: showing addresses 1-${Math.min(endIndex, addressIdsWithResidents.length)} of ${addressIdsWithResidents.length}`)
             
-            // Get home details for current page
-            const homesWithDetailsPromises = currentPageHomeIds.map(async (homeId) => {
+            // Get address details for current page
+            const addressesWithDetailsPromises = currentPageAddressIds.map(async (addressId) => {
                 try {
-                    const homeResult = await client.models.Home.get({ id: homeId })
-                    if (homeResult.data) {
-                        const home = homeResult.data
+                    const addressResult = await client.models.Address.get({ id: addressId })
+                    if (addressResult.data) {
+                        const address = addressResult.data
                         
-                        // Get residents for this home and sort them (PRIMARY_OWNER first)
-                        const residents = allPeople
-                            .filter(p => p.homeId === homeId)
+                        // Get residents for this address and sort them (PRIMARY_OWNER first)
+                        const residents = allResidents
+                            .filter(r => r.addressId === addressId)
                             .sort((a, b) => {
                                 const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
                                 const aOrder = roleOrder[a.role] || 5
@@ -636,8 +636,8 @@ export default function Organize() {
                         
                         // Get consents and assignments
                         const [consentsResult, assignmentsResult] = await Promise.all([
-                            client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
-                            client.models.Assignment.list({ filter: { homeId: { eq: home.id } } })
+                            client.models.Consent.list({ filter: { addressId: { eq: address.id } } }),
+                            client.models.Assignment.list({ filter: { addressId: { eq: address.id } } })
                         ])
                         
                         const consents = consentsResult.data
@@ -648,7 +648,7 @@ export default function Organize() {
                             residents.every(resident => resident.hasSigned)
                         
                         return { 
-                            ...home, 
+                            ...address, 
                             residents, 
                             consents,
                             assignments,
@@ -656,22 +656,22 @@ export default function Organize() {
                         }
                     }
                 } catch (error) {
-                    console.error(`Error loading home ${homeId}:`, error)
+                    console.error(`Error loading address ${addressId}:`, error)
                 }
                 return null
             })
             
-            const allHomesWithDetails = await Promise.all(homesWithDetailsPromises)
-            const homesWithDetails = allHomesWithDetails.filter(home => home !== null)
+            const allAddressesWithDetails = await Promise.all(addressesWithDetailsPromises)
+            const addressesWithDetails = allAddressesWithDetails.filter(address => address !== null)
             
-            console.log(`Loaded ${homesWithDetails.length} homes with residents for page 1 (cleared filters)`)
+            console.log(`Loaded ${addressesWithDetails.length} addresses with residents for page 1 (cleared filters)`)
             
             // Update pagination info  
-            setTotalCount(homeIdsWithResidents.length)
-            const hasMorePages = endIndex < homeIdsWithResidents.length
+            setTotalCount(addressIdsWithResidents.length)
+            const hasMorePages = endIndex < addressIdsWithResidents.length
             setNextToken(hasMorePages ? 'more' : null)
             
-            setAddresses(homesWithDetails)
+            setAddresses(addressesWithDetails)
             
         } catch (error) {
             console.error('Failed to reload data after clearing filters:', error)
@@ -762,8 +762,8 @@ export default function Organize() {
             setSelectedAddresses(new Set())
             // Don't call loadData() - we've updated the state directly
         } catch (error) {
-            console.error('Failed to unassign homes:', error)
-            alert('Failed to unassign homes')
+            console.error('Failed to unassign addresses:', error)
+            alert('Failed to unassign addresses')
         }
     }
 
@@ -879,8 +879,8 @@ export default function Organize() {
             setAssignToVolunteer('')
             // Don't call loadData() - we've updated the state directly
         } catch (error) {
-            console.error('Failed to assign homes:', error)
-            alert('Failed to assign homes')
+            console.error('Failed to assign addresses:', error)
+            alert('Failed to assign addresses')
         }
     }
 
@@ -889,7 +889,7 @@ export default function Organize() {
             <Header/>
             <div style={{maxWidth: 1400, margin: '20px auto', padding: 12}}>
                 <h2>Organize Canvassing</h2>
-                <p>Assign homes to canvassers and track progress. Showing non-absentee homes only.</p>
+                <p>Assign addresses to canvassers and track progress. Showing non-absentee addresses only.</p>
                 
                 {/* Filters */}
                 <div style={{
