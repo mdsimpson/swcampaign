@@ -6,7 +6,7 @@ import {
     SESClient,
     SendEmailCommand
 } from '@aws-sdk/client-ses'
-import { APP_URL, ADMIN_ENROLLMENT_URL } from '../../shared/config'
+import { APP_CONFIG } from '../../shared/config'
 
 export const handler = async (event: any) => {
     const headers = {
@@ -39,7 +39,7 @@ Dear ${firstName} ${lastName},
 Welcome to the SWHOA dissolution campaign! Your account has been approved and created.
 
 Login Details:
-• Website: ${process.env.APP_URL || APP_URL}
+• Website: https://${process.env.APP_DOMAIN || APP_CONFIG.DOMAIN}
 • Email: ${email}
 • Temporary Password: ${tempPassword}
 
@@ -130,7 +130,7 @@ Submitted: ${new Date().toLocaleString()}
 
 Please review this registration in the admin panel and approve or reject as appropriate.
 
-Login to review: ${process.env.APP_URL || ADMIN_ENROLLMENT_URL}
+Login to review: https://${process.env.APP_DOMAIN || APP_CONFIG.DOMAIN}/admin/enroll
 
 ---
 This is an automated notification from the SWHOA campaign system.

@@ -6,8 +6,8 @@ export const notifyAdmins = defineFunction({
   environment: {
     ALLOWED_ORIGINS: '*',
     USER_POOL_ID: process.env.AMPLIFY_AUTH_USERPOOL_ID || '',
-    FROM_EMAIL: 'mike@michael-simpson.com', // Verified SES email
-    APP_URL: 'https://swhoa.michael-simpson.com' // Configurable app URL
+    FROM_EMAIL: process.env.FROM_EMAIL || 'mike@michael-simpson.com', // Environment variable with fallback
+    APP_DOMAIN: process.env.APP_DOMAIN || 'swhoa.michael-simpson.com' // Environment variable with fallback
   },
   runtime: 20
 })

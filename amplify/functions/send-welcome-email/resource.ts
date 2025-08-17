@@ -5,8 +5,8 @@ export const sendWelcomeEmail = defineFunction({
   entry: './handler.ts', 
   environment: {
     ALLOWED_ORIGINS: '*',
-    FROM_EMAIL: 'mike@michael-simpson.com',
-    APP_URL: 'https://swhoa.michael-simpson.com' // Configurable app URL
+    FROM_EMAIL: process.env.FROM_EMAIL || 'mike@michael-simpson.com', // Environment variable with fallback
+    APP_DOMAIN: process.env.APP_DOMAIN || 'swhoa.michael-simpson.com' // Environment variable with fallback
   },
   runtime: 20
 })

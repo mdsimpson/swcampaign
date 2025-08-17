@@ -77,7 +77,7 @@ export const handler = async (event: any) => {
             }
             
             const sesClient = new SESClient({})
-            const fromEmail = 'mike@michael-simpson.com'
+            const fromEmail = process.env.FROM_EMAIL || 'mike@michael-simpson.com'
             
             const emailSubject = `Welcome to SWHOA Dissolution Campaign - Account Created`
             const emailBody = `

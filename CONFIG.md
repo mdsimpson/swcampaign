@@ -12,8 +12,10 @@ All domain URLs are centralized in configuration files to make deployment easier
 
 ```typescript
 export const APP_CONFIG = {
-  // Change this to your actual domain
-  DOMAIN: 'swhoa.michael-simpson.com',
+  // Domain from environment variable or fallback to default
+  get DOMAIN() {
+    return import.meta.env.VITE_APP_DOMAIN || 'swhoa.michael-simpson.com'
+  },
   
   // Automatically constructs full URL
   get APP_URL() {
@@ -22,14 +24,18 @@ export const APP_CONFIG = {
 }
 ```
 
+**Environment Variable**: `VITE_APP_DOMAIN` (frontend)
+
 ### Backend Configuration  
 
 **File**: `amplify/shared/config.ts`
 
 ```typescript
 export const APP_CONFIG = {
-  // Change this to your actual domain
-  DOMAIN: 'swhoa.michael-simpson.com',
+  // Domain from environment variable or fallback to default
+  get DOMAIN() {
+    return process.env.APP_DOMAIN || 'swhoa.michael-simpson.com'
+  },
   
   // Automatically constructs URLs
   get APP_URL() {
@@ -42,6 +48,8 @@ export const APP_CONFIG = {
 }
 ```
 
+**Environment Variable**: `APP_DOMAIN` (backend functions)
+
 ### Environment Variables
 
 **Files**: 
@@ -50,31 +58,47 @@ export const APP_CONFIG = {
 
 ```typescript
 environment: {
-  APP_URL: 'https://swhoa.michael-simpson.com' // Update this
+  FROM_EMAIL: process.env.FROM_EMAIL || 'mike@michael-simpson.com', // Environment variable with fallback
+  APP_DOMAIN: process.env.APP_DOMAIN || 'swhoa.michael-simpson.com' // Environment variable with fallback
 }
 ```
 
 ## 🚀 How to Change the Domain
 
-### 1. Update Configuration Files
+### 1. Update Environment Variables
+
+**Option A: Environment Variables (Recommended)**
+Set these environment variables in your deployment platform:
+
+**Frontend:**
+- `VITE_APP_DOMAIN=your-new-domain.com`
+
+**Backend Functions:**  
+- `APP_DOMAIN=your-new-domain.com`
+- `FROM_EMAIL=your-email@your-domain.com`
+
+**Option B: Update Fallback Values**
+If you prefer not to use environment variables, edit the fallback values:
 
 1. **Edit `src/config/app.ts`**:
    ```typescript
-   DOMAIN: 'your-new-domain.com',
+   return import.meta.env.VITE_APP_DOMAIN || 'your-new-domain.com'
    ```
 
 2. **Edit `amplify/shared/config.ts`**:
    ```typescript
-   DOMAIN: 'your-new-domain.com',
+   return process.env.APP_DOMAIN || 'your-new-domain.com'
    ```
 
 3. **Edit function resource files**:
    - `amplify/functions/notify-admins/resource.ts`
    - `amplify/functions/send-welcome-email/resource.ts`
+   - `amplify/functions/admin-api/resource.ts`
    
    Change:
    ```typescript
-   APP_URL: 'https://your-new-domain.com'
+   FROM_EMAIL: process.env.FROM_EMAIL || 'your-email@your-domain.com',
+   APP_DOMAIN: process.env.APP_DOMAIN || 'your-new-domain.com'
    ```
 
 ### 2. Deploy Changes
@@ -97,10 +121,13 @@ environment: {
 
 ## 📧 Email Configuration
 
-Email addresses are configured in the function resource files:
+Email addresses are configured via environment variables:
+
+**Environment Variable**: `FROM_EMAIL`
+**Default Fallback**: `mike@michael-simpson.com`
 
 ```typescript
-FROM_EMAIL: 'mike@michael-simpson.com' // Update as needed
+FROM_EMAIL: process.env.FROM_EMAIL || 'mike@michael-simpson.com' // Environment variable with fallback
 ```
 
 ## 🔍 URLs Used in the Application

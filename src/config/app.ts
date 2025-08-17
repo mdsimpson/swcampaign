@@ -2,8 +2,10 @@
 // This file contains all configurable app settings
 
 export const APP_CONFIG = {
-  // Production domain - change this to your actual domain
-  DOMAIN: 'swhoa.michael-simpson.com',
+  // Domain from environment variable or fallback to default
+  get DOMAIN() {
+    return import.meta.env.VITE_APP_DOMAIN || 'swhoa.michael-simpson.com'
+  },
   
   // Full app URL (automatically constructed)
   get APP_URL() {
@@ -17,7 +19,8 @@ export const APP_CONFIG = {
 } as const
 
 // Export individual values for convenience
-export const { DOMAIN, APP_URL } = APP_CONFIG
+export const DOMAIN = APP_CONFIG.DOMAIN
+export const APP_URL = APP_CONFIG.APP_URL
 
 // Default export for importing the entire config
 export default APP_CONFIG

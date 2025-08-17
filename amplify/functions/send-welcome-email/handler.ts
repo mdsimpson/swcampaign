@@ -2,7 +2,7 @@ import {
     SESClient,
     SendEmailCommand
 } from '@aws-sdk/client-ses'
-import { APP_URL } from '../../shared/config'
+import { APP_CONFIG } from '../../shared/config'
 
 export const handler = async (event: any) => {
     const corsHeaders = {
@@ -48,7 +48,7 @@ Dear ${firstName} ${lastName},
 Welcome to the SWHOA dissolution campaign! Your account has been approved and created.
 
 Login Details:
-• Website: ${process.env.APP_URL || APP_URL}
+• Website: https://${process.env.APP_DOMAIN || APP_CONFIG.DOMAIN}
 • Email: ${email}
 • Temporary Password: ${tempPassword}
 
