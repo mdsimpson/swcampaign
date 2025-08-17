@@ -41,39 +41,20 @@ export default function CanvassingMap() {
             array.findIndex(h => h.id === address.id) === index
         )
         
-        console.log('🏠 displayAddresses stats:', {
-            total: filteredAddresses.length,
-            unique: uniqueAddresses.length,
-            duplicatesRemoved: filteredAddresses.length - uniqueAddresses.length
-        })
-        
-        // Debug: Check if addresses have residents
-        const cloverleafAddresses = uniqueAddresses.filter(addr => addr.street && addr.street.includes('Cloverleaf'))
-        if (cloverleafAddresses.length > 0) {
-            console.log('🌿 DISPLAYADDRESSES DEBUG: Cloverleaf addresses found:', cloverleafAddresses.length)
-            cloverleafAddresses.forEach(addr => {
-                console.log(`🌿 ${addr.street}: has ${addr.residents ? addr.residents.length : 'NO'} residents property`)
-            })
-        }
         
         return uniqueAddresses
     }, [showAll, addresses, assignments])
 
     useEffect(() => {
-        console.log('useEffect triggered with user:', user?.userId)
         if (user?.userId) {
-            console.log('User authenticated, loading data...')
             loadAssignments() // This now loads both assignments and their addresses
             getUserLocation()
-        } else {
-            console.log('User not authenticated yet, skipping data load')
         }
     }, [user])
 
     // Auto-fit map bounds to show all markers
     useEffect(() => {
         if (mapInstance && mapsLoaded && displayAddresses.length > 0) {
-            console.log('🗺️ Fitting map bounds to show all markers...')
             
             const bounds = new google.maps.LatLngBounds()
             let hasValidMarkers = false
@@ -104,38 +85,14 @@ export default function CanvassingMap() {
                     }
                 })
                 
-                console.log('🗺️ Map bounds fitted successfully')
             }
         }
     }, [mapInstance, mapsLoaded, displayAddresses, userLocation])
 
-    async function loadAddresses() {
-        console.log('loadAddresses: Starting to load addresses...')
-        try {
-            // Load all addresses (including absentee owners for now)
-            const result = await client.models.Address.list()
-            console.log('loadAddresses: Raw addresses result:', result.data.length)
-            console.log('loadAddresses: First address sample:', result.data[0])
-            if (result.errors) {
-                console.error('loadAddresses: GraphQL errors:', result.errors)
-            }
-            // Don't filter out absentee owners yet - let's see all addresses
-            const allAddresses = result.data
-            console.log('loadAddresses: All addresses (including absentee):', allAddresses.length)
-            setAddresses(allAddresses)
-            console.log('loadAddresses: Set addresses state to', allAddresses.length, 'addresses')
-        } catch (error) {
-            console.error('loadAddresses: Failed to load addresses:', error)
-            console.error('loadAddresses: Error details:', error.message, error.stack)
-        }
-    }
 
     async function loadAssignments() {
-        console.log('🔄 loadAssignments: Starting to load assignments...')
-        console.log('🔄 Current user ID:', user?.userId)
         try {
             // Step 1: Load ALL residents first (same as Organize page)
-            console.log('Loading all residents first (Organize page approach)...')
             let allResidents: any[] = []
             let residentsNextToken = null
             
@@ -148,17 +105,14 @@ export default function CanvassingMap() {
                 residentsNextToken = residentsResult.nextToken
             } while (residentsNextToken)
             
-            console.log(`✅ Loaded ${allResidents.length} total residents`)
             
             // Step 2: Get all volunteers to find the current user's volunteer record
             const volunteersResult = await client.models.Volunteer.list()
-            console.log('👥 All volunteers:', volunteersResult.data?.length || 0)
             
             // Find the volunteer record for the current user
             const currentUserVolunteer = volunteersResult.data.find(v => 
                 v.userSub === user?.userId || v.userSub === user?.username
             )
-            console.log('👤 Current user volunteer record:', currentUserVolunteer?.displayName || 'Not found')
             
             if (!currentUserVolunteer) {
                 console.log('❌ No volunteer record found for current user')
@@ -171,15 +125,12 @@ export default function CanvassingMap() {
             const assignmentsResult = await client.models.Assignment.list({
                 filter: { volunteerId: { eq: currentUserVolunteer.id } }
             })
-            console.log(`📋 Found ${assignmentsResult.data?.length || 0} total assignments`)
             
             const activeAssignments = assignmentsResult.data.filter(a => a.status === 'NOT_STARTED')
-            console.log(`📋 Active assignments: ${activeAssignments.length}`)
             
             // Step 4: Load addresses for assignments (same pattern as Organize page)
             if (activeAssignments.length > 0) {
                 const addressIds = activeAssignments.map(a => a.addressId)
-                console.log(`🏠 Loading addresses for ${addressIds.length} assignments...`)
                 
                 const addressesWithDetailsPromises = addressIds.map(async (addressId) => {
                     try {
@@ -265,104 +216,13 @@ export default function CanvassingMap() {
                         lng: position.coords.longitude
                     })
                 },
-                (error) => console.log('Geolocation error:', error)
+                () => {}
             )
         }
     }
 
-    async function geocodeHomes() {
-        // Check if Google Maps is loaded
-        if (!window.google || !window.google.maps) {
-            alert('Google Maps not loaded yet. Please wait a moment and try again.')
-            return
-        }
-
-        // Get ALL addresses (assigned ones) to geocode
-        const addressesToGeocode = addresses
-        if (addressesToGeocode.length === 0) {
-            alert('No addresses to geocode!')
-            return
-        }
-
-        const confirmed = confirm(`This will geocode ALL ${addressesToGeocode.length} addresses using Google's API (including ones that already have coordinates). This may take several minutes. Continue?`)
-        if (!confirmed) return
-
-        console.log(`Geocoding ALL ${addressesToGeocode.length} addresses using Google Geocoding API...`)
-        const geocoder = new window.google.maps.Geocoder()
-        
-        let successCount = 0
-        let errorCount = 0
-        let skippedCount = 0
-        
-        for (let i = 0; i < addressesToGeocode.length; i++) {
-            const address = addressesToGeocode[i]
-            const addressStr = `${address.street}, ${address.city}, ${address.state || 'VA'} ${address.zip || ''}`
-            
-            try {
-                console.log(`Geocoding ${i + 1}/${addressesToGeocode.length}: ${addressStr}`)
-                
-                // Use Google Maps JavaScript API Geocoder
-                const geocodePromise = new Promise((resolve, reject) => {
-                    geocoder.geocode({ 
-                        address: addressStr,
-                        componentRestrictions: {
-                            country: 'US',
-                            administrativeArea: address.state || 'VA'
-                        }
-                    }, (results, status) => {
-                        if (status === 'OK' && results && results.length > 0) {
-                            resolve(results[0])
-                        } else {
-                            reject(new Error(`Geocoding failed: ${status}`))
-                        }
-                    })
-                })
-                
-                const result = await geocodePromise
-                const location = result.geometry.location
-                const lat = location.lat()
-                const lng = location.lng()
-                
-                console.log(`✅ Found coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`)
-                
-                // Update the address in the database
-                await client.models.Address.update({
-                    id: address.id,
-                    lat: lat,
-                    lng: lng
-                })
-                
-                // Update local state immediately
-                setAddresses(prevAddresses => 
-                    prevAddresses.map(h => 
-                        h.id === address.id 
-                            ? { ...h, lat: lat, lng: lng }
-                            : h
-                    )
-                )
-                
-                successCount++
-                console.log(`✅ Updated ${address.street} with real coordinates`)
-                
-                // Add a delay to respect API rate limits
-                await new Promise(resolve => setTimeout(resolve, 200))
-                
-            } catch (error) {
-                errorCount++
-                console.error(`❌ Error geocoding ${address}:`, error.message)
-                
-                // Add delay even on errors to avoid hitting rate limits
-                await new Promise(resolve => setTimeout(resolve, 500))
-            }
-        }
-        
-        console.log(`🎉 Geocoding complete! Successfully geocoded ${successCount} addresses, ${errorCount} failed.`)
-        alert(`Geocoding complete! Successfully geocoded ${successCount} out of ${addressesToGeocode.length} addresses. Refresh the page to see all markers.`)
-    }
 
     function handleAddressClick(address: any) {
-        console.log('🖱️ Marker clicked:', address.street, `(${address.residents?.length || 0} residents)`)
-        
         // Toggle selection - if clicking the same address, close the info window
         if (selectedAddress?.id === address.id) {
             setSelectedAddress(null)
@@ -475,15 +335,11 @@ export default function CanvassingMap() {
                         )}
 
                         {mapsLoaded && displayAddresses.map(address => {
-                            console.log('🎯 Rendering marker for:', address.street, 'lat:', address.lat, 'lng:', address.lng, 'hasCoords:', !!(address.lat && address.lng))
                             return address.lat && address.lng && (
                                 <Marker
                                     key={address.id}
                                     position={{lat: address.lat, lng: address.lng}}
-                                    onClick={() => {
-                                        console.log('🖱️ Marker clicked:', address.street)
-                                        handleAddressClick(address)
-                                    }}
+                                    onClick={() => handleAddressClick(address)}
                                     icon={{
                                         path: google.maps.SymbolPath.CIRCLE,
                                         scale: 8,
