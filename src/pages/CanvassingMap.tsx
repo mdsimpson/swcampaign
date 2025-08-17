@@ -33,6 +33,7 @@ export default function CanvassingMap() {
     const [allResidents, setAllResidents] = useState<any[]>([]) // Cache all residents
     const [allConsents, setAllConsents] = useState<any[]>([]) // Cache all consents
     const [hasInitialBounds, setHasInitialBounds] = useState(false) // Track if we've set initial bounds
+    const [toggleLoading, setToggleLoading] = useState(false) // Track toggle loading state
     
     const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
 
@@ -420,6 +421,20 @@ export default function CanvassingMap() {
         }
     }
 
+    async function handleShowAllToggle(checked: boolean) {
+        setToggleLoading(true)
+        
+        // Small delay to allow UI to update
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        setShowAll(checked)
+        
+        // Wait for map to render new markers
+        setTimeout(() => {
+            setToggleLoading(false)
+        }, 300)
+    }
+
     function openInteractionForm() {
         const params = new URLSearchParams({
             addressId: selectedAddress.id,
@@ -453,13 +468,19 @@ export default function CanvassingMap() {
                         </button>
                     </div>
                     <div>
-                        <label style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                        <label style={{display: 'flex', alignItems: 'center', gap: 8, opacity: toggleLoading ? 0.6 : 1}}>
                             <input 
                                 type='checkbox' 
                                 checked={showAll} 
-                                onChange={(e) => setShowAll(e.target.checked)}
+                                disabled={toggleLoading}
+                                onChange={(e) => handleShowAllToggle(e.target.checked)}
                             />
                             Show All Homes (vs My Assignments Only)
+                            {toggleLoading && (
+                                <span style={{color: '#007bff', fontSize: '12px', marginLeft: '8px'}}>
+                                    🔄 Loading...
+                                </span>
+                            )}
                         </label>
                     </div>
                 </div>
@@ -473,6 +494,10 @@ export default function CanvassingMap() {
                         ) : viewportLoading ? (
                             <span style={{color: '#007bff'}}>
                                 🗺️ Loading addresses in view...
+                            </span>
+                        ) : toggleLoading ? (
+                            <span style={{color: '#007bff'}}>
+                                🔄 Updating map view...
                             </span>
                         ) : (
                             showAll ? 
