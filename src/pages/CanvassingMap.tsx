@@ -319,7 +319,7 @@ export default function CanvassingMap() {
             addressId: selectedAddress.id,
             address: `${selectedAddress.street}, ${selectedAddress.city}, ${selectedAddress.state}`
         })
-        window.open(`/interact?${params}`, '_blank')
+        window.open(`/interact?${params}`, 'canvassingInteractionTab')
     }
 
     return (
@@ -549,7 +549,7 @@ export default function CanvassingMap() {
                                                 Record Interaction
                                             </button>
                                             <button 
-                                                onClick={() => window.open(`/history?address=${encodeURIComponent(selectedAddress.street)}`, '_blank')}
+                                                onClick={() => window.open(`/history?address=${encodeURIComponent(selectedAddress.street)}`, 'canvassingHistoryTab')}
                                                 style={{
                                                     backgroundColor: '#6c757d',
                                                     color: 'white',
