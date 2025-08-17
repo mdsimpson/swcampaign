@@ -92,7 +92,7 @@ export default function CanvassingMap() {
 
     async function loadAssignments() {
         try {
-            // Step 1: Load ALL addresses and residents first (same as Organize page)
+            // Step 1: Load ALL addresses, residents, and consents first
             let allAddresses: any[] = []
             let addressesNextToken = null
             
@@ -120,6 +120,21 @@ export default function CanvassingMap() {
             } while (residentsNextToken)
             
             console.log(`👥 Loaded ${allResidents.length} total residents`)
+            
+            // Load all consent records to determine who has signed
+            let allConsents: any[] = []
+            let consentsNextToken = null
+            
+            do {
+                const consentsResult = await client.models.Consent.list({ 
+                    limit: 1000,
+                    nextToken: consentsNextToken
+                })
+                allConsents.push(...consentsResult.data)
+                consentsNextToken = consentsResult.nextToken
+            } while (consentsNextToken)
+            
+            console.log(`📝 Loaded ${allConsents.length} total consent records`)
             
             // Step 2: Get all volunteers to find the current user's volunteer record
             const volunteersResult = await client.models.Volunteer.list()
@@ -169,34 +184,70 @@ export default function CanvassingMap() {
                             // Get residents from ALL address records with this address
                             const allResidentsForAddress = allResidents.filter(r => sameAddressIds.includes(r.addressId))
                             
-                            console.log(`🔍 Address ${address.street}: Found ${allResidentsForAddress.length} total residents across ${sameAddressIds.length} address records`)
+                            // Add consent status to each resident
+                            const residentsWithConsents = allResidentsForAddress.map(resident => {
+                                // Check if this resident has signed by looking for consent records
+                                // Match by resident ID or by name and address combination
+                                const hasConsentById = allConsents.some(consent => 
+                                    consent.residentId === resident.id
+                                )
+                                
+                                const hasConsentByName = allConsents.some(consent => 
+                                    sameAddressIds.includes(consent.addressId) &&
+                                    consent.signerName && 
+                                    consent.signerName.toLowerCase().includes(resident.firstName?.toLowerCase()) &&
+                                    consent.signerName.toLowerCase().includes(resident.lastName?.toLowerCase())
+                                )
+                                
+                                return {
+                                    ...resident,
+                                    hasSigned: hasConsentById || hasConsentByName
+                                }
+                            })
+                            
+                            console.log(`🔍 Address ${address.street}: Found ${residentsWithConsents.length} total residents across ${sameAddressIds.length} address records`)
                             
                             if (address.street && address.street.includes('Cloverleaf')) {
                                 console.log(`🌿 CLOVERLEAF DEBUG: Address details:`, address)
                                 console.log(`🌿 CLOVERLEAF DEBUG: Duplicate address IDs:`, sameAddressIds)
-                                console.log(`🌿 CLOVERLEAF DEBUG: All residents for this address:`, allResidentsForAddress)
+                                console.log(`🌿 CLOVERLEAF DEBUG: All residents for this address:`, residentsWithConsents)
+                                console.log(`🌿 CLOVERLEAF DEBUG: Consent records for these addresses:`, allConsents.filter(c => sameAddressIds.includes(c.addressId)))
                             }
                             
                             // Remove duplicate residents (same name at same address) - copied from Organize page
-                            const uniqueResidents = allResidentsForAddress.filter((person, index, self) => {
+                            const uniqueResidents = residentsWithConsents.filter((person, index, self) => {
                                 return index === self.findIndex(p => 
                                     p.firstName === person.firstName && 
                                     p.lastName === person.lastName
                                 )
                             })
                             
-                            // Sort residents (PRIMARY_OWNER first) - same as Organize page
+                            // Sort residents (PRIMARY_OWNER first, then SECONDARY_OWNER, then others)
                             const residents = uniqueResidents.sort((a, b) => {
-                                const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'Owner': 1, 'RENTER': 3, 'OTHER': 4 }
+                                const roleOrder = { 
+                                    'PRIMARY_OWNER': 1, 
+                                    'Owner': 1,  // CSV uses "Owner" for primary owners
+                                    'SECONDARY_OWNER': 2, 
+                                    'RENTER': 3, 
+                                    'OTHER': 4 
+                                }
                                 const aRole = a.role || a.occupantType || 'OTHER'
                                 const bRole = b.role || b.occupantType || 'OTHER'
                                 const aOrder = roleOrder[aRole] || 5
                                 const bOrder = roleOrder[bRole] || 5
+                                
+                                // If same role priority, sort alphabetically by first name
+                                if (aOrder === bOrder) {
+                                    const aName = (a.firstName || '').toLowerCase()
+                                    const bName = (b.firstName || '').toLowerCase()
+                                    return aName.localeCompare(bName)
+                                }
+                                
                                 return aOrder - bOrder
                             })
                             
-                            if (allResidentsForAddress.length !== residents.length) {
-                                console.log(`🧹 ${address.street}: Removed ${allResidentsForAddress.length - residents.length} duplicate residents`)
+                            if (residentsWithConsents.length !== residents.length) {
+                                console.log(`🧹 ${address.street}: Removed ${residentsWithConsents.length - residents.length} duplicate residents`)
                             }
                             
                             console.log(`🏠 ${address.street}: ${residents.length} unique residents`)
@@ -433,8 +484,13 @@ export default function CanvassingMap() {
                                                 selectedAddress.residents.map((resident, index) => {
                                                     // Use occupantType from CSV or role field, map to proper display
                                                     const roleValue = resident.role || resident.occupantType || 'resident'
-                                                    const isOwner = roleValue === 'PRIMARY_OWNER' || roleValue === 'SECONDARY_OWNER' || roleValue === 'Owner'
                                                     const roleDisplay = roleValue.replace('_', ' ').toLowerCase()
+                                                    const isAbsentee = resident.isAbsentee === true
+                                                    
+                                                    // Debug logging for role detection
+                                                    if (selectedAddress.street && selectedAddress.street.includes('Cloverleaf')) {
+                                                        console.log(`🎯 POPUP DEBUG: ${resident.firstName} ${resident.lastName} - roleValue: "${roleValue}", isAbsentee: ${isAbsentee}, hasSigned: ${resident.hasSigned}`)
+                                                    }
                                                     
                                                     return (
                                                         <div key={resident.id || index} style={{
@@ -452,34 +508,21 @@ export default function CanvassingMap() {
                                                                 </div>
                                                                 <div style={{color: '#666', fontSize: '11px', marginTop: '1px'}}>
                                                                     {roleDisplay}
-                                                                    {!isOwner && ' (cannot sign)'}
+                                                                    {isAbsentee && ' (Absentee)'}
                                                                 </div>
                                                             </div>
                                                             <div style={{marginLeft: '8px'}}>
-                                                                {isOwner ? (
-                                                                    <span style={{
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 'bold',
-                                                                        color: resident.hasSigned ? '#28a745' : '#dc3545',
-                                                                        backgroundColor: resident.hasSigned ? '#d4edda' : '#f8d7da',
-                                                                        padding: '3px 8px',
-                                                                        borderRadius: '4px',
-                                                                        border: `1px solid ${resident.hasSigned ? '#28a745' : '#dc3545'}`
-                                                                    }}>
-                                                                        {resident.hasSigned ? '✓ SIGNED' : '✗ NOT SIGNED'}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span style={{
-                                                                        fontSize: '11px',
-                                                                        color: '#6c757d',
-                                                                        backgroundColor: '#f8f9fa',
-                                                                        padding: '3px 8px',
-                                                                        borderRadius: '4px',
-                                                                        border: '1px solid #dee2e6'
-                                                                    }}>
-                                                                        N/A
-                                                                    </span>
-                                                                )}
+                                                                <span style={{
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 'bold',
+                                                                    color: resident.hasSigned ? '#28a745' : (isAbsentee ? '#ffc107' : '#dc3545'),
+                                                                    backgroundColor: resident.hasSigned ? '#d4edda' : (isAbsentee ? '#fff3cd' : '#f8d7da'),
+                                                                    padding: '3px 8px',
+                                                                    borderRadius: '4px',
+                                                                    border: `1px solid ${resident.hasSigned ? '#28a745' : (isAbsentee ? '#ffc107' : '#dc3545')}`
+                                                                }}>
+                                                                    {resident.hasSigned ? '✓ SIGNED' : (isAbsentee ? '📮 ABSENTEE' : '✗ NOT SIGNED')}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     )
