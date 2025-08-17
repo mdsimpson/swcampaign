@@ -27,6 +27,7 @@ export default function CanvassingMap() {
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
     const [mapsLoaded, setMapsLoaded] = useState(false)
     const [mapInstance, setMapInstance] = useState(null)
+    const [dataLoading, setDataLoading] = useState(true)
     
     const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
 
@@ -92,6 +93,8 @@ export default function CanvassingMap() {
 
     async function loadAssignments() {
         try {
+            setDataLoading(true)
+            
             // Step 1: Load ALL addresses, residents, and consents first
             let allAddresses: any[] = []
             let addressesNextToken = null
@@ -287,6 +290,8 @@ export default function CanvassingMap() {
             
         } catch (error) {
             console.error('💥 Failed to load assignments:', error)
+        } finally {
+            setDataLoading(false)
         }
     }
 
@@ -360,12 +365,54 @@ export default function CanvassingMap() {
 
                 <div style={{marginBottom: 16}}>
                     <p>
-                        {showAll ? 
-                            `Showing ${displayAddresses.length} addresses without signed consents` : 
-                            `Showing ${displayAddresses.length} of your assigned addresses`
-                        }
+                        {dataLoading ? (
+                            <span style={{color: '#007bff'}}>
+                                🔄 Loading marker data...
+                            </span>
+                        ) : (
+                            showAll ? 
+                                `Showing ${displayAddresses.length} addresses without signed consents` : 
+                                `Showing ${displayAddresses.length} of your assigned addresses`
+                        )}
                     </p>
                 </div>
+
+                <div style={{position: 'relative'}}>
+                    {/* Loading overlay on the map */}
+                    {dataLoading && (
+                        <div style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: 1000,
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            padding: '20px 40px',
+                            borderRadius: 8,
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 12
+                        }}>
+                            <div style={{
+                                width: 40,
+                                height: 40,
+                                border: '4px solid #f3f3f3',
+                                borderTop: '4px solid #007bff',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                            }}></div>
+                            <style>{`
+                                @keyframes spin {
+                                    0% { transform: rotate(0deg); }
+                                    100% { transform: rotate(360deg); }
+                                }
+                            `}</style>
+                            <div style={{color: '#333', fontWeight: 'bold'}}>Loading addresses and assignments...</div>
+                            <div style={{color: '#666', fontSize: '0.9em'}}>Please wait</div>
+                        </div>
+                    )}
 
                 <LoadScript 
                     googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} 
@@ -582,6 +629,7 @@ export default function CanvassingMap() {
                         )}
                     </GoogleMap>
                 </LoadScript>
+                </div>
 
                 <div style={{marginTop: 16, fontSize: 14, color: '#666'}}>
                     <p><strong>Legend:</strong></p>
