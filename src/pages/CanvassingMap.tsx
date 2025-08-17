@@ -20,7 +20,8 @@ const libraries = ['marker'] as const
 
 export default function CanvassingMap() {
     const {user} = useAuthenticator(ctx => [ctx.user])
-    const [addresses, setAddresses] = useState<any[]>([])
+    const [allAddresses, setAllAddresses] = useState<any[]>([]) // All addresses in database
+    const [viewportAddresses, setViewportAddresses] = useState<any[]>([]) // Addresses in current viewport
     const [assignments, setAssignments] = useState<any[]>([])
     const [showAll, setShowAll] = useState(false)
     const [selectedAddress, setSelectedAddress] = useState<any>(null)
@@ -28,34 +29,125 @@ export default function CanvassingMap() {
     const [mapsLoaded, setMapsLoaded] = useState(false)
     const [mapInstance, setMapInstance] = useState(null)
     const [dataLoading, setDataLoading] = useState(true)
+    const [viewportLoading, setViewportLoading] = useState(false)
+    const [allResidents, setAllResidents] = useState<any[]>([]) // Cache all residents
+    const [allConsents, setAllConsents] = useState<any[]>([]) // Cache all consents
+    const [hasInitialBounds, setHasInitialBounds] = useState(false) // Track if we've set initial bounds
     
     const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
 
     // Calculate which addresses to display based on filters
     const displayAddresses = useMemo(() => {
-        let filteredAddresses = showAll ? addresses : addresses.filter(h => 
-            assignments.some(a => a.addressId === h.id)
-        )
+        if (!viewportAddresses.length) {
+            console.log('📍 No viewport addresses to display')
+            return []
+        }
+        
+        let filteredAddresses
+        
+        if (showAll) {
+            // Show all addresses in viewport
+            filteredAddresses = viewportAddresses
+        } else {
+            // Show only assigned addresses in viewport
+            filteredAddresses = viewportAddresses.filter(h => 
+                assignments.some(a => a.addressId === h.id)
+            )
+        }
         
         // Remove duplicates by address ID to prevent multiple markers at same location
         const uniqueAddresses = filteredAddresses.filter((address, index, array) => 
             array.findIndex(h => h.id === address.id) === index
         )
         
+        console.log(`📍 ${showAll ? 'All addresses' : 'Assigned addresses'}: ${filteredAddresses.length} total → ${uniqueAddresses.length} unique after deduplication`)
         
-        return uniqueAddresses
-    }, [showAll, addresses, assignments])
+        // Add assignment status to each address for consistent marker coloring
+        const addressesWithAssignmentStatus = uniqueAddresses.map(addr => ({
+            ...addr,
+            isAssigned: assignments.some(a => a.addressId === addr.id)
+        }))
+
+        // Enrich with resident data for display (if resident data is available)
+        if (allResidents.length > 0) {
+            const enrichedAddresses = enrichAddressesWithResidents(addressesWithAssignmentStatus)
+            console.log(`📍 Enriched ${enrichedAddresses.length} addresses with resident data`)
+            return enrichedAddresses
+        } else {
+            // Return basic address data if resident data not loaded yet
+            console.log(`📍 Resident data not ready yet, showing ${addressesWithAssignmentStatus.length} basic addresses`)
+            return addressesWithAssignmentStatus.map(addr => ({ ...addr, residents: [] }))
+        }
+    }, [showAll, viewportAddresses, assignments, allResidents, allConsents])
 
     useEffect(() => {
         if (user?.userId) {
-            loadAssignments() // This now loads both assignments and their addresses
+            loadInitialData() // Load assignments and all reference data
             getUserLocation()
         }
     }, [user])
 
-    // Auto-fit map bounds to show all markers
+    // Load addresses when map viewport changes OR when initial data loads
     useEffect(() => {
-        if (mapInstance && mapsLoaded && displayAddresses.length > 0) {
+        if (mapInstance && mapsLoaded && allAddresses.length > 0) {
+            // Load viewport addresses immediately when data is ready
+            loadAddressesInViewport()
+        }
+    }, [mapInstance, mapsLoaded, allAddresses])
+
+    // Also load viewport when map first loads with initial assignments (for proper bounds fitting)
+    useEffect(() => {
+        if (mapInstance && mapsLoaded && assignments.length > 0 && allAddresses.length > 0) {
+            // For initial load, include assigned addresses in viewport to fit bounds properly
+            const assignedAddressIds = assignments.map(a => a.addressId)
+            const assignedAddresses = allAddresses.filter(addr => assignedAddressIds.includes(addr.id))
+            
+            if (assignedAddresses.length > 0) {
+                console.log(`📍 Setting initial viewport with ${assignedAddresses.length} assigned addresses`)
+                setViewportAddresses(prev => {
+                    // Merge assigned addresses with any existing viewport addresses
+                    const combined = [...prev, ...assignedAddresses]
+                    // Remove duplicates
+                    const unique = combined.filter((addr, index, array) => 
+                        array.findIndex(a => a.id === addr.id) === index
+                    )
+                    return unique
+                })
+            }
+        }
+    }, [mapInstance, mapsLoaded, assignments, allAddresses])
+
+    // Debounced viewport change handler
+    const handleViewportChange = useCallback(() => {
+        if (!mapInstance || !allAddresses.length) return
+        
+        // Simple debounce - clear previous timeout and set new one
+        const timeoutId = setTimeout(() => {
+            loadAddressesInViewport()
+        }, 500) // 500ms delay
+        
+        return timeoutId
+    }, [mapInstance, allAddresses])
+
+    // Clean debounce implementation
+    const [viewportChangeTimeout, setViewportChangeTimeout] = useState<NodeJS.Timeout | null>(null)
+    
+    const debouncedViewportChange = useCallback(() => {
+        if (viewportChangeTimeout) {
+            clearTimeout(viewportChangeTimeout)
+        }
+        
+        const timeout = setTimeout(() => {
+            loadAddressesInViewport()
+        }, 500)
+        
+        setViewportChangeTimeout(timeout)
+    }, [viewportChangeTimeout])
+
+    // Auto-fit map bounds to show all markers (ONLY on initial load)
+    useEffect(() => {
+        if (mapInstance && mapsLoaded && displayAddresses.length > 0 && !hasInitialBounds) {
+            console.log('🗺️ Setting initial map bounds for first load')
             
             const bounds = new google.maps.LatLngBounds()
             let hasValidMarkers = false
@@ -77,6 +169,7 @@ export default function CanvassingMap() {
             // Only fit bounds if we have at least one valid marker
             if (hasValidMarkers) {
                 mapInstance.fitBounds(bounds)
+                setHasInitialBounds(true) // Mark that we've set initial bounds
                 
                 // Add a listener to prevent over-zooming on single markers
                 const listener = google.maps.event.addListenerOnce(mapInstance, 'bounds_changed', () => {
@@ -88,15 +181,85 @@ export default function CanvassingMap() {
                 
             }
         }
-    }, [mapInstance, mapsLoaded, displayAddresses, userLocation])
+    }, [mapInstance, mapsLoaded, displayAddresses, userLocation, hasInitialBounds])
 
 
-    async function loadAssignments() {
+    // Load addresses that are currently visible in the map viewport
+    async function loadAddressesInViewport() {
+        if (!mapInstance || viewportLoading) return
+        
+        try {
+            setViewportLoading(true)
+            
+            // Get current map bounds
+            const bounds = mapInstance.getBounds()
+            if (!bounds) {
+                console.log('📍 No map bounds available yet, loading assigned addresses as fallback')
+                // If no bounds yet, load assigned addresses as fallback
+                if (assignments.length > 0) {
+                    const assignedAddressIds = assignments.map(a => a.addressId)
+                    const assignedAddresses = allAddresses.filter(addr => assignedAddressIds.includes(addr.id))
+                    
+                    // Deduplicate assigned addresses too
+                    const uniqueAssignedAddresses = []
+                    const seenAddresses = new Set()
+                    
+                    for (const address of assignedAddresses) {
+                        const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
+                        if (!seenAddresses.has(addressKey)) {
+                            seenAddresses.add(addressKey)
+                            uniqueAssignedAddresses.push(address)
+                        }
+                    }
+                    
+                    setViewportAddresses(uniqueAssignedAddresses)
+                    console.log(`📍 Loaded ${assignedAddresses.length} assigned addresses (${uniqueAssignedAddresses.length} unique) as initial viewport`)
+                }
+                return
+            }
+            
+            const ne = bounds.getNorthEast()
+            const sw = bounds.getSouthWest()
+            
+            // Filter addresses within viewport bounds
+            const addressesInViewport = allAddresses.filter(address => {
+                if (!address.lat || !address.lng) return false
+                
+                return address.lat >= sw.lat() && 
+                       address.lat <= ne.lat() && 
+                       address.lng >= sw.lng() && 
+                       address.lng <= ne.lng()
+            })
+            
+            // Deduplicate addresses in viewport by street address, keeping the first one found
+            // (The enrichment function will find all residents from all duplicate records anyway)
+            const uniqueViewportAddresses = []
+            const seenAddresses = new Set()
+            
+            for (const address of addressesInViewport) {
+                const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
+                if (!seenAddresses.has(addressKey)) {
+                    seenAddresses.add(addressKey)
+                    uniqueViewportAddresses.push(address)
+                }
+            }
+            
+            console.log(`📍 Found ${addressesInViewport.length} addresses in viewport (${uniqueViewportAddresses.length} unique) (bounds: ${sw.lat().toFixed(4)}, ${sw.lng().toFixed(4)} to ${ne.lat().toFixed(4)}, ${ne.lng().toFixed(4)})`)
+            setViewportAddresses(uniqueViewportAddresses)
+            
+        } catch (error) {
+            console.error('Error loading viewport addresses:', error)
+        } finally {
+            setViewportLoading(false)
+        }
+    }
+
+    async function loadInitialData() {
         try {
             setDataLoading(true)
             
-            // Step 1: Load ALL addresses, residents, and consents first
-            let allAddresses: any[] = []
+            // Step 1: Load ALL addresses, residents, and consents for reference
+            let loadedAddresses: any[] = []
             let addressesNextToken = null
             
             do {
@@ -104,13 +267,14 @@ export default function CanvassingMap() {
                     limit: 1000,
                     nextToken: addressesNextToken
                 })
-                allAddresses.push(...addressesResult.data)
+                loadedAddresses.push(...addressesResult.data)
                 addressesNextToken = addressesResult.nextToken
             } while (addressesNextToken)
             
-            console.log(`📍 Loaded ${allAddresses.length} total addresses`)
+            console.log(`📍 Loaded ${loadedAddresses.length} total addresses`)
+            setAllAddresses(loadedAddresses)
             
-            let allResidents: any[] = []
+            let loadedResidents: any[] = []
             let residentsNextToken = null
             
             do {
@@ -118,14 +282,15 @@ export default function CanvassingMap() {
                     limit: 1000,
                     nextToken: residentsNextToken
                 })
-                allResidents.push(...residentsResult.data)
+                loadedResidents.push(...residentsResult.data)
                 residentsNextToken = residentsResult.nextToken
             } while (residentsNextToken)
             
-            console.log(`👥 Loaded ${allResidents.length} total residents`)
+            console.log(`👥 Loaded ${loadedResidents.length} total residents`)
+            setAllResidents(loadedResidents)
             
             // Load all consent records to determine who has signed
-            let allConsents: any[] = []
+            let loadedConsents: any[] = []
             let consentsNextToken = null
             
             do {
@@ -133,11 +298,12 @@ export default function CanvassingMap() {
                     limit: 1000,
                     nextToken: consentsNextToken
                 })
-                allConsents.push(...consentsResult.data)
+                loadedConsents.push(...consentsResult.data)
                 consentsNextToken = consentsResult.nextToken
             } while (consentsNextToken)
             
-            console.log(`📝 Loaded ${allConsents.length} total consent records`)
+            console.log(`📝 Loaded ${loadedConsents.length} total consent records`)
+            setAllConsents(loadedConsents)
             
             // Step 2: Get all volunteers to find the current user's volunteer record
             const volunteersResult = await client.models.Volunteer.list()
@@ -150,7 +316,6 @@ export default function CanvassingMap() {
             if (!currentUserVolunteer) {
                 console.log('❌ No volunteer record found for current user')
                 setAssignments([])
-                setAddresses([])
                 return
             }
             
@@ -161,138 +326,100 @@ export default function CanvassingMap() {
             
             const activeAssignments = assignmentsResult.data.filter(a => a.status === 'NOT_STARTED')
             
-            // Step 4: Load addresses for assignments with duplicate handling (EXACTLY like Organize page)
+            // Step 4: Just store the assignments - we'll load address details on demand for viewport
             if (activeAssignments.length > 0) {
-                const addressIds = activeAssignments.map(a => a.addressId)
-                
-                const addressesWithDetailsPromises = addressIds.map(async (addressId) => {
-                    try {
-                        const addressResult = await client.models.Address.get({ id: addressId })
-                        if (addressResult.data) {
-                            const address = addressResult.data
-                            const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
-                            
-                            // Find ALL address IDs with the same street address (handling duplicates)
-                            const sameAddressIds = allAddresses
-                                .filter(a => {
-                                    const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
-                                    return aAddress === addressKey
-                                })
-                                .map(a => a.id)
-                            
-                            if (sameAddressIds.length > 1) {
-                                console.log(`🔄 Found ${sameAddressIds.length} duplicate address records for ${address.street}`)
-                            }
-                            
-                            // Get residents from ALL address records with this address
-                            const allResidentsForAddress = allResidents.filter(r => sameAddressIds.includes(r.addressId))
-                            
-                            // Add consent status to each resident
-                            const residentsWithConsents = allResidentsForAddress.map(resident => {
-                                // Check if this resident has signed by looking for consent records
-                                // Match by resident ID or by name and address combination
-                                const hasConsentById = allConsents.some(consent => 
-                                    consent.residentId === resident.id
-                                )
-                                
-                                const hasConsentByName = allConsents.some(consent => 
-                                    sameAddressIds.includes(consent.addressId) &&
-                                    consent.signerName && 
-                                    consent.signerName.toLowerCase().includes(resident.firstName?.toLowerCase()) &&
-                                    consent.signerName.toLowerCase().includes(resident.lastName?.toLowerCase())
-                                )
-                                
-                                return {
-                                    ...resident,
-                                    hasSigned: hasConsentById || hasConsentByName
-                                }
-                            })
-                            
-                            console.log(`🔍 Address ${address.street}: Found ${residentsWithConsents.length} total residents across ${sameAddressIds.length} address records`)
-                            
-                            if (address.street && address.street.includes('Cloverleaf')) {
-                                console.log(`🌿 CLOVERLEAF DEBUG: Address details:`, address)
-                                console.log(`🌿 CLOVERLEAF DEBUG: Duplicate address IDs:`, sameAddressIds)
-                                console.log(`🌿 CLOVERLEAF DEBUG: All residents for this address:`, residentsWithConsents)
-                                console.log(`🌿 CLOVERLEAF DEBUG: Consent records for these addresses:`, allConsents.filter(c => sameAddressIds.includes(c.addressId)))
-                            }
-                            
-                            // Remove duplicate residents (same name at same address) - copied from Organize page
-                            const uniqueResidents = residentsWithConsents.filter((person, index, self) => {
-                                return index === self.findIndex(p => 
-                                    p.firstName === person.firstName && 
-                                    p.lastName === person.lastName
-                                )
-                            })
-                            
-                            // Sort residents (PRIMARY_OWNER first, then SECONDARY_OWNER, then others)
-                            const residents = uniqueResidents.sort((a, b) => {
-                                const roleOrder = { 
-                                    'PRIMARY_OWNER': 1, 
-                                    'Owner': 1,  // CSV uses "Owner" for primary owners
-                                    'SECONDARY_OWNER': 2, 
-                                    'RENTER': 3, 
-                                    'OTHER': 4 
-                                }
-                                const aRole = a.role || a.occupantType || 'OTHER'
-                                const bRole = b.role || b.occupantType || 'OTHER'
-                                const aOrder = roleOrder[aRole] || 5
-                                const bOrder = roleOrder[bRole] || 5
-                                
-                                // If same role priority, sort alphabetically by first name
-                                if (aOrder === bOrder) {
-                                    const aName = (a.firstName || '').toLowerCase()
-                                    const bName = (b.firstName || '').toLowerCase()
-                                    return aName.localeCompare(bName)
-                                }
-                                
-                                return aOrder - bOrder
-                            })
-                            
-                            if (residentsWithConsents.length !== residents.length) {
-                                console.log(`🧹 ${address.street}: Removed ${residentsWithConsents.length - residents.length} duplicate residents`)
-                            }
-                            
-                            console.log(`🏠 ${address.street}: ${residents.length} unique residents`)
-                            if (residents.length > 0) {
-                                residents.forEach(r => {
-                                    const displayRole = r.role || r.occupantType || 'Unknown'
-                                    console.log(`   👤 ${r.firstName} ${r.lastName} (${displayRole})`)
-                                })
-                            }
-                            
-                            const result = {
-                                ...address,
-                                residents: residents
-                            }
-                            if (address.street && address.street.includes('Cloverleaf')) {
-                                console.log(`🌿 CLOVERLEAF FINAL: Final address object:`, result)
-                            }
-                            return result
-                        }
-                    } catch (error) {
-                        console.error(`❌ Failed to load address ${addressId}:`, error)
-                    }
-                    return null
-                })
-                
-                const allAddressesWithDetails = await Promise.all(addressesWithDetailsPromises)
-                const validAddresses = allAddressesWithDetails.filter(address => address !== null)
-                
-                console.log(`✅ Successfully loaded ${validAddresses.length} addresses with resident data`)
-                setAddresses(validAddresses)
+                console.log(`✅ Found ${activeAssignments.length} active assignments`)
                 setAssignments(activeAssignments)
             } else {
                 console.log('❌ No active assignments found')
-                setAddresses([])
                 setAssignments([])
             }
             
         } catch (error) {
-            console.error('💥 Failed to load assignments:', error)
+            console.error('💥 Failed to load initial data:', error)
         } finally {
             setDataLoading(false)
         }
+    }
+
+    // Function to enrich addresses with resident data for display
+    function enrichAddressesWithResidents(addresses: any[]) {
+        console.log(`🔍 Enriching ${addresses.length} addresses with resident data...`)
+        
+        return addresses.map(address => {
+            const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
+            
+            // Find ALL address IDs with the same street address (handling duplicates)
+            const sameAddressIds = allAddresses
+                .filter(a => {
+                    const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
+                    return aAddress === addressKey
+                })
+                .map(a => a.id)
+            
+            console.log(`🏠 ${address.street}: Found ${sameAddressIds.length} address record(s) with IDs: ${sameAddressIds.slice(0, 3).join(', ')}${sameAddressIds.length > 3 ? '...' : ''}`)
+            
+            // Get residents from ALL address records with this address
+            const allResidentsForAddress = allResidents.filter(r => sameAddressIds.includes(r.addressId))
+            console.log(`👥 ${address.street}: Found ${allResidentsForAddress.length} residents total`)
+            
+            // Add consent status to each resident
+            const residentsWithConsents = allResidentsForAddress.map(resident => {
+                const hasConsentById = allConsents.some(consent => 
+                    consent.residentId === resident.id
+                )
+                
+                const hasConsentByName = allConsents.some(consent => 
+                    sameAddressIds.includes(consent.addressId) &&
+                    consent.signerName && 
+                    consent.signerName.toLowerCase().includes(resident.firstName?.toLowerCase()) &&
+                    consent.signerName.toLowerCase().includes(resident.lastName?.toLowerCase())
+                )
+                
+                return {
+                    ...resident,
+                    hasSigned: hasConsentById || hasConsentByName
+                }
+            })
+            
+            // Remove duplicate residents and sort
+            const uniqueResidents = residentsWithConsents.filter((person, index, self) => {
+                return index === self.findIndex(p => 
+                    p.firstName === person.firstName && 
+                    p.lastName === person.lastName
+                )
+            })
+            
+            const residents = uniqueResidents.sort((a, b) => {
+                const roleOrder = { 
+                    'PRIMARY_OWNER': 1, 
+                    'Owner': 1,
+                    'SECONDARY_OWNER': 2, 
+                    'RENTER': 3, 
+                    'OTHER': 4 
+                }
+                const aRole = a.role || a.occupantType || 'OTHER'
+                const bRole = b.role || b.occupantType || 'OTHER'
+                const aOrder = roleOrder[aRole] || 5
+                const bOrder = roleOrder[bRole] || 5
+                
+                if (aOrder === bOrder) {
+                    const aName = (a.firstName || '').toLowerCase()
+                    const bName = (b.firstName || '').toLowerCase()
+                    return aName.localeCompare(bName)
+                }
+                
+                return aOrder - bOrder
+            })
+            
+            console.log(`✅ ${address.street}: Final result has ${residents.length} unique residents`)
+            
+            return {
+                ...address,
+                residents: residents
+                // Preserve any additional properties like isAssigned
+            }
+        })
     }
 
     function getUserLocation() {
@@ -311,6 +438,9 @@ export default function CanvassingMap() {
 
 
     function handleAddressClick(address: any) {
+        console.log('🖱️ Address clicked:', address.street)
+        console.log('🏠 Address has residents:', address.residents ? address.residents.length : 'NO RESIDENTS ARRAY')
+        
         // Toggle selection - if clicking the same address, close the info window
         if (selectedAddress?.id === address.id) {
             setSelectedAddress(null)
@@ -369,10 +499,14 @@ export default function CanvassingMap() {
                             <span style={{color: '#007bff'}}>
                                 🔄 Loading marker data...
                             </span>
+                        ) : viewportLoading ? (
+                            <span style={{color: '#007bff'}}>
+                                🗺️ Loading addresses in view...
+                            </span>
                         ) : (
                             showAll ? 
-                                `Showing ${displayAddresses.length} addresses without signed consents` : 
-                                `Showing ${displayAddresses.length} of your assigned addresses`
+                                `Showing ${displayAddresses.length} unique addresses in view (all homes)` : 
+                                `Showing ${displayAddresses.length} of your assigned addresses in view`
                         )}
                     </p>
                 </div>
@@ -432,8 +566,13 @@ export default function CanvassingMap() {
                             setSelectedAddress(null)
                         }}
                         onLoad={(map) => {
-                            console.log('🗺️ Map loaded, disabling default InfoWindow')
+                            console.log('🗺️ Map loaded, setting up viewport change listeners')
                             setMapInstance(map)
+                            
+                            // Add listeners for viewport changes
+                            map.addListener('bounds_changed', debouncedViewportChange)
+                            map.addListener('dragend', debouncedViewportChange)
+                            map.addListener('zoom_changed', debouncedViewportChange)
                             
                             // Completely disable default InfoWindow
                             const originalAddListener = map.addListener
@@ -473,7 +612,7 @@ export default function CanvassingMap() {
                                     icon={{
                                         path: google.maps.SymbolPath.CIRCLE,
                                         scale: 8,
-                                        fillColor: assignments.some(a => a.addressId === address.id) ? '#ff6b6b' : '#4ecdc4',
+                                        fillColor: address.isAssigned ? '#ff6b6b' : '#4ecdc4',
                                         fillOpacity: 0.8,
                                         strokeWeight: 2,
                                         strokeColor: 'white'
