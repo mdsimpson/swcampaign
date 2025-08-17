@@ -39,7 +39,6 @@ export default function CanvassingMap() {
     // Calculate which addresses to display based on filters
     const displayAddresses = useMemo(() => {
         if (!viewportAddresses.length) {
-            console.log('📍 No viewport addresses to display')
             return []
         }
         
@@ -60,7 +59,6 @@ export default function CanvassingMap() {
             array.findIndex(h => h.id === address.id) === index
         )
         
-        console.log(`📍 ${showAll ? 'All addresses' : 'Assigned addresses'}: ${filteredAddresses.length} total → ${uniqueAddresses.length} unique after deduplication`)
         
         // Add assignment status to each address for consistent marker coloring
         const addressesWithAssignmentStatus = uniqueAddresses.map(addr => ({
@@ -71,11 +69,9 @@ export default function CanvassingMap() {
         // Enrich with resident data for display (if resident data is available)
         if (allResidents.length > 0) {
             const enrichedAddresses = enrichAddressesWithResidents(addressesWithAssignmentStatus)
-            console.log(`📍 Enriched ${enrichedAddresses.length} addresses with resident data`)
             return enrichedAddresses
         } else {
             // Return basic address data if resident data not loaded yet
-            console.log(`📍 Resident data not ready yet, showing ${addressesWithAssignmentStatus.length} basic addresses`)
             return addressesWithAssignmentStatus.map(addr => ({ ...addr, residents: [] }))
         }
     }, [showAll, viewportAddresses, assignments, allResidents, allConsents])
@@ -103,7 +99,6 @@ export default function CanvassingMap() {
             const assignedAddresses = allAddresses.filter(addr => assignedAddressIds.includes(addr.id))
             
             if (assignedAddresses.length > 0) {
-                console.log(`📍 Setting initial viewport with ${assignedAddresses.length} assigned addresses`)
                 setViewportAddresses(prev => {
                     // Merge assigned addresses with any existing viewport addresses
                     const combined = [...prev, ...assignedAddresses]
@@ -147,7 +142,6 @@ export default function CanvassingMap() {
     // Auto-fit map bounds to show all markers (ONLY on initial load)
     useEffect(() => {
         if (mapInstance && mapsLoaded && displayAddresses.length > 0 && !hasInitialBounds) {
-            console.log('🗺️ Setting initial map bounds for first load')
             
             const bounds = new google.maps.LatLngBounds()
             let hasValidMarkers = false
@@ -194,7 +188,6 @@ export default function CanvassingMap() {
             // Get current map bounds
             const bounds = mapInstance.getBounds()
             if (!bounds) {
-                console.log('📍 No map bounds available yet, loading assigned addresses as fallback')
                 // If no bounds yet, load assigned addresses as fallback
                 if (assignments.length > 0) {
                     const assignedAddressIds = assignments.map(a => a.addressId)
@@ -213,7 +206,6 @@ export default function CanvassingMap() {
                     }
                     
                     setViewportAddresses(uniqueAssignedAddresses)
-                    console.log(`📍 Loaded ${assignedAddresses.length} assigned addresses (${uniqueAssignedAddresses.length} unique) as initial viewport`)
                 }
                 return
             }
@@ -244,7 +236,6 @@ export default function CanvassingMap() {
                 }
             }
             
-            console.log(`📍 Found ${addressesInViewport.length} addresses in viewport (${uniqueViewportAddresses.length} unique) (bounds: ${sw.lat().toFixed(4)}, ${sw.lng().toFixed(4)} to ${ne.lat().toFixed(4)}, ${ne.lng().toFixed(4)})`)
             setViewportAddresses(uniqueViewportAddresses)
             
         } catch (error) {
@@ -271,7 +262,6 @@ export default function CanvassingMap() {
                 addressesNextToken = addressesResult.nextToken
             } while (addressesNextToken)
             
-            console.log(`📍 Loaded ${loadedAddresses.length} total addresses`)
             setAllAddresses(loadedAddresses)
             
             let loadedResidents: any[] = []
@@ -286,7 +276,6 @@ export default function CanvassingMap() {
                 residentsNextToken = residentsResult.nextToken
             } while (residentsNextToken)
             
-            console.log(`👥 Loaded ${loadedResidents.length} total residents`)
             setAllResidents(loadedResidents)
             
             // Load all consent records to determine who has signed
@@ -302,7 +291,6 @@ export default function CanvassingMap() {
                 consentsNextToken = consentsResult.nextToken
             } while (consentsNextToken)
             
-            console.log(`📝 Loaded ${loadedConsents.length} total consent records`)
             setAllConsents(loadedConsents)
             
             // Step 2: Get all volunteers to find the current user's volunteer record
@@ -314,7 +302,6 @@ export default function CanvassingMap() {
             )
             
             if (!currentUserVolunteer) {
-                console.log('❌ No volunteer record found for current user')
                 setAssignments([])
                 return
             }
@@ -327,13 +314,7 @@ export default function CanvassingMap() {
             const activeAssignments = assignmentsResult.data.filter(a => a.status === 'NOT_STARTED')
             
             // Step 4: Just store the assignments - we'll load address details on demand for viewport
-            if (activeAssignments.length > 0) {
-                console.log(`✅ Found ${activeAssignments.length} active assignments`)
-                setAssignments(activeAssignments)
-            } else {
-                console.log('❌ No active assignments found')
-                setAssignments([])
-            }
+            setAssignments(activeAssignments)
             
         } catch (error) {
             console.error('💥 Failed to load initial data:', error)
@@ -344,8 +325,6 @@ export default function CanvassingMap() {
 
     // Function to enrich addresses with resident data for display
     function enrichAddressesWithResidents(addresses: any[]) {
-        console.log(`🔍 Enriching ${addresses.length} addresses with resident data...`)
-        
         return addresses.map(address => {
             const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
             
@@ -357,11 +336,8 @@ export default function CanvassingMap() {
                 })
                 .map(a => a.id)
             
-            console.log(`🏠 ${address.street}: Found ${sameAddressIds.length} address record(s) with IDs: ${sameAddressIds.slice(0, 3).join(', ')}${sameAddressIds.length > 3 ? '...' : ''}`)
-            
             // Get residents from ALL address records with this address
             const allResidentsForAddress = allResidents.filter(r => sameAddressIds.includes(r.addressId))
-            console.log(`👥 ${address.street}: Found ${allResidentsForAddress.length} residents total`)
             
             // Add consent status to each resident
             const residentsWithConsents = allResidentsForAddress.map(resident => {
@@ -412,8 +388,6 @@ export default function CanvassingMap() {
                 return aOrder - bOrder
             })
             
-            console.log(`✅ ${address.street}: Final result has ${residents.length} unique residents`)
-            
             return {
                 ...address,
                 residents: residents
@@ -438,9 +412,6 @@ export default function CanvassingMap() {
 
 
     function handleAddressClick(address: any) {
-        console.log('🖱️ Address clicked:', address.street)
-        console.log('🏠 Address has residents:', address.residents ? address.residents.length : 'NO RESIDENTS ARRAY')
-        
         // Toggle selection - if clicking the same address, close the info window
         if (selectedAddress?.id === address.id) {
             setSelectedAddress(null)
@@ -561,12 +532,8 @@ export default function CanvassingMap() {
                             clickableIcons: false,
                             disableDoubleClickZoom: false
                         }}
-                        onClick={() => {
-                            console.log('🗺️ Map clicked - closing InfoWindows')
-                            setSelectedAddress(null)
-                        }}
+                        onClick={() => setSelectedAddress(null)}
                         onLoad={(map) => {
-                            console.log('🗺️ Map loaded, setting up viewport change listeners')
                             setMapInstance(map)
                             
                             // Add listeners for viewport changes
@@ -641,10 +608,7 @@ export default function CanvassingMap() {
                                 }}>
                                     {/* Close button */}
                                     <button
-                                        onClick={() => {
-                                            console.log('🖱️ Custom overlay close clicked')
-                                            setSelectedAddress(null)
-                                        }}
+                                        onClick={() => setSelectedAddress(null)}
                                         style={{
                                             position: 'absolute',
                                             top: '4px',
@@ -673,10 +637,6 @@ export default function CanvassingMap() {
                                                     const roleDisplay = roleValue.replace('_', ' ').toLowerCase()
                                                     const isAbsentee = resident.isAbsentee === true
                                                     
-                                                    // Debug logging for role detection
-                                                    if (selectedAddress.street && selectedAddress.street.includes('Cloverleaf')) {
-                                                        console.log(`🎯 POPUP DEBUG: ${resident.firstName} ${resident.lastName} - roleValue: "${roleValue}", isAbsentee: ${isAbsentee}, hasSigned: ${resident.hasSigned}`)
-                                                    }
                                                     
                                                     return (
                                                         <div key={resident.id || index} style={{
