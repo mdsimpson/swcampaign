@@ -11,6 +11,8 @@ export default function InteractionHistory() {
     const [loading, setLoading] = useState(true)
     const [addresses, setAddresses] = useState<any[]>([])
     const [residents, setResidents] = useState<any[]>([])
+    const [userProfiles, setUserProfiles] = useState<any[]>([])
+    const [volunteers, setVolunteers] = useState<any[]>([])
     const [filteredAddress, setFilteredAddress] = useState('')
     const [currentPage, setCurrentPage] = useState(1)
     const [totalInteractions, setTotalInteractions] = useState(0)
@@ -83,6 +85,48 @@ export default function InteractionHistory() {
             
             setResidents(allResidents)
             console.log(`Loaded ${allResidents.length} total residents`)
+            
+            // Load all user profiles for canvasser names
+            let allUserProfiles: any[] = []
+            let userProfilesNextToken = null
+            
+            try {
+                do {
+                    const result = await client.models.UserProfile.list({
+                        limit: 1000,
+                        nextToken: userProfilesNextToken
+                    })
+                    allUserProfiles.push(...result.data)
+                    userProfilesNextToken = result.nextToken
+                } while (userProfilesNextToken)
+                
+                setUserProfiles(allUserProfiles)
+                console.log(`Loaded ${allUserProfiles.length} total user profiles`)
+            } catch (error) {
+                console.log('Could not load user profiles:', error)
+                setUserProfiles([])
+            }
+            
+            // Load all volunteers for canvasser names (backup if no UserProfile)
+            let allVolunteers: any[] = []
+            let volunteersNextToken = null
+            
+            try {
+                do {
+                    const result = await client.models.Volunteer.list({
+                        limit: 1000,
+                        nextToken: volunteersNextToken
+                    })
+                    allVolunteers.push(...result.data)
+                    volunteersNextToken = result.nextToken
+                } while (volunteersNextToken)
+                
+                setVolunteers(allVolunteers)
+                console.log(`Loaded ${allVolunteers.length} total volunteers`)
+            } catch (error) {
+                console.log('Could not load volunteers:', error)
+                setVolunteers([])
+            }
             
             // Filter interactions by address if specified
             let filteredInteractions = allInteractions
@@ -168,13 +212,44 @@ export default function InteractionHistory() {
         return addresses.find(a => a.id === interaction.addressId)
     }
 
+    function getCanvasserName(interaction: any) {
+        // First try to find the user profile by sub/userId
+        const userProfile = userProfiles.find(profile => 
+            profile.sub === interaction.createdBy || 
+            profile.email === interaction.createdBy
+        )
+        
+        if (userProfile && userProfile.firstName && userProfile.lastName) {
+            return `${userProfile.firstName} ${userProfile.lastName}`
+        }
+        
+        // If no UserProfile, try to find in Volunteer records
+        const volunteer = volunteers.find(vol => 
+            vol.userSub === interaction.createdBy || 
+            vol.email === interaction.createdBy
+        )
+        
+        if (volunteer && volunteer.displayName) {
+            return volunteer.displayName
+        }
+        
+        // If still no match, return the createdBy value or Unknown
+        return interaction.createdBy || 'Unknown'
+    }
+
     function getParticipantsDisplay(interaction: any) {
-        if (!interaction.participantResidentIds) return 'No participants recorded'
+        if (!interaction.participantResidentIds) {
+            // If no participants recorded, show who canvassed instead
+            return `Canvassed by ${interaction.createdBy || 'Unknown'}`
+        }
         
         // Parse CSV of resident IDs and names
         const participantIds = interaction.participantResidentIds.split(',').map(id => id.trim()).filter(id => id)
         
-        if (participantIds.length === 0) return 'No participants recorded'
+        if (participantIds.length === 0) {
+            // If empty string for participants, show who canvassed
+            return `Canvassed by ${interaction.createdBy || 'Unknown'}`
+        }
         
         // Get resident details
         const participants = participantIds.map(participantId => {
@@ -270,11 +345,10 @@ export default function InteractionHistory() {
                                 <tr style={{backgroundColor: '#f8f9fa'}}>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Date & Time</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Address</th>
-                                    <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Participants</th>
+                                    <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Recorded by</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Contact Made</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Materials</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Notes</th>
-                                    <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Recorded By</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -298,8 +372,8 @@ export default function InteractionHistory() {
                                                 )}
                                             </td>
                                             <td style={{border: '1px solid #ddd', padding: 12}}>
-                                                <div style={{fontSize: '0.9em'}}>
-                                                    {getParticipantsDisplay(interaction)}
+                                                <div style={{fontSize: '0.9em', fontWeight: 'bold'}}>
+                                                    {getCanvasserName(interaction)}
                                                 </div>
                                             </td>
                                             <td style={{border: '1px solid #ddd', padding: 12}}>
@@ -327,11 +401,6 @@ export default function InteractionHistory() {
                                             <td style={{border: '1px solid #ddd', padding: 12}}>
                                                 <div style={{fontSize: '0.9em', maxWidth: 200}}>
                                                     {interaction.notes || <span style={{color: '#6c757d'}}>No notes</span>}
-                                                </div>
-                                            </td>
-                                            <td style={{border: '1px solid #ddd', padding: 12}}>
-                                                <div style={{fontSize: '0.9em'}}>
-                                                    {interaction.createdBy || 'Unknown'}
                                                 </div>
                                             </td>
                                         </tr>
