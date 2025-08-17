@@ -2,6 +2,7 @@ import Header from '../components/Header'
 import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
+import billingAddresses from '../data/billingAddresses.json'
 
 export default function AbsenteeInteractions() {
     const [absenteeAddresses, setAbsenteeAddresses] = useState<any[]>([])
@@ -29,6 +30,13 @@ export default function AbsenteeInteractions() {
     const client = generateClient<Schema>({
         authMode: 'apiKey'
     })
+    
+    // Helper function to get billing address for a resident
+    function getBillingAddress(resident: any) {
+        if (!resident.firstName || !resident.lastName) return null
+        const key = `${resident.firstName} ${resident.lastName}`.toLowerCase()
+        return billingAddresses[key as keyof typeof billingAddresses] || null
+    }
 
     useEffect(() => {
         loadAbsenteeAddresses()
@@ -285,7 +293,7 @@ export default function AbsenteeInteractions() {
                                         }}
                                         onClick={() => handleSort('mailingCity')}
                                     >
-                                        Mailing Address {sortField === 'mailingCity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                        Billing Address {sortField === 'mailingCity' && (sortDirection === 'asc' ? '↑' : '↓')}
                                     </th>
                                     <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Owners</th>
                                     <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Contact Info</th>
@@ -300,7 +308,52 @@ export default function AbsenteeInteractions() {
                                             {address.city}, {address.state} {address.zip}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {address.city}, {address.state}
+                                            {(() => {
+                                                // Get billing addresses for all residents at this property
+                                                const billingAddressList = address.residents?.map((resident: any) => {
+                                                    const billing = getBillingAddress(resident)
+                                                    if (billing) {
+                                                        return {
+                                                            name: `${resident.firstName} ${resident.lastName}`,
+                                                            address: `${billing.street}, ${billing.city}, ${billing.state} ${billing.zip}`
+                                                        }
+                                                    }
+                                                    return null
+                                                }).filter(Boolean) || []
+                                                
+                                                if (billingAddressList.length > 0) {
+                                                    // Remove duplicates (same billing address)
+                                                    const uniqueAddresses = Array.from(new Set(billingAddressList.map((b: any) => b.address)))
+                                                    
+                                                    return uniqueAddresses.map((addr, i) => {
+                                                        // Create Google Maps URL for the address
+                                                        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`
+                                                        
+                                                        return (
+                                                            <div key={i}>
+                                                                <a 
+                                                                    href={mapsUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    style={{
+                                                                        color: '#007bff',
+                                                                        textDecoration: 'none',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                    onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                                                                    onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                                                                    title="View on Google Maps"
+                                                                >
+                                                                    📍 {addr}
+                                                                </a>
+                                                                {i < uniqueAddresses.length - 1 && <br/>}
+                                                            </div>
+                                                        )
+                                                    })
+                                                } else {
+                                                    return <span style={{color: '#999', fontStyle: 'italic'}}>No billing address available</span>
+                                                }
+                                            })()}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
                                             {address.residents?.map((resident: any, i: number) => (
