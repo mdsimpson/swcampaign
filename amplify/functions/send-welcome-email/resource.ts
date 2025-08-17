@@ -6,7 +6,7 @@ export const sendWelcomeEmail = defineFunction({
   environment: {
     ALLOWED_ORIGINS: '*',
     FROM_EMAIL: 'mike@michael-simpson.com',
-    APP_URL: 'https://your-app-domain.com' // TODO: Replace with your app's URL
+    APP_URL: 'https://swhoa.michael-simpson.com' // Configurable app URL
   },
   runtime: 20
 })

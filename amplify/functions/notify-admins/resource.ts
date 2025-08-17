@@ -7,7 +7,7 @@ export const notifyAdmins = defineFunction({
     ALLOWED_ORIGINS: '*',
     USER_POOL_ID: process.env.AMPLIFY_AUTH_USERPOOL_ID || '',
     FROM_EMAIL: 'mike@michael-simpson.com', // Verified SES email
-    APP_URL: 'https://your-app-domain.com' // TODO: Replace with your app's URL
+    APP_URL: 'https://swhoa.michael-simpson.com' // Configurable app URL
   },
   runtime: 20
 })

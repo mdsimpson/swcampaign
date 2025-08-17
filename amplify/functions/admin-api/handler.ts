@@ -10,6 +10,7 @@ import {
     SESClient,
     SendEmailCommand
 } from '@aws-sdk/client-ses'
+import { APP_URL } from '../../shared/config'
 
 export const handler = async (event: any) => {
     const headers = {
@@ -85,7 +86,7 @@ Dear ${firstName} ${lastName},
 Welcome to the SWHOA dissolution campaign! Your account has been approved and created.
 
 Login Details:
-• Website: https://your-app-domain.com
+• Website: ${APP_URL}
 • Email: ${email}
 • Temporary Password: ${tempPassword}
 
