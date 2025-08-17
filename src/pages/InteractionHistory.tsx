@@ -9,8 +9,8 @@ export default function InteractionHistory() {
     const navigate = useNavigate()
     const [interactions, setInteractions] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
-    const [homes, setHomes] = useState<any[]>([])
-    const [people, setPeople] = useState<any[]>([])
+    const [addresses, setAddresses] = useState<any[]>([])
+    const [residents, setResidents] = useState<any[]>([])
     const [filteredAddress, setFilteredAddress] = useState('')
     const [currentPage, setCurrentPage] = useState(1)
     const [totalInteractions, setTotalInteractions] = useState(0)
@@ -52,37 +52,37 @@ export default function InteractionHistory() {
             
             console.log(`Loaded ${allInteractions.length} total interactions`)
             
-            // Load all homes for address filtering and display
-            let allHomes: any[] = []
-            let homesNextToken = null
+            // Load all addresses for address filtering and display
+            let allAddresses: any[] = []
+            let addressesNextToken = null
             
             do {
-                const result = await client.models.Home.list({
+                const result = await client.models.Address.list({
                     limit: 1000,
-                    nextToken: homesNextToken
+                    nextToken: addressesNextToken
                 })
-                allHomes.push(...result.data)
-                homesNextToken = result.nextToken
-            } while (homesNextToken)
+                allAddresses.push(...result.data)
+                addressesNextToken = result.nextToken
+            } while (addressesNextToken)
             
-            setHomes(allHomes)
-            console.log(`Loaded ${allHomes.length} total homes`)
+            setAddresses(allAddresses)
+            console.log(`Loaded ${allAddresses.length} total addresses`)
             
-            // Load all people for participant display
-            let allPeople: any[] = []
-            let peopleNextToken = null
+            // Load all residents for participant display
+            let allResidents: any[] = []
+            let residentsNextToken = null
             
             do {
-                const result = await client.models.Person.list({
+                const result = await client.models.Resident.list({
                     limit: 1000,
-                    nextToken: peopleNextToken
+                    nextToken: residentsNextToken
                 })
-                allPeople.push(...result.data)
-                peopleNextToken = result.nextToken
-            } while (peopleNextToken)
+                allResidents.push(...result.data)
+                residentsNextToken = result.nextToken
+            } while (residentsNextToken)
             
-            setPeople(allPeople)
-            console.log(`Loaded ${allPeople.length} total people`)
+            setResidents(allResidents)
+            console.log(`Loaded ${allResidents.length} total residents`)
             
             // Filter interactions by address if specified
             let filteredInteractions = allInteractions
@@ -90,17 +90,17 @@ export default function InteractionHistory() {
             if (addressFilter.trim()) {
                 console.log(`Filtering interactions for address: "${addressFilter}"`)
                 
-                // Find homes that match the address filter
-                const matchingHomes = allHomes.filter(home => 
-                    home.street?.toLowerCase().includes(addressFilter.toLowerCase())
+                // Find addresses that match the address filter
+                const matchingAddresses = allAddresses.filter(address => 
+                    address.street?.toLowerCase().includes(addressFilter.toLowerCase())
                 )
-                const matchingHomeIds = new Set(matchingHomes.map(h => h.id))
+                const matchingAddressIds = new Set(matchingAddresses.map(a => a.id))
                 
-                console.log(`Found ${matchingHomes.length} homes matching address filter`)
+                console.log(`Found ${matchingAddresses.length} addresses matching address filter`)
                 
                 // Filter interactions to only those at matching addresses
                 filteredInteractions = allInteractions.filter(interaction => 
-                    matchingHomeIds.has(interaction.homeId)
+                    matchingAddressIds.has(interaction.addressId)
                 )
                 
                 console.log(`Filtered to ${filteredInteractions.length} interactions at matching addresses`)
@@ -164,22 +164,29 @@ export default function InteractionHistory() {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE + 1
     const endIndex = Math.min(startIndex + interactions.length - 1, totalInteractions)
 
-    function getHomeForInteraction(interaction: any) {
-        return homes.find(h => h.id === interaction.homeId)
+    function getAddressForInteraction(interaction: any) {
+        return addresses.find(a => a.id === interaction.addressId)
     }
 
     function getParticipantsDisplay(interaction: any) {
-        if (!interaction.participantPersonIds) return 'No participants recorded'
+        if (!interaction.participantResidentIds) return 'No participants recorded'
         
-        // Parse CSV of person IDs
-        const personIds = interaction.participantPersonIds.split(',').map(id => id.trim()).filter(id => id)
+        // Parse CSV of resident IDs and names
+        const participantIds = interaction.participantResidentIds.split(',').map(id => id.trim()).filter(id => id)
         
-        if (personIds.length === 0) return 'No participants recorded'
+        if (participantIds.length === 0) return 'No participants recorded'
         
-        // Get person details
-        const participants = personIds.map(personId => {
-            const person = people.find(p => p.id === personId)
-            return person ? `${person.firstName} ${person.lastName} (${person.role?.replace('_', ' ')})` : personId
+        // Get resident details
+        const participants = participantIds.map(participantId => {
+            // First try to find by resident ID
+            const resident = residents.find(r => r.id === participantId)
+            if (resident) {
+                const roleValue = resident.role || resident.occupantType || 'resident'
+                const roleDisplay = roleValue.replace('_', ' ').toLowerCase()
+                return `${resident.firstName} ${resident.lastName} (${roleDisplay})`
+            }
+            // If not found, it might be a name string (for "other person")
+            return participantId
         })
         
         return participants.join(', ')
@@ -272,22 +279,22 @@ export default function InteractionHistory() {
                             </thead>
                             <tbody>
                                 {interactions.map(interaction => {
-                                    const home = getHomeForInteraction(interaction)
+                                    const address = getAddressForInteraction(interaction)
                                     return (
                                         <tr key={interaction.id}>
                                             <td style={{border: '1px solid #ddd', padding: 12}}>
                                                 {formatDate(interaction.createdAt)}
                                             </td>
                                             <td style={{border: '1px solid #ddd', padding: 12}}>
-                                                {home ? (
+                                                {address ? (
                                                     <div>
-                                                        <div style={{fontWeight: 'bold'}}>{home.street}</div>
+                                                        <div style={{fontWeight: 'bold'}}>{address.street}</div>
                                                         <div style={{fontSize: '0.9em', color: '#666'}}>
-                                                            {home.city}, {home.state} {home.postalCode}
+                                                            {address.city}, {address.state} {address.zip}
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <span style={{color: '#dc3545'}}>Home not found</span>
+                                                    <span style={{color: '#dc3545'}}>Address not found</span>
                                                 )}
                                             </td>
                                             <td style={{border: '1px solid #ddd', padding: 12}}>

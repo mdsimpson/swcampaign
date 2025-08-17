@@ -8,7 +8,7 @@ import {Link} from 'react-router-dom'
 
 export default function InternalHome() {
     const {user} = useAuthenticator(ctx => [ctx.user])
-    const [stats, setStats] = useState({totalPeople: 0, consentsRecorded: 0, totalHomes: 0, homesWithAllConsents: 0})
+    const [stats, setStats] = useState({totalResidents: 0, consentsRecorded: 0, totalAddresses: 0, addressesWithAllConsents: 0})
     const [pendingRegistrations, setPendingRegistrations] = useState(0)
     const [outstandingAssignments, setOutstandingAssignments] = useState(0)
     const [userGroups, setUserGroups] = useState<string[]>([])
@@ -46,35 +46,35 @@ export default function InternalHome() {
     async function loadStats() {
         try {
             const consents = await client.models.Consent.list()
-            const people = await client.models.Person.list()
+            const residents = await client.models.Resident.list()
             
             // Check if we're hitting pagination limits
-            let allHomes = []
+            let allAddresses = []
             let nextToken = null
             let totalCount = 0
             
             do {
-                const homesQuery = await client.models.Home.list({
+                const addressesQuery = await client.models.Address.list({
                     limit: 1000,
                     nextToken: nextToken
                 })
-                allHomes.push(...homesQuery.data)
-                nextToken = homesQuery.nextToken
-                totalCount += homesQuery.data.length
-                console.log(`Batch loaded: ${homesQuery.data.length} homes, total so far: ${totalCount}`)
+                allAddresses.push(...addressesQuery.data)
+                nextToken = addressesQuery.nextToken
+                totalCount += addressesQuery.data.length
+                console.log(`Batch loaded: ${addressesQuery.data.length} addresses, total so far: ${totalCount}`)
             } while (nextToken)
             
-            console.log('Final total homes found:', totalCount)
-            console.log('Sample home addresses:', allHomes.slice(0, 5).map(h => h.street))
+            console.log('Final total addresses found:', totalCount)
+            console.log('Sample addresses:', allAddresses.slice(0, 5).map(a => a.street))
             
             // Check for duplicates by address
             const addressMap = new Map()
-            allHomes.forEach(home => {
-                const address = `${home.street}, ${home.city}`.toLowerCase()
-                if (addressMap.has(address)) {
-                    addressMap.set(address, addressMap.get(address) + 1)
+            allAddresses.forEach(address => {
+                const addressKey = `${address.street}, ${address.city}`.toLowerCase()
+                if (addressMap.has(addressKey)) {
+                    addressMap.set(addressKey, addressMap.get(addressKey) + 1)
                 } else {
-                    addressMap.set(address, 1)
+                    addressMap.set(addressKey, 1)
                 }
             })
             
@@ -86,26 +86,26 @@ export default function InternalHome() {
             console.log(`Unique addresses: ${uniqueAddresses}, Total records: ${totalCount}`)
             
             // For now, let's use the unique address count for the display
-            const totalHomes = uniqueAddresses
+            const totalAddresses = uniqueAddresses
             
-            const totalPeople = people.data.length
+            const totalResidents = residents.data.length
             const consentsRecorded = consents.data.length
             
-            // Calculate homes where ALL owners have signed
-            const homeIds = new Set(allHomes.map(h => h.id))
-            let homesWithAllConsents = 0
+            // Calculate addresses where ALL residents have signed
+            const addressIds = new Set(allAddresses.map(a => a.id))
+            let addressesWithAllConsents = 0
             
-            for (const homeId of homeIds) {
-                const homeOwners = people.data.filter(p => p.homeId === homeId)
-                const homeConsents = consents.data.filter(c => c.homeId === homeId)
+            for (const addressId of addressIds) {
+                const addressResidents = residents.data.filter(r => r.addressId === addressId)
+                const addressConsents = consents.data.filter(c => c.addressId === addressId)
                 
-                // Check if all owners have signed
-                if (homeOwners.length > 0 && homeConsents.length >= homeOwners.length) {
-                    homesWithAllConsents++
+                // Check if all residents have signed
+                if (addressResidents.length > 0 && addressConsents.length >= addressResidents.length) {
+                    addressesWithAllConsents++
                 }
             }
             
-            setStats({totalPeople, consentsRecorded, totalHomes, homesWithAllConsents})
+            setStats({totalResidents, consentsRecorded, totalAddresses, addressesWithAllConsents})
             setStatsLoaded(true)
         } catch (error) {
             console.error('Failed to load stats:', error)
@@ -133,9 +133,9 @@ export default function InternalHome() {
         }
     }
 
-    const consentProgressPercent = stats.totalHomes > 0 ? (stats.homesWithAllConsents / stats.totalHomes) * 100 : 0
-    const targetConsentsNeeded = stats.totalHomes  // Show total homes instead of 80%
-    const progressToTarget = stats.totalHomes > 0 ? (stats.homesWithAllConsents / stats.totalHomes) * 100 : 0
+    const consentProgressPercent = stats.totalAddresses > 0 ? (stats.addressesWithAllConsents / stats.totalAddresses) * 100 : 0
+    const targetConsentsNeeded = stats.totalAddresses  // Show total addresses instead of 80%
+    const progressToTarget = stats.totalAddresses > 0 ? (stats.addressesWithAllConsents / stats.totalAddresses) * 100 : 0
 
     const hasRole = (role: string) => userGroups.includes(role)
     const isCanvasser = hasRole('Canvasser') || hasRole('Organizer') || hasRole('Administrator')
@@ -152,8 +152,8 @@ export default function InternalHome() {
                     <h3>Consent Form Progress</h3>
                     <div style={{marginBottom: 12}}>
                         <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 4}}>
-                            <span>Homes with All Consents Signed</span>
-                            <span>{statsLoaded ? `${stats.homesWithAllConsents} / ${targetConsentsNeeded} (${consentProgressPercent.toFixed(1)}%)` : ''}</span>
+                            <span>Addresses with All Consents Signed</span>
+                            <span>{statsLoaded ? `${stats.addressesWithAllConsents} / ${targetConsentsNeeded} (${consentProgressPercent.toFixed(1)}%)` : ''}</span>
                         </div>
                         <div style={{backgroundColor: '#e0e0e0', borderRadius: 4, height: 20}}>
                             <div style={{
@@ -167,7 +167,7 @@ export default function InternalHome() {
                     </div>
 
                     <div style={{display: 'flex', gap: 20, fontSize: 14}}>
-                        <span>Total Homes: {statsLoaded ? stats.totalHomes : ''}</span>
+                        <span>Total Addresses: {statsLoaded ? stats.totalAddresses : ''}</span>
                         <span>Individual Consents: {statsLoaded ? stats.consentsRecorded : ''}</span>
                         <span>Progress to 80%: {statsLoaded ? progressToTarget.toFixed(1) + '%' : ''}</span>
                     </div>

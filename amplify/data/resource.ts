@@ -114,6 +114,7 @@ const schema = a.schema({
         createdBy: a.string(), // sub/email
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer','Canvasser']).to(['create','read','update']),
+        allow.publicApiKey().to(['create','read']) // Temporary: Allow interaction creation while debugging auth
     ]),
 
     UserProfile: a.model({

@@ -5,66 +5,66 @@ import type {Schema} from '../../../amplify/data/resource'
 
 export default function RecordConsents() {
     const [searchTerm, setSearchTerm] = useState('')
-    const [homes, setHomes] = useState<any[]>([])
+    const [addresses, setAddresses] = useState<any[]>([])
     
     const client = generateClient<Schema>({
         authMode: 'apiKey'
     })
-    const [filteredHomes, setFilteredHomes] = useState<any[]>([])
+    const [filteredAddresses, setFilteredAddresses] = useState<any[]>([])
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploadStatus, setUploadStatus] = useState('')
 
     useEffect(() => {
-        loadHomes()
+        loadAddresses()
     }, [])
 
     useEffect(() => {
         if (searchTerm) {
-            const filtered = homes.filter(home => 
-                home.street.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                home.residents?.some((person: any) => 
-                    `${person.firstName} ${person.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
+            const filtered = addresses.filter(address => 
+                address.street.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                address.residents?.some((resident: any) => 
+                    `${resident.firstName} ${resident.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
                 )
             )
-            setFilteredHomes(filtered)
+            setFilteredAddresses(filtered)
         } else {
-            setFilteredHomes([])
+            setFilteredAddresses([])
         }
-    }, [searchTerm, homes])
+    }, [searchTerm, addresses])
 
-    async function loadHomes() {
+    async function loadAddresses() {
         try {
-            const result = await client.models.Home.list()
-            const homesWithResidents = await Promise.all(
-                result.data.map(async (home) => {
-                    const residents = await client.models.Person.list({
-                        filter: { homeId: { eq: home.id } }
+            const result = await client.models.Address.list()
+            const addressesWithResidents = await Promise.all(
+                result.data.map(async (address) => {
+                    const residents = await client.models.Resident.list({
+                        filter: { addressId: { eq: address.id } }
                     })
-                    return { ...home, residents: residents.data }
+                    return { ...address, residents: residents.data }
                 })
             )
-            setHomes(homesWithResidents)
+            setAddresses(addressesWithResidents)
         } catch (error) {
-            console.error('Failed to load homes:', error)
+            console.error('Failed to load addresses:', error)
         }
     }
 
-    async function recordConsent(personId: string, homeId: string) {
+    async function recordConsent(residentId: string, addressId: string) {
         try {
             await client.models.Consent.create({
-                personId,
-                homeId,
+                residentId,
+                addressId,
                 recordedAt: new Date().toISOString(),
                 source: 'manual'
             })
             
-            await client.models.Person.update({
-                id: personId,
+            await client.models.Resident.update({
+                id: residentId,
                 hasSigned: true,
                 signedAt: new Date().toISOString()
             })
             
-            await loadHomes() // Refresh data
+            await loadAddresses() // Refresh data
             alert('Consent recorded successfully!')
         } catch (error) {
             console.error('Failed to record consent:', error)
@@ -86,16 +86,16 @@ export default function RecordConsents() {
             const [firstName, lastName, address] = line.split(',').map(s => s.trim())
             if (!firstName || !lastName || !address) continue
             
-            // Find matching person
-            const matchingHome = homes.find(h => h.street.toLowerCase().includes(address.toLowerCase()))
-            if (matchingHome) {
-                const matchingPerson = matchingHome.residents?.find((p: any) => 
-                    p.firstName?.toLowerCase() === firstName.toLowerCase() && 
-                    p.lastName?.toLowerCase() === lastName.toLowerCase()
+            // Find matching resident
+            const matchingAddress = addresses.find(a => a.street.toLowerCase().includes(address.toLowerCase()))
+            if (matchingAddress) {
+                const matchingResident = matchingAddress.residents?.find((r: any) => 
+                    r.firstName?.toLowerCase() === firstName.toLowerCase() && 
+                    r.lastName?.toLowerCase() === lastName.toLowerCase()
                 )
                 
-                if (matchingPerson && !matchingPerson.hasSigned) {
-                    await recordConsent(matchingPerson.id, matchingHome.id)
+                if (matchingResident && !matchingResident.hasSigned) {
+                    await recordConsent(matchingResident.id, matchingAddress.id)
                     newRecords++
                 }
             }
@@ -122,21 +122,21 @@ export default function RecordConsents() {
                         style={{width: '100%', padding: 8, marginBottom: 16}}
                     />
                     
-                    {filteredHomes.length > 0 && (
+                    {filteredAddresses.length > 0 && (
                         <div style={{border: '1px solid #ddd', borderRadius: 4, maxHeight: 400, overflowY: 'auto'}}>
-                            {filteredHomes.map(home => (
-                                <div key={home.id} style={{padding: 12, borderBottom: '1px solid #eee'}}>
-                                    <strong>{home.street}</strong>
+                            {filteredAddresses.map(address => (
+                                <div key={address.id} style={{padding: 12, borderBottom: '1px solid #eee'}}>
+                                    <strong>{address.street}</strong>
                                     <div style={{marginTop: 8}}>
-                                        {home.residents?.map((person: any) => (
-                                            <div key={person.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0'}}>
+                                        {address.residents?.map((resident: any) => (
+                                            <div key={resident.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0'}}>
                                                 <span>
-                                                    {person.firstName} {person.lastName} 
-                                                    {person.hasSigned && <span style={{color: 'green', marginLeft: 8}}>✓ Signed</span>}
+                                                    {resident.firstName} {resident.lastName} 
+                                                    {resident.hasSigned && <span style={{color: 'green', marginLeft: 8}}>✓ Signed</span>}
                                                 </span>
-                                                {!person.hasSigned && (
+                                                {!resident.hasSigned && (
                                                     <button 
-                                                        onClick={() => recordConsent(person.id, home.id)}
+                                                        onClick={() => recordConsent(resident.id, address.id)}
                                                         style={{backgroundColor: '#007bff', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 4}}
                                                     >
                                                         Record Consent

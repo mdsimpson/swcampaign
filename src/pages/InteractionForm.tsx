@@ -21,7 +21,9 @@ export default function InteractionForm() {
     const [notes, setNotes] = useState('')
     const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null)
     
-    const client = generateClient<Schema>()
+    const client = generateClient<Schema>({
+        authMode: 'apiKey' // Temporary: Use API key while debugging user authentication
+    })
 
     useEffect(() => {
         // Get URL parameters
@@ -169,9 +171,19 @@ export default function InteractionForm() {
                 createdBy: user?.userId || user?.username || 'unknown'
             }
             
-            await client.models.InteractionRecord.create(interactionData)
+            console.log('Creating interaction record with data:', interactionData)
+            console.log('User info:', { userId: user?.userId, username: user?.username, signInDetails: user?.signInDetails })
             
-            alert('Interaction recorded successfully!')
+            const result = await client.models.InteractionRecord.create(interactionData)
+            
+            console.log('Interaction record created successfully:', result)
+            
+            if (result.data?.id) {
+                alert('Interaction recorded successfully! Record ID: ' + result.data.id)
+            } else {
+                console.warn('Record created but no ID returned:', result)
+                alert('Interaction may have been recorded, but confirmation is unclear.')
+            }
             
             // Reset form
             setSelectedResidents([])
@@ -182,8 +194,14 @@ export default function InteractionForm() {
             setNotes('')
             
         } catch (error) {
-            console.error('Failed to record interaction:', error)
-            alert('Failed to record interaction. Please try again.')
+            console.error('Failed to record interaction - Full error:', error)
+            console.error('Error details:', {
+                message: error.message,
+                name: error.name,
+                stack: error.stack,
+                errors: error.errors
+            })
+            alert('Failed to record interaction: ' + error.message + '\nCheck console for details.')
         } finally {
             setSaving(false)
         }
