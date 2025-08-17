@@ -3,6 +3,7 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 import {fetchAuthSession} from 'aws-amplify/auth'
+import { QUERY_LIMITS } from '../../config/queries'
 import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand, ListUsersCommand, AdminDeleteUserCommand, AdminGetUserCommand, AdminListGroupsForUserCommand, AdminRemoveUserFromGroupCommand} from '@aws-sdk/client-cognito-identity-provider'
 import {getCurrentUser} from 'aws-amplify/auth'
 
@@ -38,7 +39,7 @@ export default function EnrollMembers() {
     async function loadRegistrations() {
         try {
             console.log('Loading registrations as admin...')
-            const result = await client.models.Registration.list()
+            const result = await client.models.Registration.list({ limit: QUERY_LIMITS.REGISTRATIONS_LIMIT })
             console.log(`Found ${result.data.length} total registrations`)
             const pending = result.data.filter(r => r.status === 'SUBMITTED')
             console.log(`Filtered to ${pending.length} pending registrations`)
@@ -69,7 +70,7 @@ export default function EnrollMembers() {
             }))
             
             // Get UserProfiles to match with Cognito users
-            const userProfiles = await client.models.UserProfile.list()
+            const userProfiles = await client.models.UserProfile.list({ limit: QUERY_LIMITS.USER_PROFILES_LIMIT })
             
             // Combine Cognito user data with UserProfile data and get groups
             const usersWithProfiles = await Promise.all(listUsersResult.Users?.map(async cognitoUser => {

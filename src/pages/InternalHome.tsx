@@ -5,6 +5,7 @@ import type {Schema} from '../../amplify/data/resource'
 import {useAuthenticator} from '@aws-amplify/ui-react'
 import {fetchAuthSession} from 'aws-amplify/auth'
 import {Link} from 'react-router-dom'
+import { QUERY_LIMITS, loadAllRecords } from '../config/queries'
 
 export default function InternalHome() {
     const {user} = useAuthenticator(ctx => [ctx.user])
@@ -45,31 +46,17 @@ export default function InternalHome() {
 
     async function loadStats() {
         try {
-            // Load ALL consents with pagination
-            let allConsents = []
-            let consentsNextToken = null
-            
-            do {
-                const consentsResult = await client.models.Consent.list({ 
-                    limit: 1000,
-                    nextToken: consentsNextToken
-                })
-                allConsents.push(...consentsResult.data)
-                consentsNextToken = consentsResult.nextToken
-            } while (consentsNextToken)
-            
-            // Load ALL residents with pagination
-            let allResidents = []
-            let residentsNextToken = null
-            
-            do {
-                const residentsResult = await client.models.Resident.list({ 
-                    limit: 1000,
-                    nextToken: residentsNextToken
-                })
-                allResidents.push(...residentsResult.data)
-                residentsNextToken = residentsResult.nextToken
-            } while (residentsNextToken)
+            // Load ALL consents and residents using centralized config
+            const [allConsents, allResidents] = await Promise.all([
+                loadAllRecords(
+                    (config) => client.models.Consent.list(config),
+                    QUERY_LIMITS.CONSENTS_BATCH_SIZE
+                ),
+                loadAllRecords(
+                    (config) => client.models.Resident.list(config),
+                    QUERY_LIMITS.RESIDENTS_BATCH_SIZE
+                )
+            ])
             
             const consents = { data: allConsents }
             const residents = { data: allResidents }
@@ -81,7 +68,7 @@ export default function InternalHome() {
             
             do {
                 const addressesQuery = await client.models.Address.list({
-                    limit: 1000,
+                    limit: QUERY_LIMITS.ADDRESSES_BATCH_SIZE,
                     nextToken: nextToken
                 })
                 allAddresses.push(...addressesQuery.data)

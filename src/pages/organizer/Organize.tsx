@@ -5,6 +5,7 @@ import type {Schema} from '../../../amplify/data/resource'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {fetchAuthSession} from 'aws-amplify/auth'
 import {CognitoIdentityProviderClient, ListUsersCommand, AdminListGroupsForUserCommand} from '@aws-sdk/client-cognito-identity-provider'
+import { QUERY_LIMITS, loadAllRecords, createPaginationConfig } from '../../config/queries'
 
 export default function Organize() {
     const location = useLocation()
@@ -137,7 +138,7 @@ export default function Organize() {
                 
                 do {
                     const residentsResult = await client.models.Resident.list({ 
-                        limit: 1000,
+                        limit: QUERY_LIMITS.RESIDENTS_BATCH_SIZE,
                         nextToken: residentsNextToken
                     })
                     allResidents.push(...residentsResult.data)
@@ -160,7 +161,7 @@ export default function Organize() {
                 // Search through addresses without GraphQL filter (do client-side filtering)
                 do {
                     const result = await client.models.Address.list({
-                        limit: 200,
+                        limit: QUERY_LIMITS.SEARCH_BATCH_SIZE,
                         nextToken
                     })
                     
@@ -314,30 +315,17 @@ export default function Organize() {
                 // No search - simplified logic for Address/Resident model
                 console.log('Loading addresses with residents for Organize page...')
                 
-                // Get all addresses and residents with pagination
-                let allAddresses = []
-                let addressesNextToken = null
-                
-                do {
-                    const addressesResult = await client.models.Address.list({ 
-                        limit: 1000,
-                        nextToken: addressesNextToken
-                    })
-                    allAddresses.push(...addressesResult.data)
-                    addressesNextToken = addressesResult.nextToken
-                } while (addressesNextToken)
-                
-                let allResidents = []
-                let residentsNextToken = null
-                
-                do {
-                    const residentsResult = await client.models.Resident.list({ 
-                        limit: 1000,
-                        nextToken: residentsNextToken
-                    })
-                    allResidents.push(...residentsResult.data)
-                    residentsNextToken = residentsResult.nextToken
-                } while (residentsNextToken)
+                // Get all addresses and residents using centralized config
+                const [allAddresses, allResidents] = await Promise.all([
+                    loadAllRecords(
+                        (config) => client.models.Address.list(config),
+                        QUERY_LIMITS.ADDRESSES_BATCH_SIZE
+                    ),
+                    loadAllRecords(
+                        (config) => client.models.Resident.list(config),
+                        QUERY_LIMITS.RESIDENTS_BATCH_SIZE
+                    )
+                ])
                 
                 const allAddressesResult = { data: allAddresses }
                 const allResidentsResult = { data: allResidents }
@@ -619,7 +607,7 @@ export default function Organize() {
             
             do {
                 const residentsResult = await client.models.Resident.list({ 
-                    limit: 1000,
+                    limit: QUERY_LIMITS.RESIDENTS_BATCH_SIZE,
                     nextToken: residentsNextToken
                 })
                 allResidents.push(...residentsResult.data)

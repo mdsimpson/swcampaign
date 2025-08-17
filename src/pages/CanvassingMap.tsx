@@ -4,6 +4,7 @@ import {GoogleMap, LoadScript, Marker, OverlayView} from '@react-google-maps/api
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 import {useAuthenticator} from '@aws-amplify/ui-react'
+import { QUERY_LIMITS, loadAllRecords } from '../config/queries'
 
 const mapContainerStyle = {
     width: '100%',
@@ -250,52 +251,30 @@ export default function CanvassingMap() {
         try {
             setDataLoading(true)
             
-            // Step 1: Load ALL addresses, residents, and consents for reference
-            let loadedAddresses: any[] = []
-            let addressesNextToken = null
-            
-            do {
-                const addressesResult = await client.models.Address.list({ 
-                    limit: 1000,
-                    nextToken: addressesNextToken
-                })
-                loadedAddresses.push(...addressesResult.data)
-                addressesNextToken = addressesResult.nextToken
-            } while (addressesNextToken)
+            // Step 1: Load ALL addresses, residents, and consents for reference using centralized config
+            const [loadedAddresses, loadedResidents, loadedConsents] = await Promise.all([
+                loadAllRecords(
+                    (config) => client.models.Address.list(config),
+                    QUERY_LIMITS.ADDRESSES_BATCH_SIZE
+                ),
+                loadAllRecords(
+                    (config) => client.models.Resident.list(config),
+                    QUERY_LIMITS.RESIDENTS_BATCH_SIZE
+                ),
+                loadAllRecords(
+                    (config) => client.models.Consent.list(config),
+                    QUERY_LIMITS.CONSENTS_BATCH_SIZE
+                )
+            ])
             
             setAllAddresses(loadedAddresses)
-            
-            let loadedResidents: any[] = []
-            let residentsNextToken = null
-            
-            do {
-                const residentsResult = await client.models.Resident.list({ 
-                    limit: 1000,
-                    nextToken: residentsNextToken
-                })
-                loadedResidents.push(...residentsResult.data)
-                residentsNextToken = residentsResult.nextToken
-            } while (residentsNextToken)
-            
             setAllResidents(loadedResidents)
-            
-            // Load all consent records to determine who has signed
-            let loadedConsents: any[] = []
-            let consentsNextToken = null
-            
-            do {
-                const consentsResult = await client.models.Consent.list({ 
-                    limit: 1000,
-                    nextToken: consentsNextToken
-                })
-                loadedConsents.push(...consentsResult.data)
-                consentsNextToken = consentsResult.nextToken
-            } while (consentsNextToken)
-            
             setAllConsents(loadedConsents)
             
             // Step 2: Get all volunteers to find the current user's volunteer record
-            const volunteersResult = await client.models.Volunteer.list()
+            const volunteersResult = await client.models.Volunteer.list({ 
+                limit: QUERY_LIMITS.VOLUNTEERS_LIMIT 
+            })
             
             // Find the volunteer record for the current user
             const currentUserVolunteer = volunteersResult.data.find(v => 

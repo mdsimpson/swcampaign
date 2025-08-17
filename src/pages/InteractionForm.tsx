@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { generateClient } from 'aws-amplify/data'
 import type { Schema } from '../../amplify/data/resource'
 import { useAuthenticator } from '@aws-amplify/ui-react'
+import { QUERY_LIMITS, loadAllRecords } from '../config/queries'
 
 export default function InteractionForm() {
     const { user } = useAuthenticator(ctx => [ctx.user])
@@ -46,31 +47,17 @@ export default function InteractionForm() {
 
     async function loadResidents(addressId: string) {
         try {
-            // Load ALL residents with pagination like CanvassingMap does
-            let allResidents = []
-            let residentsNextToken = null
-            
-            do {
-                const residentsResult = await client.models.Resident.list({ 
-                    limit: 1000,
-                    nextToken: residentsNextToken
-                })
-                allResidents.push(...residentsResult.data)
-                residentsNextToken = residentsResult.nextToken
-            } while (residentsNextToken)
-            
-            // Load ALL addresses with pagination
-            let allAddresses = []
-            let addressesNextToken = null
-            
-            do {
-                const addressesResult = await client.models.Address.list({ 
-                    limit: 1000,
-                    nextToken: addressesNextToken
-                })
-                allAddresses.push(...addressesResult.data)
-                addressesNextToken = addressesResult.nextToken
-            } while (addressesNextToken)
+            // Load ALL residents and addresses using centralized pagination config
+            const [allResidents, allAddresses] = await Promise.all([
+                loadAllRecords(
+                    (config) => client.models.Resident.list(config),
+                    QUERY_LIMITS.RESIDENTS_BATCH_SIZE
+                ),
+                loadAllRecords(
+                    (config) => client.models.Address.list(config),
+                    QUERY_LIMITS.ADDRESSES_BATCH_SIZE
+                )
+            ])
             
             const allResidentsResult = { data: allResidents }
             const allAddressesResult = { data: allAddresses }

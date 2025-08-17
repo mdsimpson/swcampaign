@@ -3,6 +3,7 @@ import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 import billingAddresses from '../data/billingAddresses.json'
+import { QUERY_LIMITS, loadAllRecords } from '../config/queries'
 
 export default function AbsenteeInteractions() {
     const [absenteeAddresses, setAbsenteeAddresses] = useState<any[]>([])
@@ -45,32 +46,20 @@ export default function AbsenteeInteractions() {
 
     async function loadCities() {
         try {
-            // Load ALL addresses with pagination
-            let allAddresses = []
-            let addressesNextToken = null
-            
-            do {
-                const addressesResult = await client.models.Address.list({ 
-                    limit: 1000,
-                    nextToken: addressesNextToken
-                })
-                allAddresses.push(...addressesResult.data)
-                addressesNextToken = addressesResult.nextToken
-            } while (addressesNextToken)
-            
-            // Load ALL absentee residents with pagination
-            let allAbsenteeResidents = []
-            let residentsNextToken = null
-            
-            do {
-                const residentsResult = await client.models.Resident.list({ 
-                    filter: { isAbsentee: { eq: true } },
-                    limit: 1000,
-                    nextToken: residentsNextToken
-                })
-                allAbsenteeResidents.push(...residentsResult.data)
-                residentsNextToken = residentsResult.nextToken
-            } while (residentsNextToken)
+            // Load ALL addresses and absentee residents using centralized config
+            const [allAddresses, allAbsenteeResidents] = await Promise.all([
+                loadAllRecords(
+                    (config) => client.models.Address.list(config),
+                    QUERY_LIMITS.ADDRESSES_BATCH_SIZE
+                ),
+                loadAllRecords(
+                    (config) => client.models.Resident.list({
+                        ...config,
+                        filter: { isAbsentee: { eq: true } }
+                    }),
+                    QUERY_LIMITS.RESIDENTS_BATCH_SIZE
+                )
+            ])
             
             const addressesResult = { data: allAddresses }
             const residentsResult = { data: allAbsenteeResidents }
@@ -93,31 +82,20 @@ export default function AbsenteeInteractions() {
             
             console.log('Loading absentee addresses with residents...')
             
-            // Get all addresses and absentee residents with pagination
-            let allAddresses = []
-            let addressesNextToken = null
-            
-            do {
-                const addressesResult = await client.models.Address.list({ 
-                    limit: 1000,
-                    nextToken: addressesNextToken
-                })
-                allAddresses.push(...addressesResult.data)
-                addressesNextToken = addressesResult.nextToken
-            } while (addressesNextToken)
-            
-            let allAbsenteeResidents = []
-            let residentsNextToken = null
-            
-            do {
-                const absenteeResidentsResult = await client.models.Resident.list({ 
-                    filter: { isAbsentee: { eq: true } },
-                    limit: 1000,
-                    nextToken: residentsNextToken
-                })
-                allAbsenteeResidents.push(...absenteeResidentsResult.data)
-                residentsNextToken = absenteeResidentsResult.nextToken
-            } while (residentsNextToken)
+            // Get all addresses and absentee residents using centralized config
+            const [allAddresses, allAbsenteeResidents] = await Promise.all([
+                loadAllRecords(
+                    (config) => client.models.Address.list(config),
+                    QUERY_LIMITS.ADDRESSES_BATCH_SIZE
+                ),
+                loadAllRecords(
+                    (config) => client.models.Resident.list({
+                        ...config,
+                        filter: { isAbsentee: { eq: true } }
+                    }),
+                    QUERY_LIMITS.RESIDENTS_BATCH_SIZE
+                )
+            ])
             
             const addressesResult = { data: allAddresses }
             const absenteeResidentsResult = { data: allAbsenteeResidents }
