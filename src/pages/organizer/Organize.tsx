@@ -314,11 +314,33 @@ export default function Organize() {
                 // No search - simplified logic for Address/Resident model
                 console.log('Loading addresses with residents for Organize page...')
                 
-                // Get all addresses and residents
-                const [allAddressesResult, allResidentsResult] = await Promise.all([
-                    client.models.Address.list({ limit: 5000 }),
-                    client.models.Resident.list({ limit: 5000 })
-                ])
+                // Get all addresses and residents with pagination
+                let allAddresses = []
+                let addressesNextToken = null
+                
+                do {
+                    const addressesResult = await client.models.Address.list({ 
+                        limit: 1000,
+                        nextToken: addressesNextToken
+                    })
+                    allAddresses.push(...addressesResult.data)
+                    addressesNextToken = addressesResult.nextToken
+                } while (addressesNextToken)
+                
+                let allResidents = []
+                let residentsNextToken = null
+                
+                do {
+                    const residentsResult = await client.models.Resident.list({ 
+                        limit: 1000,
+                        nextToken: residentsNextToken
+                    })
+                    allResidents.push(...residentsResult.data)
+                    residentsNextToken = residentsResult.nextToken
+                } while (residentsNextToken)
+                
+                const allAddressesResult = { data: allAddresses }
+                const allResidentsResult = { data: allResidents }
                 
                 console.log(`Found ${allAddressesResult.data.length} addresses and ${allResidentsResult.data.length} residents`)
                 

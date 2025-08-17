@@ -45,8 +45,34 @@ export default function InternalHome() {
 
     async function loadStats() {
         try {
-            const consents = await client.models.Consent.list()
-            const residents = await client.models.Resident.list()
+            // Load ALL consents with pagination
+            let allConsents = []
+            let consentsNextToken = null
+            
+            do {
+                const consentsResult = await client.models.Consent.list({ 
+                    limit: 1000,
+                    nextToken: consentsNextToken
+                })
+                allConsents.push(...consentsResult.data)
+                consentsNextToken = consentsResult.nextToken
+            } while (consentsNextToken)
+            
+            // Load ALL residents with pagination
+            let allResidents = []
+            let residentsNextToken = null
+            
+            do {
+                const residentsResult = await client.models.Resident.list({ 
+                    limit: 1000,
+                    nextToken: residentsNextToken
+                })
+                allResidents.push(...residentsResult.data)
+                residentsNextToken = residentsResult.nextToken
+            } while (residentsNextToken)
+            
+            const consents = { data: allConsents }
+            const residents = { data: allResidents }
             
             // Check if we're hitting pagination limits
             let allAddresses = []

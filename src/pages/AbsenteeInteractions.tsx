@@ -45,11 +45,35 @@ export default function AbsenteeInteractions() {
 
     async function loadCities() {
         try {
-            const addressesResult = await client.models.Address.list({ limit: 5000 })
-            const residentsResult = await client.models.Resident.list({ 
-                filter: { isAbsentee: { eq: true } },
-                limit: 5000 
-            })
+            // Load ALL addresses with pagination
+            let allAddresses = []
+            let addressesNextToken = null
+            
+            do {
+                const addressesResult = await client.models.Address.list({ 
+                    limit: 1000,
+                    nextToken: addressesNextToken
+                })
+                allAddresses.push(...addressesResult.data)
+                addressesNextToken = addressesResult.nextToken
+            } while (addressesNextToken)
+            
+            // Load ALL absentee residents with pagination
+            let allAbsenteeResidents = []
+            let residentsNextToken = null
+            
+            do {
+                const residentsResult = await client.models.Resident.list({ 
+                    filter: { isAbsentee: { eq: true } },
+                    limit: 1000,
+                    nextToken: residentsNextToken
+                })
+                allAbsenteeResidents.push(...residentsResult.data)
+                residentsNextToken = residentsResult.nextToken
+            } while (residentsNextToken)
+            
+            const addressesResult = { data: allAddresses }
+            const residentsResult = { data: allAbsenteeResidents }
             
             const absenteeAddressIds = new Set(residentsResult.data.map(r => r.addressId))
             const absenteeCities = addressesResult.data
@@ -69,14 +93,34 @@ export default function AbsenteeInteractions() {
             
             console.log('Loading absentee addresses with residents...')
             
-            // Get all addresses and absentee residents
-            const [addressesResult, absenteeResidentsResult] = await Promise.all([
-                client.models.Address.list({ limit: 5000 }),
-                client.models.Resident.list({ 
-                    filter: { isAbsentee: { eq: true } },
-                    limit: 5000 
+            // Get all addresses and absentee residents with pagination
+            let allAddresses = []
+            let addressesNextToken = null
+            
+            do {
+                const addressesResult = await client.models.Address.list({ 
+                    limit: 1000,
+                    nextToken: addressesNextToken
                 })
-            ])
+                allAddresses.push(...addressesResult.data)
+                addressesNextToken = addressesResult.nextToken
+            } while (addressesNextToken)
+            
+            let allAbsenteeResidents = []
+            let residentsNextToken = null
+            
+            do {
+                const absenteeResidentsResult = await client.models.Resident.list({ 
+                    filter: { isAbsentee: { eq: true } },
+                    limit: 1000,
+                    nextToken: residentsNextToken
+                })
+                allAbsenteeResidents.push(...absenteeResidentsResult.data)
+                residentsNextToken = absenteeResidentsResult.nextToken
+            } while (residentsNextToken)
+            
+            const addressesResult = { data: allAddresses }
+            const absenteeResidentsResult = { data: allAbsenteeResidents }
             
             console.log(`Found ${addressesResult.data.length} addresses and ${absenteeResidentsResult.data.length} absentee residents`)
             

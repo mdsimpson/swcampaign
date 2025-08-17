@@ -22,7 +22,7 @@ export default function InteractionForm() {
     const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null)
     
     const client = generateClient<Schema>({
-        authMode: 'apiKey' // Temporary: Use API key while debugging user authentication
+        authMode: 'apiKey' // Use API key access to see all residents data
     })
 
     useEffect(() => {
@@ -46,20 +46,50 @@ export default function InteractionForm() {
 
     async function loadResidents(addressId: string) {
         try {
-            // Load all residents to handle duplicate addresses like CanvassingMap does
-            const allResidentsResult = await client.models.Resident.list({ limit: 5000 })
-            const allAddressesResult = await client.models.Address.list({ limit: 5000 })
+            // Load ALL residents with pagination like CanvassingMap does
+            let allResidents = []
+            let residentsNextToken = null
+            
+            do {
+                const residentsResult = await client.models.Resident.list({ 
+                    limit: 1000,
+                    nextToken: residentsNextToken
+                })
+                allResidents.push(...residentsResult.data)
+                residentsNextToken = residentsResult.nextToken
+            } while (residentsNextToken)
+            
+            // Load ALL addresses with pagination
+            let allAddresses = []
+            let addressesNextToken = null
+            
+            do {
+                const addressesResult = await client.models.Address.list({ 
+                    limit: 1000,
+                    nextToken: addressesNextToken
+                })
+                allAddresses.push(...addressesResult.data)
+                addressesNextToken = addressesResult.nextToken
+            } while (addressesNextToken)
+            
+            const allResidentsResult = { data: allResidents }
+            const allAddressesResult = { data: allAddresses }
             
             // Find the target address
             const targetAddress = allAddressesResult.data.find(a => a.id === addressId)
             if (!targetAddress) {
-                console.error('Address not found')
+                console.error('Address not found for ID:', addressId)
                 setLoading(false)
                 return
             }
             
+            console.log('🏠 Target address found:', targetAddress.street, targetAddress.city)
+            console.log('🏠 Target address ID:', targetAddress.id)
+            
             // Find all addresses with same street address (handle duplicates)
             const addressKey = `${targetAddress.street?.toLowerCase().trim()}, ${targetAddress.city?.toLowerCase().trim()}`
+            console.log('🔍 INTERACTION FORM DEBUG: Generated address key:', addressKey)
+            
             const sameAddressIds = allAddressesResult.data
                 .filter(a => {
                     const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
@@ -67,8 +97,42 @@ export default function InteractionForm() {
                 })
                 .map(a => a.id)
             
+            console.log(`📍 Found ${sameAddressIds.length} address records with same street address:`, addressKey)
+            console.log('📍 Address IDs:', sameAddressIds)
+            
             // Get residents from all address records with this address
             const allResidentsForAddress = allResidentsResult.data.filter(r => sameAddressIds.includes(r.addressId))
+            console.log(`👥 Found ${allResidentsForAddress.length} residents total across all duplicate addresses`)
+            
+            // Debug: show each resident found
+            allResidentsForAddress.forEach(r => {
+                console.log(`   👤 BEFORE DEDUP: ${r.firstName} ${r.lastName} (addressId: ${r.addressId})`)
+            })
+            
+            // Debug: Let's see what residents exist for ANY Cloverleaf address
+            const allCloverleafResidents = allResidentsResult.data.filter(r => {
+                const residentAddress = allAddressesResult.data.find(a => a.id === r.addressId)
+                return residentAddress && residentAddress.street && residentAddress.street.toLowerCase().includes('cloverleaf')
+            })
+            console.log(`🔍 DEBUG: Found ${allCloverleafResidents.length} residents for ANY Cloverleaf address in database`)
+            
+            // Show all Cloverleaf residents to see address formats
+            if (allCloverleafResidents.length > 0) {
+                console.log('🔍 DEBUG: All Cloverleaf residents in database:')
+                allCloverleafResidents.forEach(r => {
+                    const addr = allAddressesResult.data.find(a => a.id === r.addressId)
+                    console.log(`   👤 ${r.firstName} ${r.lastName} → "${addr?.street}", "${addr?.city}" (ID: ${r.addressId})`)
+                })
+            }
+            
+            // Also debug: what address formats exist for 42927?
+            const all42927Addresses = allAddressesResult.data.filter(a => 
+                a.street && a.street.toLowerCase().includes('42927')
+            )
+            console.log(`🔍 DEBUG: All address records containing "42927":`)
+            all42927Addresses.forEach(addr => {
+                console.log(`   🏠 "${addr.street}", "${addr.city}" (ID: ${addr.id})`)
+            })
             
             // Remove duplicate residents (same name)
             const uniqueResidents = allResidentsForAddress.filter((person, index, self) => {
@@ -101,6 +165,11 @@ export default function InteractionForm() {
                 }
                 
                 return aOrder - bOrder
+            })
+            
+            console.log(`✅ Final result: ${sortedResidents.length} unique residents for interaction form`)
+            sortedResidents.forEach(r => {
+                console.log(`   👤 FINAL: ${r.firstName} ${r.lastName} (${r.role || r.occupantType || 'Unknown'})`)
             })
             
             setResidents(sortedResidents)

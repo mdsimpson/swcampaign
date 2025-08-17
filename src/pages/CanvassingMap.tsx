@@ -453,7 +453,7 @@ export default function CanvassingMap() {
                         <button 
                             onClick={() => {
                                 console.log('Manual reload triggered')
-                                loadAssignments()
+                                loadInitialData()
                             }}
                             style={{
                                 backgroundColor: '#007bff',
