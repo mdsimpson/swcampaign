@@ -1154,14 +1154,28 @@ export default function Organize() {
                                         />
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
-                                        {/* Handle case where unitNumber and street might contain duplicate data */}
-                                        {address.unitNumber && address.street && address.unitNumber !== address.street 
-                                            ? `${address.unitNumber} ${address.street}` 
-                                            : (address.street || address.unitNumber)
-                                        }<br/>
-                                        <span style={{fontSize: '0.9em', color: '#666'}}>
-                                            {address.city}, {address.state} {address.zip}
-                                        </span>
+                                        <a 
+                                            href={`https://maps.google.com/maps?q=${encodeURIComponent(
+                                                `${address.unitNumber && address.street && address.unitNumber !== address.street 
+                                                    ? `${address.unitNumber} ${address.street}` 
+                                                    : (address.street || address.unitNumber)}, ${address.city}, ${address.state} ${address.zip}`
+                                            )}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                                color: '#007bff',
+                                                textDecoration: 'none'
+                                            }}
+                                        >
+                                            {/* Handle case where unitNumber and street might contain duplicate data */}
+                                            {address.unitNumber && address.street && address.unitNumber !== address.street 
+                                                ? `${address.unitNumber} ${address.street}` 
+                                                : (address.street || address.unitNumber)
+                                            }<br/>
+                                            <span style={{fontSize: '0.9em', color: '#666'}}>
+                                                {address.city}, {address.state} {address.zip}
+                                            </span>
+                                        </a>
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         {address.residents?.map((resident: any, i: number) => (
