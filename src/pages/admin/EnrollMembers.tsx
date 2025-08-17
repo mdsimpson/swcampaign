@@ -29,7 +29,6 @@ export default function EnrollMembers() {
         try {
             const user = await getCurrentUser()
             const userEmail = user.signInDetails?.loginId || user.username
-            console.log('Current user email for comparison:', userEmail)
             setCurrentUserEmail(userEmail)
         } catch (error) {
             console.error('Failed to get current user:', error)
@@ -38,11 +37,8 @@ export default function EnrollMembers() {
 
     async function loadRegistrations() {
         try {
-            console.log('Loading registrations as admin...')
             const result = await client.models.Registration.list({ limit: QUERY_LIMITS.REGISTRATIONS_LIMIT })
-            console.log(`Found ${result.data.length} total registrations`)
             const pending = result.data.filter(r => r.status === 'SUBMITTED')
-            console.log(`Filtered to ${pending.length} pending registrations`)
             setRegistrations(pending)
         } catch (error) {
             console.error('Failed to load registrations:', error)
@@ -86,7 +82,6 @@ export default function EnrollMembers() {
                         Username: cognitoUser.Username!
                     }))
                     groups = groupsResult.Groups?.map(g => g.GroupName!) || []
-                    console.log(`Groups for ${email || cognitoUser.Username}:`, groups)
                 } catch (error) {
                     // If Username fails, try with email
                     if (email) {
@@ -96,7 +91,6 @@ export default function EnrollMembers() {
                                 Username: email
                             }))
                             groups = groupsResult.Groups?.map(g => g.GroupName!) || []
-                            console.log(`Groups for ${email} (using email):`, groups)
                         } catch (emailError) {
                             console.error(`Failed to get groups for user ${email}:`, emailError)
                         }
@@ -113,7 +107,6 @@ export default function EnrollMembers() {
                 
                 // If no groups found but we have a roleCache, use that as fallback
                 if (groups.length === 0 && profile?.roleCache) {
-                    console.log(`No groups found for ${email}, using roleCache: ${profile.roleCache}`)
                     role = profile.roleCache
                 }
                 
@@ -274,7 +267,6 @@ export default function EnrollMembers() {
             
             // First, check if user already exists
             try {
-                console.log(`Checking if user ${registration.email} already exists...`)
                 const existingUser = await cognitoClient.send(new AdminGetUserCommand({
                     UserPoolId: userPoolId,
                     Username: registration.email
@@ -282,23 +274,19 @@ export default function EnrollMembers() {
                 
                 userSub = existingUser.UserAttributes?.find(attr => attr.Name === 'sub')?.Value
                 userAlreadyExists = true
-                console.log(`User ${registration.email} already exists with sub: ${userSub}`)
                 
                 // If user exists, make sure they're in the selected group
-                console.log(`Adding existing user to ${selectedRole} group`)
                 await cognitoClient.send(new AdminAddUserToGroupCommand({
                     UserPoolId: userPoolId,
                     Username: registration.email,
                     GroupName: selectedRole
                 })).catch(err => {
                     // Group assignment might fail if already in group, that's ok
-                    console.log(`User might already be in ${selectedRole} group:`, err.message)
                 })
                 
             } catch (userNotFoundError: any) {
                 if (userNotFoundError.name === 'UserNotFoundException') {
                     // User doesn't exist, create them
-                    console.log(`User ${registration.email} does not exist, creating new user`)
                     const createUserResult = await cognitoClient.send(new AdminCreateUserCommand({
                         UserPoolId: userPoolId,
                         Username: registration.email,
@@ -315,7 +303,6 @@ export default function EnrollMembers() {
                     userSub = createUserResult.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value
                     
                     // Add new user to selected group
-                    console.log(`Adding new user to ${selectedRole} group`)
                     await cognitoClient.send(new AdminAddUserToGroupCommand({
                         UserPoolId: userPoolId,
                         Username: registration.email,
@@ -343,7 +330,6 @@ export default function EnrollMembers() {
             
             if (existingProfiles.data.length > 0) {
                 // Update existing profile
-                console.log(`Updating existing UserProfile for ${registration.email}`)
                 await client.models.UserProfile.update({
                     id: existingProfiles.data[0].id,
                     email: registration.email,
@@ -355,7 +341,6 @@ export default function EnrollMembers() {
                 })
             } else {
                 // Create new profile
-                console.log(`Creating new UserProfile for ${registration.email}`)
                 await client.models.UserProfile.create({
                     sub: userSub,
                     email: registration.email,
@@ -371,7 +356,6 @@ export default function EnrollMembers() {
             let emailSent = false
             let emailError = null
             try {
-                console.log('Sending welcome email to:', registration.email)
                 
                 const functionUrl = 'https://iztw3vy5oc7pxbe2fqlvtqchne0hzfcn.lambda-url.us-east-1.on.aws/'
                 const welcomeResponse = await fetch(functionUrl, {
@@ -388,22 +372,17 @@ export default function EnrollMembers() {
                     })
                 })
                 
-                console.log('Welcome email response status:', welcomeResponse.status)
                 const responseText = await welcomeResponse.text()
-                console.log('Welcome email response:', responseText)
                 
                 if (welcomeResponse.ok) {
-                    console.log('✅ Welcome email sent successfully')
                     emailSent = true
                 } else {
-                    console.error('❌ Failed to send welcome email:', responseText)
                     // Check if it's a verification error
                     if (responseText.includes('Email address is not verified')) {
                         emailError = 'unverified'
                     }
                 }
             } catch (error) {
-                console.error('❌ Error sending welcome email:', error)
                 emailError = 'failed'
             }
 
@@ -684,12 +663,7 @@ Note: The user will be required to change their password on first login.`
                                             </td>
                                             <td style={{padding: 12, border: '1px solid #ddd'}}>
                                                 <button 
-                                                    onClick={() => {
-                                                        console.log('Button clicked for user:', user.email)
-                                                        console.log('Current user email:', currentUserEmail)
-                                                        console.log('Are they equal?', user.email === currentUserEmail)
-                                                        handleDeleteUser(user)
-                                                    }}
+                                                    onClick={() => handleDeleteUser(user)}
                                                     disabled={user.email === currentUserEmail}
                                                     style={{
                                                         backgroundColor: user.email === currentUserEmail ? '#6c757d' : '#dc3545', 

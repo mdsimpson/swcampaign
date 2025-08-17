@@ -74,11 +74,8 @@ export default function InternalHome() {
                 allAddresses.push(...addressesQuery.data)
                 nextToken = addressesQuery.nextToken
                 totalCount += addressesQuery.data.length
-                console.log(`Batch loaded: ${addressesQuery.data.length} addresses, total so far: ${totalCount}`)
             } while (nextToken)
             
-            console.log('Final total addresses found:', totalCount)
-            console.log('Sample addresses:', allAddresses.slice(0, 5).map(a => a.street))
             
             // Check for duplicates by address
             const addressMap = new Map()
@@ -92,11 +89,8 @@ export default function InternalHome() {
             })
             
             const duplicates = Array.from(addressMap.entries()).filter(([address, count]) => count > 1)
-            console.log(`Found ${duplicates.length} addresses with duplicates:`)
-            console.log('Top 10 duplicate addresses:', duplicates.slice(0, 10))
             
             const uniqueAddresses = addressMap.size
-            console.log(`Unique addresses: ${uniqueAddresses}, Total records: ${totalCount}`)
             
             // For now, let's use the unique address count for the display
             const totalAddresses = uniqueAddresses

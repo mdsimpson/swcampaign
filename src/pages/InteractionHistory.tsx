@@ -52,7 +52,6 @@ export default function InteractionHistory() {
                 nextToken = result.nextToken
             } while (nextToken)
             
-            console.log(`Loaded ${allInteractions.length} total interactions`)
             
             // Load all addresses for address filtering and display
             let allAddresses: any[] = []
@@ -68,7 +67,6 @@ export default function InteractionHistory() {
             } while (addressesNextToken)
             
             setAddresses(allAddresses)
-            console.log(`Loaded ${allAddresses.length} total addresses`)
             
             // Load all residents for participant display
             let allResidents: any[] = []
@@ -84,7 +82,6 @@ export default function InteractionHistory() {
             } while (residentsNextToken)
             
             setResidents(allResidents)
-            console.log(`Loaded ${allResidents.length} total residents`)
             
             // Load all user profiles for canvasser names
             let allUserProfiles: any[] = []
@@ -101,7 +98,6 @@ export default function InteractionHistory() {
                 } while (userProfilesNextToken)
                 
                 setUserProfiles(allUserProfiles)
-                console.log(`Loaded ${allUserProfiles.length} total user profiles`)
             } catch (error) {
                 console.log('Could not load user profiles:', error)
                 setUserProfiles([])
@@ -122,7 +118,6 @@ export default function InteractionHistory() {
                 } while (volunteersNextToken)
                 
                 setVolunteers(allVolunteers)
-                console.log(`Loaded ${allVolunteers.length} total volunteers`)
             } catch (error) {
                 console.log('Could not load volunteers:', error)
                 setVolunteers([])
@@ -132,7 +127,6 @@ export default function InteractionHistory() {
             let filteredInteractions = allInteractions
             
             if (addressFilter.trim()) {
-                console.log(`Filtering interactions for address: "${addressFilter}"`)
                 
                 // Find addresses that match the address filter
                 const matchingAddresses = allAddresses.filter(address => 
@@ -140,14 +134,12 @@ export default function InteractionHistory() {
                 )
                 const matchingAddressIds = new Set(matchingAddresses.map(a => a.id))
                 
-                console.log(`Found ${matchingAddresses.length} addresses matching address filter`)
                 
                 // Filter interactions to only those at matching addresses
                 filteredInteractions = allInteractions.filter(interaction => 
                     matchingAddressIds.has(interaction.addressId)
                 )
                 
-                console.log(`Filtered to ${filteredInteractions.length} interactions at matching addresses`)
             }
             
             // Sort by creation date (newest first)
@@ -239,16 +231,14 @@ export default function InteractionHistory() {
 
     function getParticipantsDisplay(interaction: any) {
         if (!interaction.participantResidentIds) {
-            // If no participants recorded, show who canvassed instead
-            return `Canvassed by ${interaction.createdBy || 'Unknown'}`
+            return <span style={{color: '#6c757d', fontStyle: 'italic'}}>No specific residents selected</span>
         }
         
         // Parse CSV of resident IDs and names
         const participantIds = interaction.participantResidentIds.split(',').map(id => id.trim()).filter(id => id)
         
         if (participantIds.length === 0) {
-            // If empty string for participants, show who canvassed
-            return `Canvassed by ${interaction.createdBy || 'Unknown'}`
+            return <span style={{color: '#6c757d', fontStyle: 'italic'}}>No specific residents selected</span>
         }
         
         // Get resident details
@@ -257,14 +247,16 @@ export default function InteractionHistory() {
             const resident = residents.find(r => r.id === participantId)
             if (resident) {
                 const roleValue = resident.role || resident.occupantType || 'resident'
-                const roleDisplay = roleValue.replace('_', ' ').toLowerCase()
+                const roleDisplay = roleValue.replace('_', ' ').toLowerCase().replace('official ', '')
                 return `${resident.firstName} ${resident.lastName} (${roleDisplay})`
             }
             // If not found, it might be a name string (for "other person")
             return participantId
         })
         
-        return participants.join(', ')
+        return participants.length > 3 
+            ? `${participants.slice(0, 3).join(', ')} + ${participants.length - 3} more`
+            : participants.join(', ')
     }
 
     function formatDate(dateString: string) {
@@ -346,6 +338,7 @@ export default function InteractionHistory() {
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Date & Time</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Address</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Recorded by</th>
+                                    <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Interacted with</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Contact Made</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Materials</th>
                                     <th style={{border: '1px solid #ddd', padding: 12, textAlign: 'left'}}>Notes</th>
@@ -374,6 +367,11 @@ export default function InteractionHistory() {
                                             <td style={{border: '1px solid #ddd', padding: 12}}>
                                                 <div style={{fontSize: '0.9em', fontWeight: 'bold'}}>
                                                     {getCanvasserName(interaction)}
+                                                </div>
+                                            </td>
+                                            <td style={{border: '1px solid #ddd', padding: 12}}>
+                                                <div style={{fontSize: '0.9em', maxWidth: 200, wordWrap: 'break-word'}}>
+                                                    {getParticipantsDisplay(interaction)}
                                                 </div>
                                             </td>
                                             <td style={{border: '1px solid #ddd', padding: 12}}>

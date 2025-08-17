@@ -70,13 +70,8 @@ export default function InteractionForm() {
                 return
             }
             
-            console.log('🏠 Target address found:', targetAddress.street, targetAddress.city)
-            console.log('🏠 Target address ID:', targetAddress.id)
-            
             // Find all addresses with same street address (handle duplicates)
             const addressKey = `${targetAddress.street?.toLowerCase().trim()}, ${targetAddress.city?.toLowerCase().trim()}`
-            console.log('🔍 INTERACTION FORM DEBUG: Generated address key:', addressKey)
-            
             const sameAddressIds = allAddressesResult.data
                 .filter(a => {
                     const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
@@ -84,42 +79,8 @@ export default function InteractionForm() {
                 })
                 .map(a => a.id)
             
-            console.log(`📍 Found ${sameAddressIds.length} address records with same street address:`, addressKey)
-            console.log('📍 Address IDs:', sameAddressIds)
-            
             // Get residents from all address records with this address
             const allResidentsForAddress = allResidentsResult.data.filter(r => sameAddressIds.includes(r.addressId))
-            console.log(`👥 Found ${allResidentsForAddress.length} residents total across all duplicate addresses`)
-            
-            // Debug: show each resident found
-            allResidentsForAddress.forEach(r => {
-                console.log(`   👤 BEFORE DEDUP: ${r.firstName} ${r.lastName} (addressId: ${r.addressId})`)
-            })
-            
-            // Debug: Let's see what residents exist for ANY Cloverleaf address
-            const allCloverleafResidents = allResidentsResult.data.filter(r => {
-                const residentAddress = allAddressesResult.data.find(a => a.id === r.addressId)
-                return residentAddress && residentAddress.street && residentAddress.street.toLowerCase().includes('cloverleaf')
-            })
-            console.log(`🔍 DEBUG: Found ${allCloverleafResidents.length} residents for ANY Cloverleaf address in database`)
-            
-            // Show all Cloverleaf residents to see address formats
-            if (allCloverleafResidents.length > 0) {
-                console.log('🔍 DEBUG: All Cloverleaf residents in database:')
-                allCloverleafResidents.forEach(r => {
-                    const addr = allAddressesResult.data.find(a => a.id === r.addressId)
-                    console.log(`   👤 ${r.firstName} ${r.lastName} → "${addr?.street}", "${addr?.city}" (ID: ${r.addressId})`)
-                })
-            }
-            
-            // Also debug: what address formats exist for 42927?
-            const all42927Addresses = allAddressesResult.data.filter(a => 
-                a.street && a.street.toLowerCase().includes('42927')
-            )
-            console.log(`🔍 DEBUG: All address records containing "42927":`)
-            all42927Addresses.forEach(addr => {
-                console.log(`   🏠 "${addr.street}", "${addr.city}" (ID: ${addr.id})`)
-            })
             
             // Remove duplicate residents (same name)
             const uniqueResidents = allResidentsForAddress.filter((person, index, self) => {
@@ -154,10 +115,6 @@ export default function InteractionForm() {
                 return aOrder - bOrder
             })
             
-            console.log(`✅ Final result: ${sortedResidents.length} unique residents for interaction form`)
-            sortedResidents.forEach(r => {
-                console.log(`   👤 FINAL: ${r.firstName} ${r.lastName} (${r.role || r.occupantType || 'Unknown'})`)
-            })
             
             setResidents(sortedResidents)
             
@@ -227,17 +184,11 @@ export default function InteractionForm() {
                 createdBy: user?.userId || user?.username || 'unknown'
             }
             
-            console.log('Creating interaction record with data:', interactionData)
-            console.log('User info:', { userId: user?.userId, username: user?.username, signInDetails: user?.signInDetails })
-            
             const result = await client.models.InteractionRecord.create(interactionData)
             
-            console.log('Interaction record created successfully:', result)
-            
             if (result.data?.id) {
-                alert('Interaction recorded successfully! Record ID: ' + result.data.id)
+                alert('Interaction recorded successfully!')
             } else {
-                console.warn('Record created but no ID returned:', result)
                 alert('Interaction may have been recorded, but confirmation is unclear.')
             }
             
@@ -250,14 +201,8 @@ export default function InteractionForm() {
             setNotes('')
             
         } catch (error) {
-            console.error('Failed to record interaction - Full error:', error)
-            console.error('Error details:', {
-                message: error.message,
-                name: error.name,
-                stack: error.stack,
-                errors: error.errors
-            })
-            alert('Failed to record interaction: ' + error.message + '\nCheck console for details.')
+            console.error('Failed to record interaction:', error)
+            alert('Failed to record interaction: ' + error.message)
         } finally {
             setSaving(false)
         }
