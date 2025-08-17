@@ -4,7 +4,7 @@ import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 
 export default function AbsenteeInteractions() {
-    const [absenteeHomes, setAbsenteeHomes] = useState<any[]>([])
+    const [absenteeAddresses, setAbsenteeAddresses] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedHome, setSelectedHome] = useState<any>(null)
     const [contactMethod, setContactMethod] = useState('')
@@ -31,98 +31,78 @@ export default function AbsenteeInteractions() {
     })
 
     useEffect(() => {
-        loadAbsenteeHomes()
+        loadAbsenteeAddresses()
         loadCities()
     }, [currentPage, sortField, sortDirection])
 
     async function loadCities() {
         try {
-            const result = await client.models.Home.list({
-                filter: { absenteeOwner: { eq: true } }
+            const addressesResult = await client.models.Address.list({ limit: 5000 })
+            const residentsResult = await client.models.Resident.list({ 
+                filter: { isAbsentee: { eq: true } },
+                limit: 5000 
             })
-            const cities = [...new Set(result.data.map(home => home.city).filter(Boolean))]
-            setAvailableCities(cities.sort())
+            
+            const absenteeAddressIds = new Set(residentsResult.data.map(r => r.addressId))
+            const absenteeCities = addressesResult.data
+                .filter(addr => absenteeAddressIds.has(addr.id))
+                .map(addr => addr.city)
+                .filter(Boolean)
+            
+            setAvailableCities([...new Set(absenteeCities)].sort())
         } catch (error) {
             console.error('Failed to load cities:', error)
         }
     }
 
-    async function loadAbsenteeHomes() {
+    async function loadAbsenteeAddresses() {
         try {
             setLoading(true)
             
-            // Build filter for absentee homes
-            let homeFilter: any = { absenteeOwner: { eq: true } }
+            console.log('Loading absentee addresses with residents...')
             
-            // Add search filter if applied
-            if (searchTerm.trim()) {
-                homeFilter = {
-                    and: [
-                        homeFilter,
-                        {
-                            or: [
-                                { street: { contains: searchTerm.trim() } },
-                                { mailingStreet: { contains: searchTerm.trim() } }
-                            ]
-                        }
-                    ]
+            // Get all addresses and absentee residents
+            const [addressesResult, absenteeResidentsResult] = await Promise.all([
+                client.models.Address.list({ limit: 5000 }),
+                client.models.Resident.list({ 
+                    filter: { isAbsentee: { eq: true } },
+                    limit: 5000 
+                })
+            ])
+            
+            console.log(`Found ${addressesResult.data.length} addresses and ${absenteeResidentsResult.data.length} absentee residents`)
+            
+            // Group absentee residents by address
+            const absenteeResidentsByAddress = new Map()
+            absenteeResidentsResult.data.forEach(resident => {
+                if (!absenteeResidentsByAddress.has(resident.addressId)) {
+                    absenteeResidentsByAddress.set(resident.addressId, [])
                 }
-            }
-            
-            // Add city filter if applied
-            if (cityFilter) {
-                homeFilter = {
-                    and: [
-                        homeFilter,
-                        { city: { eq: cityFilter } }
-                    ]
-                }
-            }
-            
-            // Different approach: Find homes that have residents AND are absentee
-            // This avoids the duplicate home issue
-            console.log('Finding homes with residents that are absentee...')
-            
-            // First get all people with their home info
-            const peopleResult = await client.models.Person.list({ limit: 1000 })
-            console.log(`Found ${peopleResult.data.length} people`)
-            
-            // Get unique homeIds that have residents
-            const homeIdsWithResidents = [...new Set(peopleResult.data.map(p => p.homeId))]
-            console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
-            
-            // Now get the home details for these homes and filter for absentee
-            const homesWithResidentsPromises = homeIdsWithResidents.slice(0, 200).map(async (homeId) => {
-                try {
-                    const homeResult = await client.models.Home.get({ id: homeId })
-                    if (homeResult.data) {
-                        const home = homeResult.data
-                        // Check if this home meets our filter criteria
-                        const isAbsentee = home.absenteeOwner === true
-                        const matchesSearch = !searchTerm.trim() || 
-                            home.street?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            home.mailingStreet?.toLowerCase().includes(searchTerm.toLowerCase())
-                        const matchesCity = !cityFilter || home.city === cityFilter
-                        
-                        if (isAbsentee && matchesSearch && matchesCity) {
-                            // Get residents for this home
-                            const residents = peopleResult.data.filter(p => p.homeId === homeId)
-                            return { ...home, residents }
-                        }
-                    }
-                } catch (error) {
-                    // Home might not exist, skip it
-                }
-                return null
+                absenteeResidentsByAddress.get(resident.addressId).push(resident)
             })
             
-            const allHomesWithResidents = await Promise.all(homesWithResidentsPromises)
-            const homesWithResidents = allHomesWithResidents.filter(home => home !== null)
-            
-            console.log(`Found ${homesWithResidents.length} absentee homes with residents`)
+            // Find addresses that have absentee residents and match filters
+            const absenteeAddressList = addressesResult.data
+                .filter(address => {
+                    const hasAbsenteeResidents = absenteeResidentsByAddress.has(address.id)
+                    if (!hasAbsenteeResidents) return false
+                    
+                    // Apply search filter
+                    const matchesSearch = !searchTerm.trim() || 
+                        address.street?.toLowerCase().includes(searchTerm.toLowerCase())
+                    
+                    // Apply city filter
+                    const matchesCity = !cityFilter || address.city === cityFilter
+                    
+                    return matchesSearch && matchesCity
+                })
+                .map(address => ({
+                    ...address,
+                    residents: absenteeResidentsByAddress.get(address.id) || []
+                }))
             
             // Apply sorting
-            homesWithResidents.sort((a, b) => {
+            absenteeAddressList.sort((a, b) => {
                 let aVal: any, bVal: any
                 
                 switch (sortField) {
@@ -133,10 +113,6 @@ export default function AbsenteeInteractions() {
                     case 'city':
                         aVal = a.city || ''
                         bVal = b.city || ''
-                        break
-                    case 'mailingCity':
-                        aVal = a.mailingCity || ''
-                        bVal = b.mailingCity || ''
                         break
                     default:
                         aVal = a.street || ''
@@ -153,11 +129,13 @@ export default function AbsenteeInteractions() {
                 return 0
             })
             
-            setAbsenteeHomes(homesWithResidents)
-            setTotalCount(homesWithResidents.length) // Approximate count
+            console.log(`Found ${absenteeAddressList.length} addresses with absentee residents`)
+            
+            setAbsenteeAddresses(absenteeAddressList)
+            setTotalCount(absenteeAddressList.length)
             
         } catch (error) {
-            console.error('Failed to load absentee homes:', error)
+            console.error('Failed to load absentee addresses:', error)
         } finally {
             setLoading(false)
         }
@@ -165,7 +143,7 @@ export default function AbsenteeInteractions() {
     
     function applyFilters() {
         setCurrentPage(1) // Reset to first page when filters change
-        loadAbsenteeHomes()
+        loadAbsenteeAddresses()
     }
     
     function handleSort(field: string) {
@@ -239,7 +217,7 @@ export default function AbsenteeInteractions() {
                             type="text"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Property or mailing address..."
+                            placeholder="Property address..."
                             style={{padding: 8, borderRadius: 4, border: '1px solid #ddd'}}
                         />
                     </div>
@@ -275,10 +253,10 @@ export default function AbsenteeInteractions() {
 
                 {/* Stats */}
                 <div style={{marginBottom: 16, fontSize: '0.9em', color: '#666'}}>
-                    Showing {absenteeHomes.length} absentee homes (Page {currentPage} of {Math.ceil(totalCount / pageSize)})
+                    Showing {absenteeAddresses.length} absentee addresses (Page {currentPage} of {Math.ceil(totalCount / pageSize)})
                 </div>
                 
-                {absenteeHomes.length === 0 && !loading ? (
+                {absenteeAddresses.length === 0 && !loading ? (
                     <p>No absentee owners found.</p>
                 ) : (
                     <div style={{overflowX: 'auto'}}>
@@ -315,41 +293,39 @@ export default function AbsenteeInteractions() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {absenteeHomes.map(home => (
-                                    <tr key={home.id}>
+                                {absenteeAddresses.map(address => (
+                                    <tr key={address.id}>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {/* Handle case where unitNumber and street might contain duplicate data */}
-                                            {home.unitNumber && home.street && home.unitNumber !== home.street 
-                                                ? `${home.unitNumber} ${home.street}` 
-                                                : (home.street || home.unitNumber)
-                                            }<br/>
-                                            {home.city}, {home.state} {home.postalCode}
+                                            {address.street}<br/>
+                                            {address.city}, {address.state} {address.zip}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {home.mailingStreet}<br/>
-                                            {home.mailingCity}, {home.mailingState} {home.mailingPostalCode}
+                                            {address.city}, {address.state}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {home.residents?.map((person: any, i: number) => (
-                                                <div key={person.id}>
-                                                    {person.firstName} {person.lastName}
-                                                    {person.role && ` (${person.role.replace('_', ' ')})`}
-                                                    {i < home.residents.length - 1 && <br/>}
+                                            {address.residents?.map((resident: any, i: number) => (
+                                                <div key={resident.id}>
+                                                    {resident.firstName} {resident.lastName}
+                                                    {resident.occupantType && ` (${resident.occupantType})`}
+                                                    {i < address.residents.length - 1 && <br/>}
                                                 </div>
                                             )) || 'No residents listed'}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {home.residents?.map((person: any, i: number) => (
-                                                <div key={person.id} style={{fontSize: '0.9em'}}>
-                                                    {person.email && <div>📧 <a href={`mailto:${person.email}`} style={{color: '#007bff', textDecoration: 'none'}}>{person.email}</a></div>}
-                                                    {person.mobilePhone && <div>📱 {person.mobilePhone}</div>}
-                                                    {i < home.residents.length - 1 && <br/>}
+                                            {address.residents?.map((resident: any, i: number) => (
+                                                <div key={resident.id} style={{fontSize: '0.9em'}}>
+                                                    {resident.contactEmail && <div>📧 <a href={`mailto:${resident.contactEmail}`} style={{color: '#007bff', textDecoration: 'none'}}>{resident.contactEmail}</a></div>}
+                                                    {resident.additionalEmail && <div>📧 <a href={`mailto:${resident.additionalEmail}`} style={{color: '#007bff', textDecoration: 'none'}}>{resident.additionalEmail}</a></div>}
+                                                    {resident.cellPhone && <div>📱 {resident.cellPhone}</div>}
+                                                    {resident.unitPhone && <div>📞 {resident.unitPhone}</div>}
+                                                    {resident.workPhone && <div>🏢 {resident.workPhone}</div>}
+                                                    {i < address.residents.length - 1 && <br/>}
                                                 </div>
                                             ))}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
                                             <button 
-                                                onClick={() => setSelectedHome(home)}
+                                                onClick={() => setSelectedHome(address)}
                                                 style={{
                                                     backgroundColor: '#007bff',
                                                     color: 'white',

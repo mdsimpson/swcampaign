@@ -16,24 +16,19 @@ const schema = a.schema({
         allow.publicApiKey().to(['create']), // Public sign-up form
     ]),
 
-    Home: a.model({
-        unitNumber: a.string(),
+    Address: a.model({
+        externalId: a.string(), // Original ID from CSV
         street: a.string().required(),
         city: a.string().required(),
         state: a.string().default('VA'),
-        postalCode: a.string(),
-        mailingStreet: a.string(),
-        mailingCity: a.string(),
-        mailingState: a.string(),
-        mailingPostalCode: a.string(),
-        absenteeOwner: a.boolean().default(false),
+        zip: a.string(),
         lat: a.float(),
         lng: a.float(),
         notes: a.string(),
-        residents: a.hasMany('Person','homeId'),
-        assignments: a.hasMany('Assignment','homeId'),
-        interactions: a.hasMany('InteractionRecord','homeId'),
-        consents: a.hasMany('Consent','homeId'),
+        residents: a.hasMany('Resident','addressId'),
+        assignments: a.hasMany('Assignment','addressId'),
+        interactions: a.hasMany('InteractionRecord','addressId'),
+        consents: a.hasMany('Consent','addressId'),
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
@@ -41,17 +36,23 @@ const schema = a.schema({
         allow.publicApiKey().to(['create','read','update']) // Allow import scripts and coordinate updates
     ]),
 
-    Person: a.model({
-        homeId: a.id().required(),
-        home: a.belongsTo('Home','homeId'),
-        role: a.enum(['PRIMARY_OWNER','SECONDARY_OWNER','RENTER','OTHER']),
+    Resident: a.model({
+        externalId: a.string(), // Original ID from CSV
+        addressId: a.id().required(),
+        address: a.belongsTo('Address','addressId'),
         firstName: a.string(),
         lastName: a.string(),
-        email: a.string(),
-        mobilePhone: a.string(),
+        occupantType: a.string(), // e.g., "Official Owner", "Official Co Owner"
+        contactEmail: a.string(),
+        additionalEmail: a.string(),
+        cellPhone: a.string(),
+        cellPhoneAlert: a.string(),
+        unitPhone: a.string(),
+        workPhone: a.string(),
+        isAbsentee: a.boolean().default(false),
         hasSigned: a.boolean().default(false),
         signedAt: a.datetime(),
-        consents: a.hasMany('Consent','personId'),
+        consents: a.hasMany('Consent','residentId'),
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
@@ -60,10 +61,10 @@ const schema = a.schema({
     ]),
 
     Consent: a.model({
-        personId: a.id().required(),
-        person: a.belongsTo('Person','personId'),
-        homeId: a.id().required(),
-        home: a.belongsTo('Home','homeId'),
+        residentId: a.id().required(),
+        resident: a.belongsTo('Resident','residentId'),
+        addressId: a.id().required(),
+        address: a.belongsTo('Address','addressId'),
         recordedBy: a.string(),
         recordedAt: a.datetime().required(),
         source: a.string(), // manual | bulk-upload
@@ -85,8 +86,8 @@ const schema = a.schema({
     ]),
 
     Assignment: a.model({
-        homeId: a.id().required(),
-        home: a.belongsTo('Home','homeId'),
+        addressId: a.id().required(),
+        address: a.belongsTo('Address','addressId'),
         volunteerId: a.id().required(),
         volunteer: a.belongsTo('Volunteer','volunteerId'),
         assignedAt: a.datetime(),
@@ -100,9 +101,9 @@ const schema = a.schema({
     ]),
 
     InteractionRecord: a.model({
-        homeId: a.id().required(),
-        home: a.belongsTo('Home','homeId'),
-        participantPersonIds: a.string(), // CSV of Person IDs (or names if Other)
+        addressId: a.id().required(),
+        address: a.belongsTo('Address','addressId'),
+        participantResidentIds: a.string(), // CSV of Resident IDs (or names if Other)
         spokeToHomeowner: a.boolean().default(false),
         spokeToOther: a.boolean().default(false),
         leftFlyer: a.boolean().default(false),

@@ -121,11 +121,17 @@ export default function CanvassingMap() {
                             // Get residents for this home from pre-loaded list (Organize page approach)
                             const allResidentsForHome = allPeople.filter(p => p.homeId === homeId)
                             
-                            // Filter out test/fake residents
+                            // Filter out test/fake residents (enhanced to catch all variations)
                             const realResidents = allResidentsForHome.filter(person => {
                                 const fullName = `${person.firstName || ''} ${person.lastName || ''}`.toLowerCase();
-                                const testPatterns = ['test', 'manual', 'debug', 'sample', 'fake', 'demo'];
-                                return !testPatterns.some(pattern => fullName.includes(pattern));
+                                const testPatterns = ['test', 'manual', 'debug', 'sample', 'fake', 'demo', 'resident'];
+                                const specificFakes = ['test resident', 'manual resident', 'manual test', 'joe smith (test)', 'jane doe', 'john doe', 'bob smith'];
+                                
+                                // Filter by patterns and specific fake names
+                                const hasTestPattern = testPatterns.some(pattern => fullName.includes(pattern));
+                                const isSpecificFake = specificFakes.some(fake => fullName.includes(fake));
+                                
+                                return !hasTestPattern && !isSpecificFake;
                             });
                             
                             // Remove duplicate residents (same name at same address) - copied from Organize page

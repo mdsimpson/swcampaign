@@ -4,10 +4,10 @@ import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../amplify/data/resource'
 
 interface ReportData {
-    totalHomes: number
-    totalPeople: number
-    absenteeHomes: number
-    homesWithAllConsents: number
+    totalAddresses: number
+    totalResidents: number
+    absenteeAddresses: number
+    addressesWithAllConsents: number
     totalConsents: number
     activeAssignments: number
     completedAssignments: number
@@ -32,34 +32,36 @@ export default function Reports() {
 
     async function loadReportData() {
         try {
-            const [homesResult, peopleResult, consentsResult, assignmentsResult, interactionsResult, volunteersResult] = await Promise.all([
-                client.models.Home.list(),
-                client.models.Person.list(),
+            const [addressesResult, residentsResult, consentsResult, assignmentsResult, interactionsResult, volunteersResult] = await Promise.all([
+                client.models.Address.list(),
+                client.models.Resident.list(),
                 client.models.Consent.list(),
                 client.models.Assignment.list(),
                 client.models.InteractionRecord.list(),
                 client.models.Volunteer.list()
             ])
 
-            const homes = homesResult.data
-            const people = peopleResult.data
+            const addresses = addressesResult.data
+            const residents = residentsResult.data
             const consents = consentsResult.data
             const assignments = assignmentsResult.data
             const interactions = interactionsResult.data
             const volunteers = volunteersResult.data
 
             // Calculate key metrics
-            const absenteeHomes = homes.filter(h => h.absenteeOwner).length
+            const absenteeAddresses = addresses.filter(addr => 
+                residents.some(r => r.addressId === addr.id && r.isAbsentee)
+            ).length
             
-            // Calculate homes with all consents
-            const homeIds = [...new Set(homes.map(h => h.id))]
-            let homesWithAllConsents = 0
+            // Calculate addresses with all consents
+            const addressIds = [...new Set(addresses.map(a => a.id))]
+            let addressesWithAllConsents = 0
             
-            for (const homeId of homeIds) {
-                const homeOwners = people.filter(p => p.homeId === homeId)
-                const homeConsents = consents.filter(c => c.homeId === homeId)
-                if (homeOwners.length > 0 && homeConsents.length >= homeOwners.length) {
-                    homesWithAllConsents++
+            for (const addressId of addressIds) {
+                const addressResidents = residents.filter(r => r.addressId === addressId)
+                const addressConsents = consents.filter(c => c.addressId === addressId)
+                if (addressResidents.length > 0 && addressConsents.length >= addressResidents.length) {
+                    addressesWithAllConsents++
                 }
             }
 
@@ -100,10 +102,10 @@ export default function Reports() {
             ]
 
             setReportData({
-                totalHomes: homes.length,
-                totalPeople: people.length,
-                absenteeHomes,
-                homesWithAllConsents,
+                totalAddresses: addresses.length,
+                totalResidents: residents.length,
+                absenteeAddresses,
+                addressesWithAllConsents,
                 totalConsents: consents.length,
                 activeAssignments: assignments.filter(a => a.status !== 'DONE').length,
                 completedAssignments: assignments.filter(a => a.status === 'DONE').length,
@@ -210,18 +212,18 @@ export default function Reports() {
                             marginBottom: 24
                         }}>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
-                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Total Homes</h4>
-                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#007bff'}}>{reportData.totalHomes}</div>
+                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Total Addresses</h4>
+                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#007bff'}}>{reportData.totalAddresses}</div>
                             </div>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
                                 <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Total Residents</h4>
-                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#28a745'}}>{reportData.totalPeople}</div>
+                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#28a745'}}>{reportData.totalResidents}</div>
                             </div>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
-                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Homes Complete</h4>
-                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#ffc107'}}>{reportData.homesWithAllConsents}</div>
+                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Addresses Complete</h4>
+                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#ffc107'}}>{reportData.addressesWithAllConsents}</div>
                                 <div style={{fontSize: '0.9em', color: '#666'}}>
-                                    {Math.round((reportData.homesWithAllConsents / (reportData.totalHomes - reportData.absenteeHomes)) * 100)}% of eligible
+                                    {Math.round((reportData.addressesWithAllConsents / (reportData.totalAddresses - reportData.absenteeAddresses)) * 100)}% of eligible
                                 </div>
                             </div>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
@@ -236,8 +238,8 @@ export default function Reports() {
                             gap: 16
                         }}>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
-                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Absentee Homes</h4>
-                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#6c757d'}}>{reportData.absenteeHomes}</div>
+                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Absentee Addresses</h4>
+                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#6c757d'}}>{reportData.absenteeAddresses}</div>
                             </div>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
                                 <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Active Assignments</h4>
@@ -302,10 +304,10 @@ export default function Reports() {
                         <div>
                             <h4>Progress Summary</h4>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8}}>
-                                <p><strong>Target:</strong> 80% of eligible homes (non-absentee)</p>
-                                <p><strong>Eligible Homes:</strong> {reportData.totalHomes - reportData.absenteeHomes}</p>
-                                <p><strong>Homes Complete:</strong> {reportData.homesWithAllConsents} ({Math.round((reportData.homesWithAllConsents / (reportData.totalHomes - reportData.absenteeHomes)) * 100)}%)</p>
-                                <p><strong>Homes Needed for 80%:</strong> {Math.max(0, Math.ceil((reportData.totalHomes - reportData.absenteeHomes) * 0.8) - reportData.homesWithAllConsents)}</p>
+                                <p><strong>Target:</strong> 80% of eligible addresses (non-absentee)</p>
+                                <p><strong>Eligible Addresses:</strong> {reportData.totalAddresses - reportData.absenteeAddresses}</p>
+                                <p><strong>Addresses Complete:</strong> {reportData.addressesWithAllConsents} ({Math.round((reportData.addressesWithAllConsents / (reportData.totalAddresses - reportData.absenteeAddresses)) * 100)}%)</p>
+                                <p><strong>Addresses Needed for 80%:</strong> {Math.max(0, Math.ceil((reportData.totalAddresses - reportData.absenteeAddresses) * 0.8) - reportData.addressesWithAllConsents)}</p>
                             </div>
                         </div>
                     </div>
@@ -415,7 +417,7 @@ export default function Reports() {
                                                      reportData.totalInteractions * 100) + '%'
                                         : '0%'
                                 }</p>
-                                <p><strong>Homes Contacted:</strong> {reportData.totalInteractions} of {reportData.totalHomes - reportData.absenteeHomes} eligible homes</p>
+                                <p><strong>Addresses Contacted:</strong> {reportData.totalInteractions} of {reportData.totalAddresses - reportData.absenteeAddresses} eligible addresses</p>
                             </div>
                         </div>
                     </div>
@@ -426,8 +428,8 @@ export default function Reports() {
                     <div>
                         <h3>Absentee Owners Summary</h3>
                         <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8}}>
-                            <p><strong>Total Absentee Homes:</strong> {reportData.absenteeHomes}</p>
-                            <p><strong>Percentage of Total:</strong> {Math.round((reportData.absenteeHomes / reportData.totalHomes) * 100)}%</p>
+                            <p><strong>Total Absentee Addresses:</strong> {reportData.absenteeAddresses}</p>
+                            <p><strong>Percentage of Total:</strong> {Math.round((reportData.absenteeAddresses / reportData.totalAddresses) * 100)}%</p>
                             <p><strong>Note:</strong> Absentee owners require special outreach via mail, email, or phone rather than door-to-door canvassing.</p>
                         </div>
                         

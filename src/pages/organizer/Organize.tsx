@@ -10,10 +10,10 @@ export default function Organize() {
     const location = useLocation()
     const navigate = useNavigate()
     
-    const [homes, setHomes] = useState<any[]>([])
+    const [addresses, setAddresses] = useState<any[]>([])
     const [volunteers, setVolunteers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
-    const [selectedHomes, setSelectedHomes] = useState<Set<string>>(new Set())
+    const [selectedAddresses, setSelectedAddresses] = useState<Set<string>>(new Set())
     const [assignToVolunteer, setAssignToVolunteer] = useState('')
     
     // Initialize filter state from URL params
@@ -121,68 +121,68 @@ export default function Organize() {
                 }
             }
             
-            let homesWithDetails: any[] = []
+            let addressesWithDetails: any[] = []
             
             if (searchTerm.trim() || residentFilter.trim()) {
-                // When searching, search ALL homes first, then add resident info
+                // When searching, search ALL addresses first, then add resident info
                 console.log(`Searching for address: "${searchTerm.trim()}" and resident: "${residentFilter.trim()}"`)
                 
                 let searchResults: any[] = []
                 let nextToken = null
                 let searchCount = 0
                 
-                // Get ALL people first for resident filtering
-                let allPeople: any[] = []
-                let peopleNextToken = null
+                // Get ALL residents first for resident filtering
+                let allResidents: any[] = []
+                let residentsNextToken = null
                 
                 do {
-                    const peopleResult = await client.models.Person.list({ 
+                    const residentsResult = await client.models.Resident.list({ 
                         limit: 1000,
-                        nextToken: peopleNextToken
+                        nextToken: residentsNextToken
                     })
-                    allPeople.push(...peopleResult.data)
-                    peopleNextToken = peopleResult.nextToken
-                } while (peopleNextToken)
+                    allResidents.push(...residentsResult.data)
+                    residentsNextToken = residentsResult.nextToken
+                } while (residentsNextToken)
                 
-                // Find homes that match resident filter
-                let residentMatchingHomeIds: Set<string> = new Set()
+                // Find addresses that match resident filter
+                let residentMatchingAddressIds: Set<string> = new Set()
                 if (residentFilter.trim()) {
                     const residentFilterLower = residentFilter.toLowerCase()
-                    const matchingPeople = allPeople.filter(person => 
-                        (person.firstName?.toLowerCase().includes(residentFilterLower)) ||
-                        (person.lastName?.toLowerCase().includes(residentFilterLower)) ||
-                        (`${person.firstName} ${person.lastName}`.toLowerCase().includes(residentFilterLower))
+                    const matchingResidents = allResidents.filter(resident => 
+                        (resident.firstName?.toLowerCase().includes(residentFilterLower)) ||
+                        (resident.lastName?.toLowerCase().includes(residentFilterLower)) ||
+                        (`${resident.firstName} ${resident.lastName}`.toLowerCase().includes(residentFilterLower))
                     )
-                    residentMatchingHomeIds = new Set(matchingPeople.map(p => p.homeId))
-                    console.log(`Found ${matchingPeople.length} people matching "${residentFilter}" in ${residentMatchingHomeIds.size} homes`)
+                    residentMatchingAddressIds = new Set(matchingResidents.map(r => r.addressId))
+                    console.log(`Found ${matchingResidents.length} residents matching "${residentFilter}" in ${residentMatchingAddressIds.size} addresses`)
                 }
                 
-                // Search through homes without GraphQL filter (do client-side filtering)
+                // Search through addresses without GraphQL filter (do client-side filtering)
                 do {
-                    const result = await client.models.Home.list({
+                    const result = await client.models.Address.list({
                         limit: 200,
                         nextToken
                     })
                     
-                    for (const home of result.data) {
+                    for (const address of result.data) {
                         let matches = true
                         
                         // Apply address filter only if searchTerm has content
                         if (searchTerm.trim()) {
-                            if (!home.street?.toLowerCase().includes(searchTerm.trim().toLowerCase())) {
+                            if (!address.street?.toLowerCase().includes(searchTerm.trim().toLowerCase())) {
                                 matches = false
                             }
                         }
                         
                         // Apply resident filter only if residentFilter has content
                         if (residentFilter.trim()) {
-                            if (!residentMatchingHomeIds.has(home.id)) {
+                            if (!residentMatchingAddressIds.has(address.id)) {
                                 matches = false
                             }
                         }
                         
                         if (matches) {
-                            searchResults.push(home)
+                            searchResults.push(address)
                         }
                     }
                     
@@ -190,46 +190,46 @@ export default function Organize() {
                     searchCount += result.data.length
                 } while (nextToken && searchResults.length < 500)
                 
-                console.log(`Searched ${searchCount} homes, found ${searchResults.length} matches`)
+                console.log(`Searched ${searchCount} addresses, found ${searchResults.length} matches`)
                 
-                // Remove duplicates from search results (by address, not just home ID)
-                const uniqueSearchResults = searchResults.filter((home, index, self) => {
-                    const address = `${home.street?.toLowerCase().trim()}, ${home.city?.toLowerCase().trim()}`
-                    return index === self.findIndex(h => {
-                        const hAddress = `${h.street?.toLowerCase().trim()}, ${h.city?.toLowerCase().trim()}`
-                        return hAddress === address
+                // Remove duplicates from search results (by address, not just address ID)
+                const uniqueSearchResults = searchResults.filter((address, index, self) => {
+                    const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
+                    return index === self.findIndex(a => {
+                        const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
+                        return aAddress === addressKey
                     })
                 })
-                console.log(`After removing address duplicates: ${uniqueSearchResults.length} unique homes (from ${searchResults.length} total results)`)
+                console.log(`After removing address duplicates: ${uniqueSearchResults.length} unique addresses (from ${searchResults.length} total results)`)
                 
                 // For pagination on search results
                 const startIndex = (currentPage - 1) * pageSize
                 const endIndex = startIndex + pageSize
-                const currentPageHomes = uniqueSearchResults.slice(startIndex, endIndex)
+                const currentPageAddresses = uniqueSearchResults.slice(startIndex, endIndex)
                 
-                // Use the already loaded people data
-                console.log(`Loaded ${allPeople.length} total people for search`)
-                const allPeopleResult = { data: allPeople }
+                // Use the already loaded residents data
+                console.log(`Loaded ${allResidents.length} total residents for search`)
+                const allResidentsResult = { data: allResidents }
                 
                 // Load details for search results
-                const searchDetailsPromises = currentPageHomes.map(async (home) => {
+                const searchDetailsPromises = currentPageAddresses.map(async (address) => {
                     try {
-                        // For this address, get residents from ALL matching home records (to handle DB duplicates)
-                        const homeAddress = `${home.street?.toLowerCase().trim()}, ${home.city?.toLowerCase().trim()}`
+                        // For this address, get residents from ALL matching address records (to handle DB duplicates)
+                        const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
                         
-                        // Find all home IDs with the same address
-                        const sameAddressHomeIds = searchResults
-                            .filter(h => {
-                                const hAddress = `${h.street?.toLowerCase().trim()}, ${h.city?.toLowerCase().trim()}`
-                                return hAddress === homeAddress
+                        // Find all address IDs with the same address
+                        const sameAddressIds = searchResults
+                            .filter(a => {
+                                const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
+                                return aAddress === addressKey
                             })
-                            .map(h => h.id)
+                            .map(a => a.id)
                         
-                        console.log(`Address "${home.street}" has ${sameAddressHomeIds.length} home records in DB`)
+                        console.log(`Address "${address.street}" has ${sameAddressIds.length} address records in DB`)
                         
-                        // Get residents from all home records with this address
-                        const allResidentsForAddress = allPeopleResult.data
-                            .filter(p => sameAddressHomeIds.includes(p.homeId))
+                        // Get residents from all address records with this address
+                        const allResidentsForAddress = allResidentsResult.data
+                            .filter(r => sameAddressIds.includes(r.addressId))
                         
                         // Remove duplicate residents (same name at same address)
                         const uniqueResidents = allResidentsForAddress.filter((person, index, self) => {
@@ -247,14 +247,14 @@ export default function Organize() {
                             return aOrder - bOrder
                         })
                         
-                        console.log(`Address "${home.street}": ${allResidentsForAddress.length} total residents, ${residents.length} unique residents`)
+                        console.log(`Address "${address.street}": ${allResidentsForAddress.length} total residents, ${residents.length} unique residents`)
                         
-                        // Get consents and assignments from all home records with this address
-                        const consentsPromises = sameAddressHomeIds.map(homeId => 
-                            client.models.Consent.list({ filter: { homeId: { eq: homeId } } })
+                        // Get consents and assignments from all address records with this address
+                        const consentsPromises = sameAddressIds.map(addressId => 
+                            client.models.Consent.list({ filter: { addressId: { eq: addressId } } })
                         )
-                        const assignmentsPromises = sameAddressHomeIds.map(homeId => 
-                            client.models.Assignment.list({ filter: { homeId: { eq: homeId } } })
+                        const assignmentsPromises = sameAddressIds.map(addressId => 
+                            client.models.Assignment.list({ filter: { addressId: { eq: addressId } } })
                         )
                         
                         const [allConsentsResults, allAssignmentsResults] = await Promise.all([
@@ -280,28 +280,28 @@ export default function Organize() {
                             residents.every(resident => resident.hasSigned)
                         
                         return { 
-                            ...home, 
+                            ...address, 
                             residents, 
                             consents,
                             assignments,
                             consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
                         }
                     } catch (error) {
-                        console.error(`Error loading home details:`, error)
+                        console.error(`Error loading address details:`, error)
                         return null
                     }
                 })
                 
                 const searchDetailsResults = await Promise.all(searchDetailsPromises)
-                homesWithDetails = searchDetailsResults.filter(home => home !== null)
+                addressesWithDetails = searchDetailsResults.filter(address => address !== null)
                 
-                console.log(`Search processing complete: ${homesWithDetails.length} homes with details`)
+                console.log(`Search processing complete: ${addressesWithDetails.length} addresses with details`)
                 
                 // Check for duplicates in search results
-                const searchIds = homesWithDetails.map(h => h.id)
+                const searchIds = addressesWithDetails.map(a => a.id)
                 const uniqueSearchIds = [...new Set(searchIds)]
                 if (searchIds.length !== uniqueSearchIds.length) {
-                    console.log(`⚠️ Found ${searchIds.length - uniqueSearchIds.length} duplicate homes in search details`)
+                    console.log(`⚠️ Found ${searchIds.length - uniqueSearchIds.length} duplicate addresses in search details`)
                 }
                 
                 // Update pagination for search results
@@ -311,105 +311,104 @@ export default function Organize() {
                 console.log(`Search mode: found ${uniqueSearchResults.length} total matches, showing page ${currentPage}`)
                 
             } else {
-                // No search - use original logic (homes with residents only)
-                console.log('Finding homes with residents for Organize page...')
+                // No search - simplified logic for Address/Resident model
+                console.log('Loading addresses with residents for Organize page...')
                 
-                // Get ALL people first (handle pagination)
-                let allPeople: any[] = []
-                let peopleNextToken = null
+                // Get all addresses and residents
+                const [allAddressesResult, allResidentsResult] = await Promise.all([
+                    client.models.Address.list({ limit: 5000 }),
+                    client.models.Resident.list({ limit: 5000 })
+                ])
                 
-                do {
-                    const peopleResult = await client.models.Person.list({ 
-                        limit: 1000,
-                        nextToken: peopleNextToken
-                    })
-                    allPeople.push(...peopleResult.data)
-                    peopleNextToken = peopleResult.nextToken
-                } while (peopleNextToken)
+                console.log(`Found ${allAddressesResult.data.length} addresses and ${allResidentsResult.data.length} residents`)
                 
-                console.log(`Found ${allPeople.length} people total`)
-                const allPeopleResult = { data: allPeople }
-                
-                // Get unique homeIds that have residents
-                const homeIdsWithResidents = [...new Set(allPeopleResult.data.map(p => p.homeId))]
-                console.log(`Found ${homeIdsWithResidents.length} unique homes with residents`)
-                
-                // For pagination, slice the homeIds
-                const startIndex = (currentPage - 1) * pageSize
-                const endIndex = startIndex + pageSize
-                const currentPageHomeIds = homeIdsWithResidents.slice(startIndex, endIndex)
-                
-                console.log(`Page ${currentPage}: showing homes ${startIndex + 1}-${Math.min(endIndex, homeIdsWithResidents.length)} of ${homeIdsWithResidents.length}`)
-                
-                // Get home details for current page
-                const homesWithDetailsPromises = currentPageHomeIds.map(async (homeId) => {
-                    try {
-                        const homeResult = await client.models.Home.get({ id: homeId })
-                        if (homeResult.data) {
-                            const home = homeResult.data
-                            
-                            // Get residents for this home and sort them (PRIMARY_OWNER first)
-                            const residents = allPeopleResult.data
-                                .filter(p => p.homeId === homeId)
-                                .sort((a, b) => {
-                                    // PRIMARY_OWNER first, then SECONDARY_OWNER, then others
-                                    const roleOrder = { 'PRIMARY_OWNER': 1, 'SECONDARY_OWNER': 2, 'RENTER': 3, 'OTHER': 4 }
-                                    const aOrder = roleOrder[a.role] || 5
-                                    const bOrder = roleOrder[b.role] || 5
-                                    return aOrder - bOrder
-                                })
-                            
-                            // Get consents and assignments
-                            const [consentsResult, assignmentsResult] = await Promise.all([
-                                client.models.Consent.list({ filter: { homeId: { eq: home.id } } }),
-                                client.models.Assignment.list({ filter: { homeId: { eq: home.id } } })
-                            ])
-                            
-                            const consents = consentsResult.data
-                            const assignments = assignmentsResult.data.filter(a => a.status !== 'DONE')
-                            
-                            // Determine consent status
-                            const allOwnersSigned = residents.length > 0 && 
-                                residents.every(resident => resident.hasSigned)
-                            
-                            return { 
-                                ...home, 
-                                residents, 
-                                consents,
-                                assignments,
-                                consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
-                            }
-                        }
-                    } catch (error) {
-                        console.error(`Error loading home ${homeId}:`, error)
+                // Group residents by address
+                const residentsByAddress = new Map()
+                allResidentsResult.data.forEach(resident => {
+                    if (!residentsByAddress.has(resident.addressId)) {
+                        residentsByAddress.set(resident.addressId, [])
                     }
-                    return null
+                    residentsByAddress.get(resident.addressId).push(resident)
                 })
                 
-                const allHomesWithDetails = await Promise.all(homesWithDetailsPromises)
-                homesWithDetails = allHomesWithDetails.filter(home => home !== null)
+                // Get addresses with residents
+                const addressesWithResidents = allAddressesResult.data
+                    .filter(address => residentsByAddress.has(address.id))
+                    .map(address => ({
+                        ...address,
+                        residents: residentsByAddress.get(address.id) || []
+                    }))
                 
-                console.log(`Loaded ${homesWithDetails.length} homes with residents for page ${currentPage}`)
+                console.log(`Found ${addressesWithResidents.length} addresses with residents`)
+                
+                // For pagination, slice the addresses
+                const startIndex = (currentPage - 1) * pageSize
+                const endIndex = startIndex + pageSize
+                const currentPageAddresses = addressesWithResidents.slice(startIndex, endIndex)
+                
+                console.log(`Page ${currentPage}: showing addresses ${startIndex + 1}-${Math.min(endIndex, addressesWithResidents.length)} of ${addressesWithResidents.length}`)
+                
+                // Add additional details to current page addresses
+                const addressesWithDetailsPromises = currentPageAddresses.map(async (address) => {
+                    try {
+                        // Get consents and assignments for this address
+                        const [consentsResult, assignmentsResult] = await Promise.all([
+                            client.models.Consent.list({ filter: { addressId: { eq: address.id } } }),
+                            client.models.Assignment.list({ filter: { addressId: { eq: address.id } } })
+                        ])
+                        
+                        const consents = consentsResult.data
+                        const assignments = assignmentsResult.data.filter(a => a.status !== 'DONE')
+                        
+                        // Sort residents (by occupantType - owners first)
+                        const sortedResidents = address.residents.sort((a, b) => {
+                            const typeOrder = { 'Official Owner': 1, 'Official Co Owner': 2, 'RENTER': 3, 'OTHER': 4 }
+                            const aOrder = typeOrder[a.occupantType] || 5
+                            const bOrder = typeOrder[b.occupantType] || 5
+                            return aOrder - bOrder
+                        })
+                        
+                        // Determine consent status
+                        const allOwnersSigned = sortedResidents.length > 0 && 
+                            sortedResidents.every(resident => resident.hasSigned)
+                        
+                        return { 
+                            ...address, 
+                            residents: sortedResidents,
+                            consents,
+                            assignments,
+                            consentStatus: allOwnersSigned ? 'complete' : 'incomplete'
+                        }
+                    } catch (error) {
+                        console.error(`Error loading address details for ${address.street}:`, error)
+                        return null
+                    }
+                })
+                
+                const allAddressesWithDetails = await Promise.all(addressesWithDetailsPromises)
+                addressesWithDetails = allAddressesWithDetails.filter(address => address !== null)
+                
+                console.log(`Loaded ${addressesWithDetails.length} addresses with residents for page ${currentPage}`)
                 
                 // Update pagination info  
-                setTotalCount(homeIdsWithResidents.length)
-                const hasMorePages = endIndex < homeIdsWithResidents.length
+                setTotalCount(addressesWithResidents.length)
+                const hasMorePages = endIndex < addressesWithResidents.length
                 setNextToken(hasMorePages ? 'more' : null)
-                console.log(`Browse mode: ${homeIdsWithResidents.length} total homes with residents, showing page ${currentPage} (${homesWithDetails.length} homes)`)
+                console.log(`Browse mode: ${addressesWithResidents.length} total addresses with residents, showing page ${currentPage} (${addressesWithDetails.length} addresses)`)
             }
             
             // Apply additional filters that can't be done at DB level
-            let filteredData = homesWithDetails
+            let filteredData = addressesWithDetails
             
             if (statusFilter !== 'all') {
-                filteredData = filteredData.filter(home => home.consentStatus === statusFilter)
+                filteredData = filteredData.filter(address => address.consentStatus === statusFilter)
             }
             
             if (assignmentFilter !== 'all') {
                 if (assignmentFilter === 'assigned') {
-                    filteredData = filteredData.filter(home => home.assignments.length > 0)
+                    filteredData = filteredData.filter(address => address.assignments.length > 0)
                 } else if (assignmentFilter === 'unassigned') {
-                    filteredData = filteredData.filter(home => home.assignments.length === 0)
+                    filteredData = filteredData.filter(address => address.assignments.length === 0)
                 }
             }
             
@@ -446,20 +445,20 @@ export default function Organize() {
             })
             
             // Final check for duplicates before setting state (by address, not just ID)
-            const finalUniqueHomes = filteredData.filter((home, index, self) => {
-                const address = `${home.street?.toLowerCase().trim()}, ${home.city?.toLowerCase().trim()}`
-                return index === self.findIndex(h => {
-                    const hAddress = `${h.street?.toLowerCase().trim()}, ${h.city?.toLowerCase().trim()}`
-                    return hAddress === address
+            const finalUniqueAddresses = filteredData.filter((address, index, self) => {
+                const addressKey = `${address.street?.toLowerCase().trim()}, ${address.city?.toLowerCase().trim()}`
+                return index === self.findIndex(a => {
+                    const aAddress = `${a.street?.toLowerCase().trim()}, ${a.city?.toLowerCase().trim()}`
+                    return aAddress === addressKey
                 })
             })
             
-            if (filteredData.length !== finalUniqueHomes.length) {
-                console.log(`⚠️ Removed ${filteredData.length - finalUniqueHomes.length} duplicate addresses before setting state`)
+            if (filteredData.length !== finalUniqueAddresses.length) {
+                console.log(`⚠️ Removed ${filteredData.length - finalUniqueAddresses.length} duplicate addresses before setting state`)
             }
             
-            console.log(`Final: setting ${finalUniqueHomes.length} homes, totalCount should be ${totalCount}`)
-            setHomes(finalUniqueHomes)
+            console.log(`Final: setting ${finalUniqueAddresses.length} addresses, totalCount should be ${totalCount}`)
+            setAddresses(finalUniqueAddresses)
             
             // Load volunteers and eligible users
             if (volunteers.length === 0) {
@@ -558,7 +557,7 @@ export default function Organize() {
     
     function applyFilters() {
         setCurrentPage(1) // Reset to first page when filters change
-        setSelectedHomes(new Set()) // Clear selections
+        setSelectedAddresses(new Set()) // Clear selections
         setPreviousTokens([]) // Clear pagination tokens
         setNextToken(null)
         
@@ -581,7 +580,7 @@ export default function Organize() {
         setStatusFilter('all')
         setAssignmentFilter('all')
         setCurrentPage(1)
-        setSelectedHomes(new Set())
+        setSelectedAddresses(new Set())
         setPreviousTokens([])
         setNextToken(null)
         
@@ -690,32 +689,32 @@ export default function Organize() {
         }
     }
 
-    function toggleHomeSelection(homeId: string) {
-        const newSelected = new Set(selectedHomes)
-        if (newSelected.has(homeId)) {
-            newSelected.delete(homeId)
+    function toggleAddressSelection(addressId: string) {
+        const newSelected = new Set(selectedAddresses)
+        if (newSelected.has(addressId)) {
+            newSelected.delete(addressId)
         } else {
-            newSelected.add(homeId)
+            newSelected.add(addressId)
         }
-        setSelectedHomes(newSelected)
+        setSelectedAddresses(newSelected)
     }
 
     function selectAll() {
-        const allIds = new Set(homes.map(home => home.id))
-        setSelectedHomes(allIds)
+        const allIds = new Set(addresses.map(address => address.id))
+        setSelectedAddresses(allIds)
     }
 
     function clearSelection() {
-        setSelectedHomes(new Set())
+        setSelectedAddresses(new Set())
     }
 
-    async function unassignSelectedHomes() {
-        if (selectedHomes.size === 0) {
-            alert('Please select homes to unassign')
+    async function unassignSelectedAddresses() {
+        if (selectedAddresses.size === 0) {
+            alert('Please select addresses to unassign')
             return
         }
 
-        if (!confirm(`Are you sure you want to unassign ${selectedHomes.size} homes?`)) {
+        if (!confirm(`Are you sure you want to unassign ${selectedAddresses.size} addresses?`)) {
             return
         }
 
@@ -724,10 +723,10 @@ export default function Organize() {
             const deletePromises = []
             const assignmentIdsToDelete = new Set<string>()
             
-            for (const homeId of selectedHomes) {
-                const home = homes.find(h => h.id === homeId)
-                if (home && home.assignments) {
-                    for (const assignment of home.assignments) {
+            for (const addressId of selectedAddresses) {
+                const address = addresses.find(a => a.id === addressId)
+                if (address && address.assignments) {
+                    for (const assignment of address.assignments) {
                         assignmentIdsToDelete.add(assignment.id)
                         deletePromises.push(
                             client.models.Assignment.delete({ id: assignment.id })
@@ -737,30 +736,30 @@ export default function Organize() {
             }
 
             if (deletePromises.length === 0) {
-                alert('No assignments found for selected homes')
+                alert('No assignments found for selected addresses')
                 return
             }
 
             await Promise.all(deletePromises)
 
-            // Update homes state to remove assignments without reloading
-            setHomes(prevHomes => 
-                prevHomes.map(home => {
-                    if (selectedHomes.has(home.id)) {
-                        // Remove assignments for this home
+            // Update addresses state to remove assignments without reloading
+            setAddresses(prevAddresses => 
+                prevAddresses.map(address => {
+                    if (selectedAddresses.has(address.id)) {
+                        // Remove assignments for this address
                         return {
-                            ...home,
-                            assignments: home.assignments?.filter(
+                            ...address,
+                            assignments: address.assignments?.filter(
                                 a => !assignmentIdsToDelete.has(a.id)
                             ) || []
                         }
                     }
-                    return home
+                    return address
                 })
             )
 
-            alert(`Unassigned ${selectedHomes.size} homes successfully`)
-            setSelectedHomes(new Set())
+            alert(`Unassigned ${selectedAddresses.size} addresses successfully`)
+            setSelectedAddresses(new Set())
             // Don't call loadData() - we've updated the state directly
         } catch (error) {
             console.error('Failed to unassign homes:', error)
@@ -768,9 +767,9 @@ export default function Organize() {
         }
     }
 
-    async function assignSelectedHomes() {
-        if (!assignToVolunteer || selectedHomes.size === 0) {
-            alert('Please select homes and a volunteer')
+    async function assignSelectedAddresses() {
+        if (!assignToVolunteer || selectedAddresses.size === 0) {
+            alert('Please select addresses and a volunteer')
             return
         }
 
@@ -826,8 +825,8 @@ export default function Organize() {
                 return
             }
 
-            const assignments = Array.from(selectedHomes).map(homeId => ({
-                homeId,
+            const assignments = Array.from(selectedAddresses).map(addressId => ({
+                addressId,
                 volunteerId: volunteerId, // Use the Volunteer model ID, not the user ID
                 assignedAt: new Date().toISOString(),
                 status: 'NOT_STARTED'
@@ -876,7 +875,7 @@ export default function Organize() {
             )
 
             alert(`Assigned ${selectedHomes.size} homes successfully`)
-            setSelectedHomes(new Set())
+            setSelectedAddresses(new Set())
             setAssignToVolunteer('')
             // Don't call loadData() - we've updated the state directly
         } catch (error) {
@@ -1001,7 +1000,7 @@ export default function Organize() {
                     borderRadius: 8
                 }}>
                     <div>
-                        <strong>{selectedHomes.size}</strong> homes selected
+                        <strong>{selectedAddresses.size}</strong> addresses selected
                     </div>
                     
                     <button
@@ -1015,7 +1014,7 @@ export default function Organize() {
                             cursor: 'pointer'
                         }}
                     >
-                        Select All ({homes.length})
+                        Select All ({addresses.length})
                     </button>
                     
                     <button
@@ -1047,30 +1046,30 @@ export default function Organize() {
                         </select>
                         
                         <button
-                            onClick={assignSelectedHomes}
-                            disabled={selectedHomes.size === 0 || !assignToVolunteer}
+                            onClick={assignSelectedAddresses}
+                            disabled={selectedAddresses.size === 0 || !assignToVolunteer}
                             style={{
-                                backgroundColor: selectedHomes.size > 0 && assignToVolunteer ? '#28a745' : '#6c757d',
+                                backgroundColor: selectedAddresses.size > 0 && assignToVolunteer ? '#28a745' : '#6c757d',
                                 color: 'white',
                                 border: 'none',
                                 padding: '8px 16px',
                                 borderRadius: 4,
-                                cursor: selectedHomes.size > 0 && assignToVolunteer ? 'pointer' : 'not-allowed'
+                                cursor: selectedAddresses.size > 0 && assignToVolunteer ? 'pointer' : 'not-allowed'
                             }}
                         >
                             Assign Selected
                         </button>
                         
                         <button
-                            onClick={unassignSelectedHomes}
-                            disabled={selectedHomes.size === 0}
+                            onClick={unassignSelectedAddresses}
+                            disabled={selectedAddresses.size === 0}
                             style={{
-                                backgroundColor: selectedHomes.size > 0 ? '#dc3545' : '#6c757d',
+                                backgroundColor: selectedAddresses.size > 0 ? '#dc3545' : '#6c757d',
                                 color: 'white',
                                 border: 'none',
                                 padding: '8px 16px',
                                 borderRadius: 4,
-                                cursor: selectedHomes.size > 0 ? 'pointer' : 'not-allowed'
+                                cursor: selectedAddresses.size > 0 ? 'pointer' : 'not-allowed'
                             }}
                         >
                             Unassign Selected
@@ -1085,10 +1084,10 @@ export default function Organize() {
                             const filters = []
                             if (searchTerm.trim()) filters.push(`address: "${searchTerm}"`)
                             if (residentFilter.trim()) filters.push(`resident: "${residentFilter}"`)
-                            return `Showing ${homes.length} homes on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Found ${totalCount} matches for ${filters.join(' and ')})`
+                            return `Showing ${addresses.length} addresses on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Found ${totalCount} matches for ${filters.join(' and ')})`
                         })()
                     ) : (
-                        `Showing ${homes.length} homes on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Total: ${totalCount} homes with residents)`
+                        `Showing ${addresses.length} addresses on page ${currentPage} of ${Math.ceil(totalCount / pageSize)} (Total: ${totalCount} addresses with residents)`
                     )}
                 </div>
 
@@ -1100,8 +1099,8 @@ export default function Organize() {
                                 <th style={{border: '1px solid #ddd', padding: 8, width: 40}}>
                                     <input
                                         type="checkbox"
-                                        checked={homes.length > 0 && selectedHomes.size === homes.length}
-                                        onChange={() => selectedHomes.size === homes.length ? clearSelection() : selectAll()}
+                                        checked={addresses.length > 0 && selectedAddresses.size === addresses.length}
+                                        onChange={() => selectedAddresses.size === addresses.length ? clearSelection() : selectAll()}
                                     />
                                 </th>
                                 <th 
@@ -1142,30 +1141,30 @@ export default function Organize() {
                                         textAlign: 'center',
                                         color: '#666'
                                     }}>
-                                        Loading homes...
+                                        Loading addresses...
                                     </td>
                                 </tr>
-                            ) : homes.map(home => (
-                                <tr key={home.id} style={{backgroundColor: selectedHomes.has(home.id) ? '#e3f2fd' : 'white'}}>
+                            ) : addresses.map(address => (
+                                <tr key={address.id} style={{backgroundColor: selectedAddresses.has(address.id) ? '#e3f2fd' : 'white'}}>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedHomes.has(home.id)}
-                                            onChange={() => toggleHomeSelection(home.id)}
+                                            checked={selectedAddresses.has(address.id)}
+                                            onChange={() => toggleAddressSelection(address.id)}
                                         />
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         {/* Handle case where unitNumber and street might contain duplicate data */}
-                                        {home.unitNumber && home.street && home.unitNumber !== home.street 
-                                            ? `${home.unitNumber} ${home.street}` 
-                                            : (home.street || home.unitNumber)
+                                        {address.unitNumber && address.street && address.unitNumber !== address.street 
+                                            ? `${address.unitNumber} ${address.street}` 
+                                            : (address.street || address.unitNumber)
                                         }<br/>
                                         <span style={{fontSize: '0.9em', color: '#666'}}>
-                                            {home.city}, {home.state} {home.postalCode}
+                                            {address.city}, {address.state} {address.zip}
                                         </span>
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
-                                        {home.residents?.map((resident: any, i: number) => (
+                                        {address.residents?.map((resident: any, i: number) => (
                                             <div key={resident.id} style={{marginBottom: 4}}>
                                                 {resident.firstName} {resident.lastName}
                                                 <span style={{fontSize: '0.8em', color: resident.hasSigned ? '#28a745' : '#dc3545'}}>
@@ -1184,18 +1183,18 @@ export default function Organize() {
                                             padding: '4px 8px',
                                             borderRadius: 4,
                                             fontSize: '0.8em',
-                                            backgroundColor: home.consentStatus === 'complete' ? '#d4edda' : '#f8d7da',
-                                            color: home.consentStatus === 'complete' ? '#155724' : '#721c24'
+                                            backgroundColor: address.consentStatus === 'complete' ? '#d4edda' : '#f8d7da',
+                                            color: address.consentStatus === 'complete' ? '#155724' : '#721c24'
                                         }}>
-                                            {home.consentStatus === 'complete' ? 'Complete' : 'Incomplete'}
+                                            {address.consentStatus === 'complete' ? 'Complete' : 'Incomplete'}
                                         </span>
                                         <div style={{fontSize: '0.8em', color: '#666', marginTop: 4}}>
-                                            {home.consents.length} of {home.residents.length} signed
+                                            {address.consents.length} of {address.residents.length} signed
                                         </div>
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
-                                        {home.assignments.length > 0 ? (
-                                            home.assignments.map((assignment: any) => (
+                                        {address.assignments.length > 0 ? (
+                                            address.assignments.map((assignment: any) => (
                                                 <div key={assignment.id} style={{fontSize: '0.9em'}}>
                                                     {volunteers.find(v => v.id === assignment.volunteerId)?.displayName || 'Unknown'}
                                                     <div style={{fontSize: '0.8em', color: '#666'}}>
@@ -1209,7 +1208,7 @@ export default function Organize() {
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         <button
-                                            onClick={() => window.open(`/history?address=${encodeURIComponent(home.street)}`, '_blank')}
+                                            onClick={() => window.open(`/history?address=${encodeURIComponent(address.street)}`, '_blank')}
                                             style={{
                                                 backgroundColor: '#17a2b8',
                                                 color: 'white',
@@ -1295,9 +1294,9 @@ export default function Organize() {
                     </div>
                 )}
 
-                {homes.length === 0 && !loading && (
+                {addresses.length === 0 && !loading && (
                     <div style={{textAlign: 'center', padding: 40, color: '#666'}}>
-                        No homes match the current filters.
+                        No addresses match the current filters.
                     </div>
                 )}
             </div>
