@@ -132,8 +132,37 @@ export default function InternalHome() {
 
     async function loadOutstandingAssignments() {
         try {
-            const assignments = await client.models.Assignment.list()
-            const outstanding = assignments.data.filter(a => a.status === 'NOT_STARTED').length
+            if (!user) return
+            
+            // Get the current user's sub (unique identifier)
+            const userSub = user.username
+            
+            // Find the volunteer record for this user
+            const volunteers = await client.models.Volunteer.list({
+                filter: { userSub: { eq: userSub } }
+            })
+            
+            if (volunteers.data.length === 0) {
+                // User doesn't have a volunteer record, so no assignments
+                setOutstandingAssignments(0)
+                return
+            }
+            
+            const volunteerId = volunteers.data[0].id
+            
+            // Load assignments for this volunteer only
+            const assignments = await client.models.Assignment.list({
+                filter: { volunteerId: { eq: volunteerId } }
+            })
+            
+            // Count assignments that are NOT_STARTED
+            const notStartedAssignments = assignments.data.filter(a => a.status === 'NOT_STARTED')
+            
+            // Use unique addresses to avoid counting duplicates
+            const uniqueAddressIds = new Set(notStartedAssignments.map(a => a.addressId))
+            
+            // Use the unique address count instead of total assignment count
+            const outstanding = uniqueAddressIds.size
             setOutstandingAssignments(outstanding)
         } catch (error) {
             console.error('Failed to load outstanding assignments:', error)
