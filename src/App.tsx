@@ -8,6 +8,7 @@ import SignUp from './pages/SignUp'
 import VerifyEmail from './pages/VerifyEmail'
 import ResetPassword from './pages/ResetPassword'
 import EnrollMembers from './pages/admin/EnrollMembers'
+import ResidentsPage from './pages/admin/ResidentsPage'
 import UserProfile from './pages/UserProfile'
 import Reports from './pages/Reports'
 import CanvassingMap from './pages/CanvassingMap'
@@ -66,6 +67,13 @@ export default function App() {
             <Route path='/absentee' element={<Authenticator><AbsenteeInteractions/></Authenticator>}/>
             <Route path='/admin/enroll' element={<Authenticator><EnrollMembers/></Authenticator>}/>
             <Route path='/admin/consents' element={<Authenticator><RecordConsents/></Authenticator>}/>
+            <Route path='/admin/residents' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <ResidentsPage/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
             <Route path='/organize' element={<Authenticator><Organize/></Authenticator>}/>
             <Route path='*' element={<Navigate to='/' replace/>}/>
         </Routes>
