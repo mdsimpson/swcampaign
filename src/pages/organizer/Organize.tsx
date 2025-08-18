@@ -6,12 +6,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {fetchAuthSession} from 'aws-amplify/auth'
 import {CognitoIdentityProviderClient, ListUsersCommand, AdminListGroupsForUserCommand} from '@aws-sdk/client-cognito-identity-provider'
 import { QUERY_LIMITS, loadAllRecords, createPaginationConfig } from '../../config/queries'
-import outputs from '../../../amplify_outputs.json'
 
 // Get User Pool ID - use production ID when deployed, sandbox when local
 const USER_POOL_ID = window.location.hostname === 'swhoa.michael-simpson.com' 
     ? 'us-east-1_kAw9CKPT3'  // Production User Pool ID
-    : outputs?.auth?.user_pool_id || 'us-east-1_GrxwbZK9I'  // Sandbox User Pool ID
+    : 'us-east-1_GrxwbZK9I'  // Sandbox User Pool ID
 
 export default function Organize() {
     const location = useLocation()

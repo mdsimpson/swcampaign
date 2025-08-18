@@ -6,12 +6,11 @@ import {fetchAuthSession} from 'aws-amplify/auth'
 import { QUERY_LIMITS } from '../../config/queries'
 import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand, ListUsersCommand, AdminDeleteUserCommand, AdminGetUserCommand, AdminListGroupsForUserCommand, AdminRemoveUserFromGroupCommand} from '@aws-sdk/client-cognito-identity-provider'
 import {getCurrentUser} from 'aws-amplify/auth'
-import outputs from '../../../../amplify_outputs.json'
 
 // Get User Pool ID - use production ID when deployed, sandbox when local
 const USER_POOL_ID = window.location.hostname === 'swhoa.michael-simpson.com' 
     ? 'us-east-1_kAw9CKPT3'  // Production User Pool ID
-    : outputs?.auth?.user_pool_id || 'us-east-1_GrxwbZK9I'  // Sandbox User Pool ID
+    : 'us-east-1_GrxwbZK9I'  // Sandbox User Pool ID
 
 export default function EnrollMembers() {
     const [registrations, setRegistrations] = useState<any[]>([])
