@@ -6,6 +6,11 @@ import {fetchAuthSession} from 'aws-amplify/auth'
 import { QUERY_LIMITS } from '../../config/queries'
 import {CognitoIdentityProviderClient, AdminCreateUserCommand, AdminAddUserToGroupCommand, ListUsersCommand, AdminDeleteUserCommand, AdminGetUserCommand, AdminListGroupsForUserCommand, AdminRemoveUserFromGroupCommand} from '@aws-sdk/client-cognito-identity-provider'
 import {getCurrentUser} from 'aws-amplify/auth'
+import {Amplify} from 'aws-amplify'
+
+// Get User Pool ID from Amplify configuration at module level
+const authConfig = Amplify.getConfig().Auth
+const USER_POOL_ID = authConfig?.Cognito?.userPoolId || 'us-east-1_GrxwbZK9I'
 
 export default function EnrollMembers() {
     const [registrations, setRegistrations] = useState<any[]>([])
@@ -57,7 +62,7 @@ export default function EnrollMembers() {
                 credentials: session.credentials
             })
             
-            const userPoolId = 'us-east-1_GrxwbZK9I'
+            const userPoolId = USER_POOL_ID
             
             // Get all users from Cognito
             const listUsersResult = await cognitoClient.send(new ListUsersCommand({
@@ -150,7 +155,7 @@ export default function EnrollMembers() {
                 credentials: session.credentials
             })
             
-            const userPoolId = 'us-east-1_GrxwbZK9I'
+            const userPoolId = USER_POOL_ID
             const allRoles = ['Administrator', 'Organizer', 'Canvasser', 'Member']
             
             // Remove user from all groups first
@@ -217,7 +222,7 @@ export default function EnrollMembers() {
                 credentials: session.credentials
             })
             
-            const userPoolId = 'us-east-1_GrxwbZK9I'
+            const userPoolId = USER_POOL_ID
             
             // Delete from Cognito
             await cognitoClient.send(new AdminDeleteUserCommand({
@@ -260,7 +265,7 @@ export default function EnrollMembers() {
                 credentials: session.credentials
             })
             
-            const userPoolId = 'us-east-1_GrxwbZK9I'
+            const userPoolId = USER_POOL_ID
             
             let userSub: string | undefined
             let userAlreadyExists = false

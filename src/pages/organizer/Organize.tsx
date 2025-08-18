@@ -6,6 +6,11 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {fetchAuthSession} from 'aws-amplify/auth'
 import {CognitoIdentityProviderClient, ListUsersCommand, AdminListGroupsForUserCommand} from '@aws-sdk/client-cognito-identity-provider'
 import { QUERY_LIMITS, loadAllRecords, createPaginationConfig } from '../../config/queries'
+import {Amplify} from 'aws-amplify'
+
+// Get User Pool ID from Amplify configuration
+const authConfig = Amplify.getConfig().Auth
+const USER_POOL_ID = authConfig?.Cognito?.userPoolId || 'us-east-1_GrxwbZK9I'
 
 export default function Organize() {
     const location = useLocation()
@@ -495,7 +500,7 @@ export default function Organize() {
                         credentials: session.credentials
                     })
                     
-                    const userPoolId = 'us-east-1_GrxwbZK9I'
+                    const userPoolId = USER_POOL_ID
                     
                     // Get all users from Cognito
                     const listUsersResult = await cognitoClient.send(new ListUsersCommand({
