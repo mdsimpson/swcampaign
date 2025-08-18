@@ -14,6 +14,9 @@
     "safe-import": "tsx scripts/safe-import-homeowners.ts",
     "import:votes": "tsx scripts/import-votes.ts",
     "seed:admin": "tsx scripts/seed-admin.ts",
+    "seed:admin:production": "tsx scripts/seed-admin-production.ts",
+    "import:production": "tsx scripts/import-production-data.ts",
+    "import:production:fixed": "tsx scripts/import-production-data-fixed.ts",
     "export:backup": "tsx scripts/export-backup.ts",
     "import:homeowners:sqlite": "tsx scripts/import-homeowners-sqlite.ts"
   },
