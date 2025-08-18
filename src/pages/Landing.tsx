@@ -1,8 +1,41 @@
 import {Authenticator} from '@aws-amplify/ui-react'
 import {Link, useNavigate} from 'react-router-dom'
+import {useEffect, useState, useRef} from 'react'
+import {getCurrentUser} from 'aws-amplify/auth'
+import InternalHome from './InternalHome'
 
 export default function Landing() {
     const nav = useNavigate()
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+    const authUserRef = useRef(null)
+    
+    useEffect(() => {
+        async function checkAuth() {
+            try {
+                await getCurrentUser()
+                setIsAuthenticated(true)
+            } catch {
+                setIsAuthenticated(false)
+            }
+        }
+        checkAuth()
+    }, [])
+    
+    // Show loading while checking authentication
+    if (isAuthenticated === null) {
+        return <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh'}}>Loading...</div>
+    }
+    
+    // If user is authenticated, show the internal home page
+    if (isAuthenticated) {
+        return (
+            <Authenticator>
+                <InternalHome />
+            </Authenticator>
+        )
+    }
+    
+    // If not authenticated, show the login form
     return (
         <div style={{maxWidth: 900, margin: '40px auto', padding: 16}}>
             <div style={{textAlign: 'center'}}>
@@ -19,7 +52,15 @@ export default function Landing() {
                             signIn: {username: {label: 'Email'}}
                         }}
                     >
-                        {({user}) => nav('/')}
+                        {({user}) => {
+                            // Use useRef to avoid state updates during render
+                            if (user && !authUserRef.current) {
+                                authUserRef.current = user
+                                // Schedule state update for next tick
+                                setTimeout(() => setIsAuthenticated(true), 0)
+                            }
+                            return null
+                        }}
                     </Authenticator>
                     <p><Link to='/reset'>Forgot my password</Link></p>
                 </div>
