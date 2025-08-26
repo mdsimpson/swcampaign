@@ -231,8 +231,53 @@ export default function InternalHome() {
                         </div>
                     )}
 
+                    {/* Rules and Guidelines Section */}
+                    <div style={{backgroundColor: '#f5f5f5', border: '1px solid #ddd', borderRadius: 4, padding: 16, marginBottom: 12}}>
+                        <h4 style={{marginTop: 0, marginBottom: 12}}>Rules/Guidelines for Committee Members</h4>
+                        <ol style={{paddingLeft: 20, marginBottom: 16}}>
+                            <li style={{marginBottom: 8}}>Committee Members must conduct themselves in business-like and professional manner when conducting Association business, including being courteous and respectful to all residents.</li>
+                            <li style={{marginBottom: 8}}>Committee Members should identify themselves to residents with whom they are communicating.</li>
+                            <li style={{marginBottom: 8}}>If conducting in person efforts by going to residents' doors, Committee Members must
+                                <ol type="a" style={{paddingLeft: 20, marginTop: 4}}>
+                                    <li>Use walkways and avoid walking on any yard</li>
+                                    <li>Respect "no soliciting" signs or any other request to leave</li>
+                                    <li>Avoid confrontation; walk away if necessary</li>
+                                    <li>Report safety concerns to the Board such as any owner making threats</li>
+                                </ol>
+                            </li>
+                            <li style={{marginBottom: 8}}>Committee Members may not share any owner's personal contact information or voting status with any person outside of the Committee, Board, or management.</li>
+                        </ol>
+                        
+                        <h4 style={{marginBottom: 12}}>Committee FAQs</h4>
+                        
+                        <div style={{marginBottom: 12}}>
+                            <strong style={{fontStyle: 'italic'}}>How are Committee Members appointed?</strong>
+                            <p style={{marginTop: 4, marginBottom: 0}}>Committee Members are appointed by the President of the Committee, but may be removed by the Board.</p>
+                        </div>
+                        
+                        <div style={{marginBottom: 12}}>
+                            <strong style={{fontStyle: 'italic'}}>What do Committee Members do?</strong>
+                            <p style={{marginTop: 4, marginBottom: 0}}>Committee Members are mainly tasked with helping the Association obtain the necessary consents to terminate the Declaration and dissolve the Association. Committee Members may be asked to conduct in-person outreach or reach out to owners by phone to encourage owners to submit the consents</p>
+                        </div>
+                        
+                        <div style={{marginBottom: 12}}>
+                            <strong style={{fontStyle: 'italic'}}>Can the Committee Members share the contact information of the property owners who have not submitted consents?</strong>
+                            <p style={{marginTop: 4, marginBottom: 0}}>No. Committee Members are not permitted to publish the voting status or contact information of owners. This information is provided to Committee Members solely to aid them in determining who they still need to contact. It is not for publication or for any other use.</p>
+                        </div>
+                        
+                        <div style={{marginBottom: 12}}>
+                            <strong style={{fontStyle: 'italic'}}>Can Committee members contact the homeowners over phone and email using the HOAs contact list?</strong>
+                            <p style={{marginTop: 4, marginBottom: 0}}>Yes. If Committee Member is reaching out regarding obtaining the owners' consent then that is official Association business that the Committee Member has been tasked with carrying out. If the Committee Member is using the contact information for other purposes, that would not be authorized or permitted.</p>
+                        </div>
+                        
+                        <div style={{marginBottom: 12}}>
+                            <strong style={{fontStyle: 'italic'}}>Can the committee members share homeowners email address and phone number with their friends and neighbors to work on this effort?</strong>
+                            <p style={{marginTop: 4, marginBottom: 0}}>No, the purpose of the Committee is to deputize additional members to help share the burden of the effort to get approvals without publishing potentially private information to the entire membership. If a Committee Members neighbors or friends would like to help, they can express their interest in joining the Committee.</p>
+                        </div>
+                    </div>
+
                     {(!isCanvasser || outstandingAssignments === 0) && (!isAdmin || pendingRegistrations === 0) && (
-                        <p style={{color: '#666', fontStyle: 'italic'}}>No pending actions.</p>
+                        <p style={{color: '#666', fontStyle: 'italic'}}>No other pending actions.</p>
                     )}
                 </div>
 
