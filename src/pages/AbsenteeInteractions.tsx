@@ -378,23 +378,27 @@ export default function AbsenteeInteractions() {
                                             })()}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {address.residents?.map((resident: any, i: number) => (
+                                            {address.residents?.filter((resident: any, index: number, array: any[]) => 
+                                                array.findIndex(r => r.id === resident.id) === index
+                                            ).map((resident: any, i: number, filteredArray: any[]) => (
                                                 <div key={resident.id}>
                                                     {resident.firstName} {resident.lastName}
                                                     {resident.occupantType && ` (${resident.occupantType})`}
-                                                    {i < address.residents.length - 1 && <br/>}
+                                                    {i < filteredArray.length - 1 && <br/>}
                                                 </div>
                                             )) || 'No residents listed'}
                                         </td>
                                         <td style={{border: '1px solid #ddd', padding: 8}}>
-                                            {address.residents?.map((resident: any, i: number) => (
+                                            {address.residents?.filter((resident: any, index: number, array: any[]) => 
+                                                array.findIndex(r => r.id === resident.id) === index
+                                            ).map((resident: any, i: number, filteredArray: any[]) => (
                                                 <div key={resident.id} style={{fontSize: '0.9em'}}>
                                                     {resident.contactEmail && <div>📧 <a href={`mailto:${resident.contactEmail}`} style={{color: '#007bff', textDecoration: 'none'}}>{resident.contactEmail}</a></div>}
                                                     {resident.additionalEmail && <div>📧 <a href={`mailto:${resident.additionalEmail}`} style={{color: '#007bff', textDecoration: 'none'}}>{resident.additionalEmail}</a></div>}
                                                     {resident.cellPhone && <div>📱 {resident.cellPhone}</div>}
                                                     {resident.unitPhone && <div>📞 {resident.unitPhone}</div>}
                                                     {resident.workPhone && <div>🏢 {resident.workPhone}</div>}
-                                                    {i < address.residents.length - 1 && <br/>}
+                                                    {i < filteredArray.length - 1 && <br/>}
                                                 </div>
                                             ))}
                                         </td>

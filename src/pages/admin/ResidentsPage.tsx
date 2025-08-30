@@ -105,11 +105,15 @@ export default function ResidentsPage() {
                 addressMap.set(address.id, address)
             })
             
-            // Add address details to residents
-            const residentsWithAddresses = allResidents.map(resident => ({
-                ...resident,
-                address: addressMap.get(resident.addressId)
-            }))
+            // Add address details to residents and remove duplicates
+            const residentsWithAddresses = allResidents
+                .filter((resident, index, array) => 
+                    array.findIndex(r => r.id === resident.id) === index
+                )
+                .map(resident => ({
+                    ...resident,
+                    address: addressMap.get(resident.addressId)
+                }))
             
             // Apply filters
             let filteredResidents = residentsWithAddresses

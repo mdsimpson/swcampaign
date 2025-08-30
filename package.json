@@ -17,8 +17,12 @@
     "seed:admin:production": "tsx scripts/seed-admin-production.ts",
     "import:production": "tsx scripts/import-production-data.ts",
     "import:production:fixed": "tsx scripts/import-production-data-fixed.ts",
+    "import:production:new": "tsx scripts/import-production-new-data.ts",
     "export:backup": "tsx scripts/export-backup.ts",
-    "import:homeowners:sqlite": "tsx scripts/import-homeowners-sqlite.ts"
+    "import:homeowners:sqlite": "tsx scripts/import-homeowners-sqlite.ts",
+    "reset:import": "tsx scripts/reset-and-import-data.ts",
+    "force:delete": "tsx scripts/force-delete-all.ts",
+    "import:fresh": "tsx scripts/import-fresh-data.ts"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.0.9",
