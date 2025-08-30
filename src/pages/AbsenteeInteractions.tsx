@@ -161,8 +161,15 @@ export default function AbsenteeInteractions() {
             
             console.log(`Found ${absenteeAddressList.length} addresses with absentee residents`)
             
-            setAbsenteeAddresses(absenteeAddressList)
+            // Update total count
             setTotalCount(absenteeAddressList.length)
+            
+            // Apply pagination
+            const startIndex = (currentPage - 1) * pageSize
+            const endIndex = startIndex + pageSize
+            const currentPageAddresses = absenteeAddressList.slice(startIndex, endIndex)
+            
+            setAbsenteeAddresses(currentPageAddresses)
             
         } catch (error) {
             console.error('Failed to load absentee addresses:', error)
