@@ -204,7 +204,8 @@ export default function InternalHome() {
 
                     <div style={{display: 'flex', gap: 20, fontSize: 14}}>
                         <span>Total Addresses: {statsLoaded ? stats.totalAddresses : ''}</span>
-                        <span>Individual Consents: {statsLoaded ? stats.consentsRecorded : ''}</span>
+                        <span>Total Individuals: {statsLoaded ? stats.totalResidents : ''}</span>
+                        <span>Individual Consents: {statsLoaded ? `${stats.consentsRecorded} (${stats.totalResidents > 0 ? ((stats.consentsRecorded / stats.totalResidents) * 100).toFixed(1) : '0'}%)` : ''}</span>
                         <span>Progress to 80%: {statsLoaded ? progressToTarget.toFixed(1) + '%' : ''}</span>
                     </div>
                 </div>
