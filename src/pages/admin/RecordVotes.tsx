@@ -49,7 +49,7 @@ export default function RecordConsents() {
         }
     }
 
-    async function recordConsent(residentId: string, addressId: string) {
+    async function recordConsent(residentId: string, addressId: string, showAlert = true) {
         try {
             await client.models.Consent.create({
                 residentId,
@@ -57,18 +57,18 @@ export default function RecordConsents() {
                 recordedAt: new Date().toISOString(),
                 source: 'manual'
             })
-            
+
             await client.models.Resident.update({
                 id: residentId,
                 hasSigned: true,
                 signedAt: new Date().toISOString()
             })
-            
+
             await loadAddresses() // Refresh data
-            alert('Consent recorded successfully!')
+            if (showAlert) alert('Consent recorded successfully!')
         } catch (error) {
             console.error('Failed to record consent:', error)
-            alert('Failed to record consent')
+            if (showAlert) alert('Failed to record consent')
         }
     }
 
@@ -96,7 +96,7 @@ export default function RecordConsents() {
                 const resident = residents.data[0]
 
                 if (!resident.hasSigned) {
-                    await recordConsent(resident.id, resident.addressId!)
+                    await recordConsent(resident.id, resident.addressId!, false)
                     newRecords++
                 }
             } else {
