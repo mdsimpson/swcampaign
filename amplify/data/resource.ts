@@ -37,7 +37,8 @@ const schema = a.schema({
     ]),
 
     Resident: a.model({
-        externalId: a.string(), // Original ID from CSV
+        personId: a.string(), // Person ID from CSV (person_id column)
+        externalId: a.string(), // Original ID from CSV (deprecated)
         addressId: a.id().required(),
         address: a.belongsTo('Address','addressId'),
         firstName: a.string(),

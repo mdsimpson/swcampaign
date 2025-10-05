@@ -1,0 +1,499 @@
+[
+  {
+    "residentId": "141",
+    "firstName": "Anu",
+    "lastName": "Tamang",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "142",
+    "firstName": "Austin",
+    "lastName": "Harley",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "185",
+    "firstName": "Meenakshi",
+    "lastName": "Marimuthu",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "224",
+    "firstName": "Brandon",
+    "lastName": "Smith",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "225",
+    "firstName": "Tonya",
+    "lastName": "Smith",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "316",
+    "firstName": "Christopher",
+    "lastName": "Sawyer",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "317",
+    "firstName": "Hannah",
+    "lastName": "Sawyer",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "403",
+    "firstName": "David",
+    "lastName": "Belgin",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "404",
+    "firstName": "Catherine",
+    "lastName": "Belgin",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "422",
+    "firstName": "Deanna",
+    "lastName": "DiGiovanna",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "448",
+    "firstName": "Devaki",
+    "lastName": "Chebolu",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "449",
+    "firstName": "Bala",
+    "lastName": "Chebolu",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "473",
+    "firstName": "Dominic",
+    "lastName": "Donatella",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "474",
+    "firstName": "Kimberly",
+    "lastName": "Donatella",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "583",
+    "firstName": "Gang",
+    "lastName": "Chen",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "584",
+    "firstName": "Hong",
+    "lastName": "Liu",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "651",
+    "firstName": "Harshit",
+    "lastName": "Thaker",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "652",
+    "firstName": "Kinnari",
+    "lastName": "Thaker",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "693",
+    "firstName": "Ingrid",
+    "lastName": "Davis",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "733",
+    "firstName": "Janelle",
+    "lastName": "Lindstrom",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "751",
+    "firstName": "Jaya",
+    "lastName": "Atluri",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "752",
+    "firstName": "Srikanth",
+    "lastName": "Saladi",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "781",
+    "firstName": "Jennifer",
+    "lastName": "Gladwin",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "860",
+    "firstName": "Jose",
+    "lastName": "Simonelli",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "861",
+    "firstName": "Nicole",
+    "lastName": "Simonelli",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "872",
+    "firstName": "Joseph",
+    "lastName": "Hoban",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "873",
+    "firstName": "Amanda",
+    "lastName": "Hoban",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "952",
+    "firstName": "Kevin",
+    "lastName": "Winter",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "953",
+    "firstName": "grace",
+    "lastName": "Winter",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "980",
+    "firstName": "Krishna",
+    "lastName": "Chakravadhanula",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "981",
+    "firstName": "Uma",
+    "lastName": "Burugula",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1094",
+    "firstName": "Mark",
+    "lastName": "Kelly",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1095",
+    "firstName": "Gaynor",
+    "lastName": "Kelly",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1165",
+    "firstName": "Michael",
+    "lastName": "O'Brien",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1166",
+    "firstName": "Caren",
+    "lastName": "O'Brien",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1179",
+    "firstName": "Michael",
+    "lastName": "Schubert TR",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1180",
+    "firstName": "Lynette",
+    "lastName": "Schubert TR",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1185",
+    "firstName": "Michael",
+    "lastName": "Dearden",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1229",
+    "firstName": "Fadwa",
+    "lastName": "Bennani",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1249",
+    "firstName": "Muruganandam",
+    "lastName": "Padmanabhan",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1250",
+    "firstName": "Hamsaveni",
+    "lastName": "Kothandaraman",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1265",
+    "firstName": "Nahid",
+    "lastName": "Akmal",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1266",
+    "firstName": "Sara",
+    "lastName": "Akmal",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1267",
+    "firstName": "Naji",
+    "lastName": "Abi Najm",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1272",
+    "firstName": "Nan",
+    "lastName": "Jia",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1355",
+    "firstName": "Paul",
+    "lastName": "Tran",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1356",
+    "firstName": "Anne",
+    "lastName": "Tran",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1381",
+    "firstName": "Prakash",
+    "lastName": "Patel",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1382",
+    "firstName": "Uma",
+    "lastName": "Patel",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1474",
+    "firstName": "Ravindra",
+    "lastName": "Mudiyala",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1475",
+    "firstName": "Mamatha",
+    "lastName": "Yennam",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1495",
+    "firstName": "Richard",
+    "lastName": "Greene",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1496",
+    "firstName": "Diane",
+    "lastName": "Greene",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1624",
+    "firstName": "Scott",
+    "lastName": "Lawson",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1625",
+    "firstName": "Andrea",
+    "lastName": "Lawson",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1653",
+    "firstName": "Sharat",
+    "lastName": "Chandra",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1654",
+    "firstName": "Neha",
+    "lastName": "Yadav",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1724",
+    "firstName": "Srikanth",
+    "lastName": "Manasani",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1725",
+    "firstName": "Chithkala",
+    "lastName": "Manasani",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1799",
+    "firstName": "Yu Jin",
+    "lastName": "Seo",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1800",
+    "firstName": "Supreeth",
+    "lastName": "Shettar",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1801",
+    "firstName": "Sushmitha",
+    "lastName": "Rajappa",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1819",
+    "firstName": "Tammy",
+    "lastName": "Nguyen",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1820",
+    "firstName": "Tung",
+    "lastName": "Nguyen",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1858",
+    "firstName": "Timothy",
+    "lastName": "Weaver",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1859",
+    "firstName": "Hyunjung",
+    "lastName": "Park",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1933",
+    "firstName": "Vincent",
+    "lastName": "Iglio",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1934",
+    "firstName": "Manuela",
+    "lastName": "Iglio",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1937",
+    "firstName": "Vineet",
+    "lastName": "Maheshwari",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1938",
+    "firstName": "Anuja",
+    "lastName": "Rathi",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  },
+  {
+    "residentId": "1957",
+    "firstName": "William",
+    "lastName": "Galvin Jr",
+    "shouldBeAbsentee": false,
+    "currentIsAbsentee": true
+  }
+]

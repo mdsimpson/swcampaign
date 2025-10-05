@@ -35,20 +35,25 @@ async function graphqlRequest(query: string, variables: any = {}) {
     return result.data
 }
 
-async function getResident(id: string) {
+async function getResidentByExternalId(externalId: string) {
     const query = `
-        query GetResident($id: ID!) {
-            getResident(id: $id) {
-                id
-                addressId
-                firstName
-                lastName
-                hasSigned
+        query ListResidents($filter: ModelResidentFilterInput) {
+            listResidents(filter: $filter) {
+                items {
+                    id
+                    externalId
+                    addressId
+                    firstName
+                    lastName
+                    hasSigned
+                }
             }
         }
     `
-    const data = await graphqlRequest(query, { id })
-    return data.getResident
+    const data = await graphqlRequest(query, {
+        filter: { externalId: { eq: externalId } }
+    })
+    return data.listResidents.items.length > 0 ? data.listResidents.items[0] : null
 }
 
 async function listConsentsByResident(residentId: string) {
@@ -135,11 +140,11 @@ async function main() {
         }
 
         try {
-            // Fetch the resident to get their addressId
-            const resident = await getResident(residentId)
+            // Fetch the resident by externalId to get their database ID and addressId
+            const resident = await getResidentByExternalId(residentId)
 
             if (!resident) {
-                console.warn(`⚠️  Resident ${residentId} not found, skipping`)
+                console.warn(`⚠️  Resident with externalId ${residentId} not found, skipping`)
                 skipped++
                 continue
             }
@@ -150,23 +155,23 @@ async function main() {
                 continue
             }
 
-            // Check if consent already exists for this resident
-            const existingConsents = await listConsentsByResident(residentId)
+            // Check if consent already exists for this resident (use database ID)
+            const existingConsents = await listConsentsByResident(resident.id)
 
             if (existingConsents && existingConsents.length > 0) {
-                console.log(`ℹ️  Consent already exists for resident ${residentId} (${row.resident_first_name} ${row.resident_last_name}), skipping`)
+                console.log(`ℹ️  Consent already exists for resident externalId ${residentId} (${row.resident_first_name} ${row.resident_last_name}), skipping`)
                 skipped++
                 continue
             }
 
-            // Create the consent record
-            await createConsent(residentId, resident.addressId)
+            // Create the consent record (use database ID, not externalId)
+            await createConsent(resident.id, resident.addressId)
 
-            // Update the resident record to mark as signed
-            await updateResident(residentId)
+            // Update the resident record to mark as signed (use database ID, not externalId)
+            await updateResident(resident.id)
 
             created++
-            console.log(`✅ Created consent for resident ${residentId} (${row.resident_first_name} ${row.resident_last_name})`)
+            console.log(`✅ Created consent for resident externalId ${residentId} (DB ID: ${resident.id}) - ${row.resident_first_name} ${row.resident_last_name}`)
 
         } catch (err) {
             console.error(`❌ Error processing resident ${residentId}:`, err)

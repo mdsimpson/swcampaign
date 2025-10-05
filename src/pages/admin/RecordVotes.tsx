@@ -85,12 +85,12 @@ export default function RecordConsents() {
         let notFound = 0
 
         for (const line of lines) {
-            const [id] = line.split(',').map(s => s.trim())
-            if (!id) continue
+            const [personId] = line.split(',').map(s => s.trim())
+            if (!personId) continue
 
-            // Find resident by externalId
+            // Find resident by personId
             const residents = await client.models.Resident.list({
-                filter: { externalId: { eq: id } }
+                filter: { personId: { eq: personId } }
             })
 
             if (residents.data.length > 0) {
@@ -159,7 +159,7 @@ export default function RecordConsents() {
 
                 <div>
                     <h3>Bulk Upload Consents (CSV)</h3>
-                    <p>CSV format: id (matched to externalId), other columns ignored</p>
+                    <p>CSV format: first column must be person_id (matches personId field in database)</p>
                     <input 
                         type='file'
                         accept='.csv'
