@@ -163,6 +163,87 @@ export default function RecordConsents() {
         }
     }
 
+    async function removeDuplicateConsents() {
+        if (!confirm('⚠️ This will remove duplicate consent records, keeping only one per resident. Continue?')) {
+            return
+        }
+
+        try {
+            setUploadStatus('Loading all consents...')
+            setUploadProgress({ current: 0, total: 0 })
+
+            // Load all consents
+            let allConsents: any[] = []
+            let nextToken = null
+            do {
+                const result = await client.models.Consent.list({ limit: 1000, nextToken: nextToken })
+                allConsents.push(...result.data)
+                nextToken = result.nextToken
+            } while (nextToken)
+
+            setUploadStatus(`Analyzing ${allConsents.length} consents...`)
+
+            // Group by residentId
+            const consentsByResident = new Map<string, any[]>()
+            for (const consent of allConsents) {
+                const residentId = consent.residentId
+                if (!consentsByResident.has(residentId)) {
+                    consentsByResident.set(residentId, [])
+                }
+                consentsByResident.get(residentId)!.push(consent)
+            }
+
+            // Find duplicates
+            const duplicates: any[] = []
+            for (const [residentId, consents] of consentsByResident.entries()) {
+                if (consents.length > 1) {
+                    duplicates.push({ residentId, consents })
+                }
+            }
+
+            if (duplicates.length === 0) {
+                setUploadStatus('✅ No duplicates found!')
+                return
+            }
+
+            const totalToDelete = duplicates.reduce((sum, d) => sum + d.consents.length - 1, 0)
+            setUploadStatus(`Found ${duplicates.length} residents with duplicates. Removing ${totalToDelete} duplicate consents...`)
+            setUploadProgress({ current: 0, total: totalToDelete })
+
+            let deletedCount = 0
+
+            for (const { residentId, consents } of duplicates) {
+                // Sort by: prefer one with email, then by most recent createdAt
+                const sorted = consents.sort((a, b) => {
+                    if (a.email && !b.email) return -1
+                    if (!a.email && b.email) return 1
+                    if (a.createdAt && b.createdAt) {
+                        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    }
+                    return 0
+                })
+
+                // Keep the first one, delete the rest
+                const toDelete = sorted.slice(1)
+
+                for (const consent of toDelete) {
+                    await client.models.Consent.delete({ id: consent.id })
+                    deletedCount++
+                    if (deletedCount % 10 === 0) {
+                        setUploadProgress({ current: deletedCount, total: totalToDelete })
+                    }
+                }
+            }
+
+            setUploadStatus(`✅ Removed ${deletedCount} duplicate consents! Remaining: ${allConsents.length - deletedCount}`)
+            setUploadProgress({ current: 0, total: 0 })
+            await loadAddresses()
+        } catch (error) {
+            console.error('Error removing duplicates:', error)
+            setUploadStatus(`❌ Error: ${error}`)
+        }
+    }
+
     async function handleFileUpload() {
         if (!selectedFile) return
 
@@ -370,22 +451,44 @@ export default function RecordConsents() {
 
                 <div style={{marginTop: 32, paddingTop: 24, borderTop: '2px solid #ddd'}}>
                     <h3 style={{color: '#dc3545'}}>⚠️ Danger Zone</h3>
-                    <p style={{color: '#666'}}>This will delete ALL consent records and reset all residents to unsigned status.</p>
-                    <button
-                        onClick={deleteAllConsents}
-                        disabled={uploadProgress.total > 0}
-                        style={{
-                            backgroundColor: uploadProgress.total === 0 ? '#dc3545' : '#ccc',
-                            color: 'white',
-                            border: 'none',
-                            padding: '8px 16px',
-                            borderRadius: 4,
-                            cursor: uploadProgress.total === 0 ? 'pointer' : 'not-allowed',
-                            fontWeight: 'bold'
-                        }}
-                    >
-                        🗑️ Delete All Consents
-                    </button>
+
+                    <div style={{marginBottom: 16}}>
+                        <p style={{color: '#666', marginBottom: 8}}>Remove duplicate consent records (keeps one per resident with email preference):</p>
+                        <button
+                            onClick={removeDuplicateConsents}
+                            disabled={uploadProgress.total > 0}
+                            style={{
+                                backgroundColor: uploadProgress.total === 0 ? '#ffc107' : '#ccc',
+                                color: '#333',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: 4,
+                                cursor: uploadProgress.total === 0 ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            🧹 Remove Duplicate Consents
+                        </button>
+                    </div>
+
+                    <div>
+                        <p style={{color: '#666', marginBottom: 8}}>Delete ALL consent records and reset all residents to unsigned status:</p>
+                        <button
+                            onClick={deleteAllConsents}
+                            disabled={uploadProgress.total > 0}
+                            style={{
+                                backgroundColor: uploadProgress.total === 0 ? '#dc3545' : '#ccc',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: 4,
+                                cursor: uploadProgress.total === 0 ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            🗑️ Delete All Consents
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

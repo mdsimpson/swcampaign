@@ -73,7 +73,7 @@ const schema = a.schema({
     }).authorization(allow => [
         allow.groups(['Administrator']).to(['create','read','update','delete']),
         allow.groups(['Organizer']).to(['read']),
-        allow.publicApiKey().to(['create','read']) // Allow bulk import scripts
+        allow.publicApiKey().to(['create','read','update','delete']) // Allow bulk operations and cleanup scripts
     ]),
 
     Volunteer: a.model({
