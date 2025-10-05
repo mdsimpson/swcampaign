@@ -74,35 +74,38 @@ export default function RecordConsents() {
 
     async function handleFileUpload() {
         if (!selectedFile) return
-        
+
         setUploadStatus('Processing...')
         const text = await selectedFile.text()
         const lines = text.split('\n').filter(line => line.trim())
-        
+
         let processed = 0
         let newRecords = 0
-        
+        let notFound = 0
+
         for (const line of lines.slice(1)) { // Skip header
-            const [firstName, lastName, address] = line.split(',').map(s => s.trim())
-            if (!firstName || !lastName || !address) continue
-            
-            // Find matching resident
-            const matchingAddress = addresses.find(a => a.street.toLowerCase().includes(address.toLowerCase()))
-            if (matchingAddress) {
-                const matchingResident = matchingAddress.residents?.find((r: any) => 
-                    r.firstName?.toLowerCase() === firstName.toLowerCase() && 
-                    r.lastName?.toLowerCase() === lastName.toLowerCase()
-                )
-                
-                if (matchingResident && !matchingResident.hasSigned) {
-                    await recordConsent(matchingResident.id, matchingAddress.id)
+            const [id] = line.split(',').map(s => s.trim())
+            if (!id) continue
+
+            // Find resident by externalId
+            const residents = await client.models.Resident.list({
+                filter: { externalId: { eq: id } }
+            })
+
+            if (residents.data.length > 0) {
+                const resident = residents.data[0]
+
+                if (!resident.hasSigned) {
+                    await recordConsent(resident.id, resident.addressId!)
                     newRecords++
                 }
+            } else {
+                notFound++
             }
             processed++
         }
-        
-        setUploadStatus(`Processed ${processed} entries, ${newRecords} new consents recorded.`)
+
+        setUploadStatus(`Processed ${processed} entries, ${newRecords} new consents recorded, ${notFound} not found.`)
         setSelectedFile(null)
     }
 
@@ -153,7 +156,7 @@ export default function RecordConsents() {
 
                 <div>
                     <h3>Bulk Upload Consents (CSV)</h3>
-                    <p>CSV format: FirstName, LastName, Address</p>
+                    <p>CSV format: id (matched to externalId), other columns ignored</p>
                     <input 
                         type='file'
                         accept='.csv'
