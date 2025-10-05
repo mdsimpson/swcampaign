@@ -7,9 +7,7 @@ export default function RecordConsents() {
     const [searchTerm, setSearchTerm] = useState('')
     const [addresses, setAddresses] = useState<any[]>([])
     
-    const client = generateClient<Schema>({
-        authMode: 'apiKey'
-    })
+    const client = generateClient<Schema>()
     const [filteredAddresses, setFilteredAddresses] = useState<any[]>([])
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploadStatus, setUploadStatus] = useState('')
