@@ -15,15 +15,37 @@ export default function DataManagement() {
     async function getStats() {
         setStatus('Loading statistics...')
         try {
-            const [residents, addresses, consents] = await Promise.all([
-                client.models.Resident.list({ limit: 1000 }),
-                client.models.Address.list({ limit: 1000 }),
-                client.models.Consent.list({ limit: 1000 })
-            ])
+            // Count residents with pagination
+            let residentCount = 0
+            let residentsToken = null
+            do {
+                const result = await client.models.Resident.list({ limit: 1000, nextToken: residentsToken })
+                residentCount += result.data.length
+                residentsToken = result.nextToken
+            } while (residentsToken)
+
+            // Count addresses with pagination
+            let addressCount = 0
+            let addressesToken = null
+            do {
+                const result = await client.models.Address.list({ limit: 1000, nextToken: addressesToken })
+                addressCount += result.data.length
+                addressesToken = result.nextToken
+            } while (addressesToken)
+
+            // Count consents with pagination
+            let consentCount = 0
+            let consentsToken = null
+            do {
+                const result = await client.models.Consent.list({ limit: 1000, nextToken: consentsToken })
+                consentCount += result.data.length
+                consentsToken = result.nextToken
+            } while (consentsToken)
+
             setStats({
-                residents: residents.data.length,
-                addresses: addresses.data.length,
-                consents: consents.data.length
+                residents: residentCount,
+                addresses: addressCount,
+                consents: consentCount
             })
             setStatus('Statistics loaded')
         } catch (error) {
