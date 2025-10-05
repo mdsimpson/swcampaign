@@ -296,6 +296,8 @@ export default function RecordConsents() {
         let alreadySigned = 0
         let emailsUpdated = 0
         let notFound = 0
+        let skippedMissingData = 0
+        let skippedDuplicates = 0
         const errors: string[] = []
         const processedInThisUpload = new Set<string>() // Track processed residents in this upload
 
@@ -308,7 +310,11 @@ export default function RecordConsents() {
             const email = row.resident_email?.trim() || row.expanded_email?.trim() // Capture email from CSV
 
             if (!firstName || !lastName || !street) {
+                skippedMissingData++
                 processed++
+                if (skippedMissingData <= 5) {
+                    console.log(`   ⚠️  SKIPPED (missing data): firstName="${firstName}", lastName="${lastName}", street="${street}"`)
+                }
                 continue
             }
 
@@ -342,7 +348,8 @@ export default function RecordConsents() {
                 if (foundResident) {
                     // Skip if we already processed this resident in this upload session
                     if (processedInThisUpload.has(foundResident.id)) {
-                        if (processed < 10) {
+                        skippedDuplicates++
+                        if (skippedDuplicates <= 10) {
                             console.log(`   ⏭️  SKIPPED (duplicate in CSV): ${firstName} ${lastName}`)
                         }
                         processed++
@@ -398,14 +405,40 @@ export default function RecordConsents() {
         }
 
         await loadAddresses() // Refresh the data
-        setUploadStatus(`Processed ${processed} entries: ${newRecords} new consents, ${alreadySigned} already signed${emailsUpdated > 0 ? ` (${emailsUpdated} emails updated)` : ''}, ${notFound} not found.`)
+
+        // Build detailed status message
+        const statusParts = [
+            `${rows.length} rows in CSV`,
+            `${newRecords} new consents created`,
+            `${alreadySigned} already signed${emailsUpdated > 0 ? ` (${emailsUpdated} emails updated)` : ''}`,
+            `${notFound} not found in DB`,
+            `${skippedDuplicates} duplicates in CSV`,
+            `${skippedMissingData} missing data`
+        ]
+
+        const finalStatus = `✅ ${statusParts.join(' | ')}`
+        setUploadStatus(finalStatus)
         setUploadProgress({ current: 0, total: 0 })
         setSelectedFile(null)
 
+        console.log('\n' + '='.repeat(80))
+        console.log('UPLOAD SUMMARY:')
+        console.log('='.repeat(80))
+        console.log(`Total rows in CSV: ${rows.length}`)
+        console.log(`New consents created: ${newRecords}`)
+        console.log(`Already signed (skipped): ${alreadySigned}`)
+        console.log(`Emails updated: ${emailsUpdated}`)
+        console.log(`Not found in database: ${notFound}`)
+        console.log(`Duplicates in CSV (skipped): ${skippedDuplicates}`)
+        console.log(`Missing data (skipped): ${skippedMissingData}`)
+        console.log('='.repeat(80))
+        console.log(`Expected total consents: ${newRecords + alreadySigned}`)
+        console.log('='.repeat(80))
+
         if (errors.length > 0 && errors.length <= 20) {
-            console.log('Not found:', errors)
+            console.log('\nNot found in database:', errors)
         } else if (errors.length > 20) {
-            console.log('Not found (first 20):', errors.slice(0, 20))
+            console.log('\nNot found in database (first 20):', errors.slice(0, 20))
             console.log(`... and ${errors.length - 20} more`)
         }
     }
