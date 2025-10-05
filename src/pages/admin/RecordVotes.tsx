@@ -4,6 +4,23 @@ import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 import Papa from 'papaparse'
 
+function normalizeStreet(street: string): string {
+    return street.toLowerCase()
+        .replace(/\bterrace\b/g, 'ter')
+        .replace(/\bcircle\b/g, 'cir')
+        .replace(/\bcourt\b/g, 'ct')
+        .replace(/\bdrive\b/g, 'dr')
+        .replace(/\bstreet\b/g, 'st')
+        .replace(/\bavenue\b/g, 'ave')
+        .replace(/\broad\b/g, 'rd')
+        .replace(/\blane\b/g, 'ln')
+        .replace(/\bsquare\b/g, 'sq')
+        .replace(/\bplace\b/g, 'pl')
+        .replace(/\bboulevard\b/g, 'blvd')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
 export default function RecordConsents() {
     const [searchTerm, setSearchTerm] = useState('')
     const [addresses, setAddresses] = useState<any[]>([])
@@ -114,11 +131,20 @@ export default function RecordConsents() {
                     }
                 })
 
+                if (processed < 5) {
+                    console.log(`[${processed + 1}] Searching: ${firstName} ${lastName} at ${street}`)
+                    console.log(`   Found ${residents.data.length} name matches`)
+                }
+
                 // Filter by address street (client-side since we can't join in the filter)
                 let foundResident = null
+                const normalizedCsvStreet = normalizeStreet(street)
                 for (const resident of residents.data) {
                     const address = await client.models.Address.get({ id: resident.addressId! })
-                    if (address.data?.street.toLowerCase() === street.toLowerCase()) {
+                    if (processed < 5 && address.data) {
+                        console.log(`   Comparing: "${normalizedCsvStreet}" vs "${normalizeStreet(address.data.street)}"`)
+                    }
+                    if (address.data && normalizeStreet(address.data.street) === normalizedCsvStreet) {
                         foundResident = resident
                         break
                     }
@@ -133,6 +159,9 @@ export default function RecordConsents() {
                     }
                 } else {
                     notFound++
+                    if (processed < 10) {
+                        console.log(`   ❌ NOT FOUND: ${firstName} ${lastName} at ${street}`)
+                    }
                     errors.push(`${firstName} ${lastName} at ${street}`)
                 }
             } catch (err) {
