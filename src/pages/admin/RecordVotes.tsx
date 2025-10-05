@@ -89,6 +89,62 @@ export default function RecordConsents() {
         }
     }
 
+    async function deleteAllConsents() {
+        if (!confirm('⚠️ WARNING: This will DELETE ALL consents and reset all residents to unsigned. Are you sure?')) {
+            return
+        }
+
+        try {
+            setUploadStatus('Deleting all consents...')
+            setUploadProgress({ current: 0, total: 0 })
+
+            // Delete all consents
+            let consentsNextToken = null
+            let deletedCount = 0
+            do {
+                const consents = await client.models.Consent.list({ limit: 100, nextToken: consentsNextToken })
+                for (const consent of consents.data) {
+                    await client.models.Consent.delete({ id: consent.id })
+                    deletedCount++
+                    if (deletedCount % 50 === 0) {
+                        setUploadProgress({ current: deletedCount, total: deletedCount })
+                    }
+                }
+                consentsNextToken = consents.nextToken
+            } while (consentsNextToken)
+
+            setUploadStatus('Resetting resident signatures...')
+
+            // Reset all residents' hasSigned status
+            let residentsNextToken = null
+            let resetCount = 0
+            do {
+                const residents = await client.models.Resident.list({ limit: 100, nextToken: residentsNextToken })
+                for (const resident of residents.data) {
+                    if (resident.hasSigned) {
+                        await client.models.Resident.update({
+                            id: resident.id,
+                            hasSigned: false,
+                            signedAt: null
+                        })
+                        resetCount++
+                        if (resetCount % 50 === 0) {
+                            setUploadProgress({ current: resetCount, total: resetCount })
+                        }
+                    }
+                }
+                residentsNextToken = residents.nextToken
+            } while (residentsNextToken)
+
+            setUploadStatus(`✅ Deleted ${deletedCount} consents and reset ${resetCount} residents`)
+            setUploadProgress({ current: 0, total: 0 })
+            await loadAddresses()
+        } catch (error) {
+            console.error('Error deleting consents:', error)
+            setUploadStatus(`❌ Error: ${error}`)
+        }
+    }
+
     async function handleFileUpload() {
         if (!selectedFile) return
 
@@ -105,7 +161,7 @@ export default function RecordConsents() {
         setUploadProgress({ current: 0, total: rows.length })
 
         // Load ALL residents (like /organize page does)
-        setStatus('Loading all residents from database...')
+        setUploadStatus('Loading all residents from database...')
         let allResidents: any[] = []
         let residentsNextToken = null
         do {
@@ -125,7 +181,7 @@ export default function RecordConsents() {
         let notFound = 0
         const errors: string[] = []
 
-        setStatus('Processing consent records...')
+        setUploadStatus('Processing consent records...')
 
         for (const row of rows) {
             const firstName = row.resident_first_name?.trim()
@@ -290,6 +346,26 @@ export default function RecordConsents() {
                         </div>
                     )}
                     {uploadStatus && uploadProgress.total === 0 && <p style={{marginTop: 8, color: '#666'}}>{uploadStatus}</p>}
+                </div>
+
+                <div style={{marginTop: 32, paddingTop: 24, borderTop: '2px solid #ddd'}}>
+                    <h3 style={{color: '#dc3545'}}>⚠️ Danger Zone</h3>
+                    <p style={{color: '#666'}}>This will delete ALL consent records and reset all residents to unsigned status.</p>
+                    <button
+                        onClick={deleteAllConsents}
+                        disabled={uploadProgress.total > 0}
+                        style={{
+                            backgroundColor: uploadProgress.total === 0 ? '#dc3545' : '#ccc',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: 4,
+                            cursor: uploadProgress.total === 0 ? 'pointer' : 'not-allowed',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        🗑️ Delete All Consents
+                    </button>
                 </div>
             </div>
         </div>
