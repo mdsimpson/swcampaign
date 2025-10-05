@@ -104,6 +104,15 @@ export default function RecordConsents() {
         const rows = parsed.data as any[]
         setUploadProgress({ current: 0, total: rows.length })
 
+        // DEBUG: Show sample residents from database
+        const sampleResidents = await client.models.Resident.list({ limit: 5 })
+        console.log('=== SAMPLE RESIDENTS IN DATABASE ===')
+        for (const r of sampleResidents.data) {
+            console.log(`"${r.firstName}" "${r.lastName}" (ID: ${r.id})`)
+        }
+        console.log('=== END SAMPLE ===')
+        console.log('')
+
         let processed = 0
         let newRecords = 0
         let alreadySigned = 0
