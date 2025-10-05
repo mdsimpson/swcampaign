@@ -32,6 +32,8 @@
     "import:production:fixed": "tsx scripts/import-production-data-fixed.ts",
     "import:production:new": "tsx scripts/import-production-new-data.ts",
     "import:current": "tsx scripts/import-current-production.ts",
+    "delete:current": "tsx scripts/delete-current-production.ts",
+    "reset:current": "npm run delete:current && npm run import:current",
     "export:backup": "tsx scripts/export-backup.ts",
     "import:homeowners:sqlite": "tsx scripts/import-homeowners-sqlite.ts",
     "reset:import": "tsx scripts/reset-and-import-data.ts",

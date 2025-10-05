@@ -16,6 +16,7 @@ import InteractionForm from './pages/InteractionForm'
 import InteractionHistory from './pages/InteractionHistory'
 import AbsenteeInteractions from './pages/AbsenteeInteractions'
 import RecordConsents from './pages/admin/RecordVotes'
+import DataManagement from './pages/admin/DataManagement'
 import Organize from './pages/organizer/Organize'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 
@@ -71,6 +72,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <ResidentsPage/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/data' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <DataManagement/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>
