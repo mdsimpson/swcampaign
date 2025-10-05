@@ -53,7 +53,7 @@ const schema = a.schema({
         isAbsentee: a.boolean().default(false),
         hasSigned: a.boolean().default(false),
         signedAt: a.datetime(),
-        consents: a.hasMany('Consent','residentId'),
+        consent: a.hasOne('Consent','residentId'), // Changed to hasOne - each resident can only sign once
     }).authorization(allow => [
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
@@ -68,7 +68,7 @@ const schema = a.schema({
         address: a.belongsTo('Address','addressId'),
         recordedBy: a.string(),
         recordedAt: a.datetime().required(),
-        source: a.string(), // manual | bulk-upload
+        source: a.string(), // manual | bulk-upload | csv-upload
     }).authorization(allow => [
         allow.groups(['Administrator']).to(['create','read','update','delete']),
         allow.groups(['Organizer']).to(['read']),
