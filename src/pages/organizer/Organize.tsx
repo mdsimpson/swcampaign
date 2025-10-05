@@ -1131,6 +1131,7 @@ export default function Organize() {
                                     Address {sortField === 'street' && (sortDirection === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Residents</th>
+                                <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Person ID</th>
                                 <th 
                                     style={{
                                         border: '1px solid #ddd', 
@@ -1150,7 +1151,7 @@ export default function Organize() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} style={{
+                                    <td colSpan={7} style={{
                                         border: '1px solid #ddd', 
                                         padding: 40, 
                                         textAlign: 'center',
@@ -1206,6 +1207,13 @@ export default function Organize() {
                                                 )}
                                             </div>
                                         )) || 'No residents'}
+                                    </td>
+                                    <td style={{border: '1px solid #ddd', padding: 8}}>
+                                        {address.residents?.map((resident: any, i: number) => (
+                                            <div key={resident.id} style={{marginBottom: 4, fontSize: '0.9em', color: '#666'}}>
+                                                {resident.externalId || '-'}
+                                            </div>
+                                        )) || '-'}
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         <span style={{
