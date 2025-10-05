@@ -57,7 +57,7 @@ const schema = a.schema({
         allow.groups(['Administrator','Organizer']).to(['create','read','update','delete']),
         allow.groups(['Canvasser']).to(['read','update']),
         allow.groups(['Member']).to(['read']),
-        allow.publicApiKey().to(['create','read','update','delete']) // Allow import scripts and bulk operations
+        allow.publicApiKey().to(['create','read','update','delete']) // Allow import scripts, bulk operations, and consent uploads
     ]),
 
     Consent: a.model({
