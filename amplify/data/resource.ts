@@ -69,6 +69,7 @@ const schema = a.schema({
         recordedBy: a.string(),
         recordedAt: a.datetime().required(),
         source: a.string(), // manual | bulk-upload | csv-upload
+        email: a.string(), // Email from consent CSV upload (resident_email or expanded_email)
     }).authorization(allow => [
         allow.groups(['Administrator']).to(['create','read','update','delete']),
         allow.groups(['Organizer']).to(['read']),

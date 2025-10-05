@@ -366,22 +366,25 @@ export default function CanvassingMap() {
             // Get residents from ALL address records with this address
             const allResidentsForAddress = allResidents.filter(r => sameAddressIds.includes(r.addressId))
             
-            // Add consent status to each resident
+            // Add consent status and email to each resident
             const residentsWithConsents = allResidentsForAddress.map(resident => {
-                const hasConsentById = allConsents.some(consent => 
+                const consentById = allConsents.find(consent =>
                     consent.residentId === resident.id
                 )
-                
-                const hasConsentByName = allConsents.some(consent => 
+
+                const consentByName = allConsents.find(consent =>
                     sameAddressIds.includes(consent.addressId) &&
-                    consent.signerName && 
+                    consent.signerName &&
                     consent.signerName.toLowerCase().includes(resident.firstName?.toLowerCase()) &&
                     consent.signerName.toLowerCase().includes(resident.lastName?.toLowerCase())
                 )
-                
+
+                const consent = consentById || consentByName
+
                 return {
                     ...resident,
-                    hasSigned: hasConsentById || hasConsentByName
+                    hasSigned: !!consent,
+                    consentEmail: consent?.email || null
                 }
             })
             
@@ -460,6 +463,70 @@ export default function CanvassingMap() {
         }
     }
 
+    function exportToCSV() {
+        // Create CSV header
+        const headers = ['Address', 'City', 'State', 'Zip', 'First Name', 'Last Name', 'Signed', 'Email']
+        const rows = [headers]
+
+        // Add data rows - one row per resident
+        displayAddresses.forEach(address => {
+            const residents = address.residents || []
+
+            if (residents.length === 0) {
+                // If no residents, add one row with address info only
+                rows.push([
+                    address.street || '',
+                    address.city || '',
+                    address.state || '',
+                    address.zip || '',
+                    '',
+                    '',
+                    'No',
+                    ''
+                ])
+            } else {
+                // Add one row per resident
+                residents.forEach((resident: any) => {
+                    rows.push([
+                        address.street || '',
+                        address.city || '',
+                        address.state || '',
+                        address.zip || '',
+                        resident.firstName || '',
+                        resident.lastName || '',
+                        resident.hasSigned ? 'Yes' : 'No',
+                        resident.consentEmail || ''
+                    ])
+                })
+            }
+        })
+
+        // Convert to CSV string
+        const csvContent = rows.map(row =>
+            row.map(cell => {
+                // Escape quotes and wrap in quotes if contains comma, quote, or newline
+                const cellStr = String(cell)
+                if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                    return `"${cellStr.replace(/"/g, '""')}"`
+                }
+                return cellStr
+            }).join(',')
+        ).join('\n')
+
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+
+        link.setAttribute('href', url)
+        link.setAttribute('download', `canvassing-export-${new Date().toISOString().split('T')[0]}.csv`)
+        link.style.visibility = 'hidden'
+
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
 
     function handleAddressClick(address: any) {
         // Toggle selection - if clicking the same address, close the info window
@@ -514,6 +581,20 @@ export default function CanvassingMap() {
                             }}
                         >
                             Reload Data
+                        </button>
+                        <button
+                            onClick={exportToCSV}
+                            disabled={displayAddresses.length === 0}
+                            style={{
+                                backgroundColor: displayAddresses.length > 0 ? '#28a745' : '#6c757d',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: 4,
+                                cursor: displayAddresses.length > 0 ? 'pointer' : 'not-allowed'
+                            }}
+                        >
+                            📥 Export to CSV
                         </button>
                         <label style={{display: 'flex', alignItems: 'center', gap: 8, opacity: toggleLoading ? 0.6 : 1}}>
                             <input

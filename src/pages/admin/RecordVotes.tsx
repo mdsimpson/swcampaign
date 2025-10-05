@@ -66,14 +66,32 @@ export default function RecordConsents() {
         }
     }
 
-    async function recordConsent(residentId: string, addressId: string, showAlert = true) {
+    async function recordConsent(residentId: string, addressId: string, showAlert = true, email?: string, source = 'manual') {
         try {
-            await client.models.Consent.create({
-                residentId,
-                addressId,
-                recordedAt: new Date().toISOString(),
-                source: 'manual'
+            // Check if consent already exists (idempotent)
+            const existingConsents = await client.models.Consent.list({
+                filter: { residentId: { eq: residentId } }
             })
+
+            if (existingConsents.data.length === 0) {
+                // Create new consent
+                await client.models.Consent.create({
+                    residentId,
+                    addressId,
+                    recordedAt: new Date().toISOString(),
+                    source: source,
+                    email: email || null
+                })
+            } else {
+                // Update existing consent with email if provided
+                const existingConsent = existingConsents.data[0]
+                if (email && !existingConsent.email) {
+                    await client.models.Consent.update({
+                        id: existingConsent.id,
+                        email: email
+                    })
+                }
+            }
 
             await client.models.Resident.update({
                 id: residentId,
@@ -187,6 +205,7 @@ export default function RecordConsents() {
             const firstName = row.resident_first_name?.trim()
             const lastName = row.resident_last_name?.trim()
             const street = row.resident_street?.trim() || row.expanded_street?.trim()
+            const email = row.resident_email?.trim() || row.expanded_email?.trim() // Capture email from CSV
 
             if (!firstName || !lastName || !street) {
                 processed++
@@ -221,10 +240,11 @@ export default function RecordConsents() {
                 }
 
                 if (foundResident) {
+                    // Always call recordConsent to update email if needed (idempotent)
+                    await recordConsent(foundResident.id, foundResident.addressId!, false, email, 'csv-upload')
                     if (foundResident.hasSigned) {
                         alreadySigned++
                     } else {
-                        await recordConsent(foundResident.id, foundResident.addressId!, false)
                         newRecords++
                     }
                 } else {

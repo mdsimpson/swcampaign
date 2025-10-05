@@ -147,6 +147,7 @@ type Consent @model {
   recordedBy: String
   recordedAt: AWSDateTime!
   source: String
+  email: String
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
 }
@@ -348,6 +349,7 @@ input CreateConsentInput {
   recordedBy: String
   recordedAt: AWSDateTime!
   source: String
+  email: String
 }
 
 input CreateVolunteerInput {
@@ -439,6 +441,7 @@ input UpdateConsentInput {
   recordedBy: String
   recordedAt: AWSDateTime
   source: String
+  email: String
 }
 
 input UpdateVolunteerInput {
