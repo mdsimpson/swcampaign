@@ -13,6 +13,7 @@ export default function RecordConsents() {
     const [filteredAddresses, setFilteredAddresses] = useState<any[]>([])
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploadStatus, setUploadStatus] = useState('')
+    const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
 
     useEffect(() => {
         loadAddresses()
@@ -77,13 +78,15 @@ export default function RecordConsents() {
 
         setUploadStatus('Processing...')
         const text = await selectedFile.text()
-        const lines = text.split('\n').filter(line => line.trim())
+        const lines = text.split('\n').filter(line => line.trim()).slice(1) // Skip header
+
+        setUploadProgress({ current: 0, total: lines.length })
 
         let processed = 0
         let newRecords = 0
         let notFound = 0
 
-        for (const line of lines.slice(1)) { // Skip header
+        for (const line of lines) {
             const [id] = line.split(',').map(s => s.trim())
             if (!id) continue
 
@@ -103,9 +106,11 @@ export default function RecordConsents() {
                 notFound++
             }
             processed++
+            setUploadProgress({ current: processed, total: lines.length })
         }
 
         setUploadStatus(`Processed ${processed} entries, ${newRecords} new consents recorded, ${notFound} not found.`)
+        setUploadProgress({ current: 0, total: 0 })
         setSelectedFile(null)
     }
 
@@ -163,11 +168,11 @@ export default function RecordConsents() {
                         onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                         style={{marginBottom: 12}}
                     />
-                    <button 
+                    <button
                         onClick={handleFileUpload}
-                        disabled={!selectedFile}
+                        disabled={!selectedFile || uploadProgress.total > 0}
                         style={{
-                            backgroundColor: selectedFile ? '#28a745' : '#ccc',
+                            backgroundColor: selectedFile && uploadProgress.total === 0 ? '#28a745' : '#ccc',
                             color: 'white',
                             border: 'none',
                             padding: '8px 16px',
@@ -177,7 +182,28 @@ export default function RecordConsents() {
                     >
                         Upload CSV
                     </button>
-                    {uploadStatus && <p style={{marginTop: 8, color: '#666'}}>{uploadStatus}</p>}
+                    {uploadProgress.total > 0 && (
+                        <div style={{marginTop: 12}}>
+                            <div style={{
+                                width: '100%',
+                                height: 24,
+                                backgroundColor: '#e0e0e0',
+                                borderRadius: 4,
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    width: `${(uploadProgress.current / uploadProgress.total) * 100}%`,
+                                    height: '100%',
+                                    backgroundColor: '#28a745',
+                                    transition: 'width 0.3s ease'
+                                }}/>
+                            </div>
+                            <p style={{marginTop: 4, color: '#666', fontSize: 14}}>
+                                Processing {uploadProgress.current} of {uploadProgress.total}
+                            </p>
+                        </div>
+                    )}
+                    {uploadStatus && uploadProgress.total === 0 && <p style={{marginTop: 8, color: '#666'}}>{uploadStatus}</p>}
                 </div>
             </div>
         </div>
