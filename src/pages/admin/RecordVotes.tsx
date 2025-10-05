@@ -274,11 +274,30 @@ export default function RecordConsents() {
 
         console.log(`=== Loaded ${allResidents.length} total residents from database ===`)
 
+        // Load existing consents to check which residents already have consents
+        setUploadStatus('Loading existing consents...')
+        let allConsents: any[] = []
+        let consentsNextToken = null
+        do {
+            const consentsResult = await client.models.Consent.list({
+                limit: 1000,
+                nextToken: consentsNextToken
+            })
+            allConsents.push(...consentsResult.data)
+            consentsNextToken = consentsResult.nextToken
+        } while (consentsNextToken)
+
+        // Create a Set of residentIds that already have consents
+        const residentsWithConsents = new Set(allConsents.map(c => c.residentId))
+        console.log(`=== Found ${residentsWithConsents.size} residents with existing consents ===`)
+
         let processed = 0
         let newRecords = 0
         let alreadySigned = 0
+        let emailsUpdated = 0
         let notFound = 0
         const errors: string[] = []
+        const processedInThisUpload = new Set<string>() // Track processed residents in this upload
 
         setUploadStatus('Processing consent records...')
 
@@ -321,11 +340,45 @@ export default function RecordConsents() {
                 }
 
                 if (foundResident) {
-                    // Always call recordConsent to update email if needed (idempotent)
-                    await recordConsent(foundResident.id, foundResident.addressId!, false, email, 'csv-upload')
-                    if (foundResident.hasSigned) {
+                    // Skip if we already processed this resident in this upload session
+                    if (processedInThisUpload.has(foundResident.id)) {
+                        if (processed < 10) {
+                            console.log(`   ⏭️  SKIPPED (duplicate in CSV): ${firstName} ${lastName}`)
+                        }
+                        processed++
+                        continue
+                    }
+
+                    // Mark as processed in this upload
+                    processedInThisUpload.add(foundResident.id)
+
+                    // Check if resident already has consent
+                    if (residentsWithConsents.has(foundResident.id)) {
+                        // Update email if needed
+                        const existingConsent = allConsents.find(c => c.residentId === foundResident.id)
+                        if (email && existingConsent && !existingConsent.email) {
+                            await client.models.Consent.update({
+                                id: existingConsent.id,
+                                email: email
+                            })
+                            emailsUpdated++
+                        }
                         alreadySigned++
                     } else {
+                        // Create new consent
+                        await client.models.Consent.create({
+                            residentId: foundResident.id,
+                            addressId: foundResident.addressId!,
+                            recordedAt: new Date().toISOString(),
+                            source: 'csv-upload',
+                            email: email || null
+                        })
+                        await client.models.Resident.update({
+                            id: foundResident.id,
+                            hasSigned: true,
+                            signedAt: new Date().toISOString()
+                        })
+                        residentsWithConsents.add(foundResident.id) // Track for this session
                         newRecords++
                     }
                 } else {
@@ -345,7 +398,7 @@ export default function RecordConsents() {
         }
 
         await loadAddresses() // Refresh the data
-        setUploadStatus(`Processed ${processed} entries, ${newRecords} new consents recorded, ${alreadySigned} already signed, ${notFound} not found.`)
+        setUploadStatus(`Processed ${processed} entries: ${newRecords} new consents, ${alreadySigned} already signed${emailsUpdated > 0 ? ` (${emailsUpdated} emails updated)` : ''}, ${notFound} not found.`)
         setUploadProgress({ current: 0, total: 0 })
         setSelectedFile(null)
 
