@@ -1,7 +1,7 @@
 // Check both endpoints to see which has data
 import fetch from 'node-fetch'
 
-const NEW_ENDPOINT = "https://bwng3ppgdfhl5cnfzv3difc4vm.appsync-api.us-east-1.amazonaws.com/graphql"
+const NEW_ENDPOINT = "https://2evbycyqcrcadnfqs2q6vpuahu.appsync-api.us-east-1.amazonaws.com/graphql"
 const OLD_ENDPOINT = "https://2evbycyqcrcadnfqs2q6vpuahu.appsync-api.us-east-1.amazonaws.com/graphql"
 const API_KEY = "da2-mgxvgdjuffbvpcz4gljvulnw4m"
 

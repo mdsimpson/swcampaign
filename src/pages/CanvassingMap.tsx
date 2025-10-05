@@ -35,7 +35,9 @@ export default function CanvassingMap() {
     const [allConsents, setAllConsents] = useState<any[]>([]) // Cache all consents
     const [hasInitialBounds, setHasInitialBounds] = useState(false) // Track if we've set initial bounds
     const [toggleLoading, setToggleLoading] = useState(false) // Track toggle loading state
-    
+    const [filterText, setFilterText] = useState('') // Text filter for addresses/names
+    const [signatureFilter, setSignatureFilter] = useState<'all' | 'none' | 'some' | 'complete'>('all') // Signature status filter
+
     const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
 
     // Calculate which addresses to display based on filters
@@ -43,25 +45,25 @@ export default function CanvassingMap() {
         if (!viewportAddresses.length) {
             return []
         }
-        
+
         let filteredAddresses
-        
+
         if (showAll) {
             // Show all addresses in viewport
             filteredAddresses = viewportAddresses
         } else {
             // Show only assigned addresses in viewport
-            filteredAddresses = viewportAddresses.filter(h => 
+            filteredAddresses = viewportAddresses.filter(h =>
                 assignments.some(a => a.addressId === h.id)
             )
         }
-        
+
         // Remove duplicates by address ID to prevent multiple markers at same location
-        const uniqueAddresses = filteredAddresses.filter((address, index, array) => 
+        const uniqueAddresses = filteredAddresses.filter((address, index, array) =>
             array.findIndex(h => h.id === address.id) === index
         )
-        
-        
+
+
         // Add assignment status to each address for consistent marker coloring
         const addressesWithAssignmentStatus = uniqueAddresses.map(addr => ({
             ...addr,
@@ -69,14 +71,59 @@ export default function CanvassingMap() {
         }))
 
         // Enrich with resident data for display (if resident data is available)
+        let enrichedAddresses
         if (allResidents.length > 0) {
-            const enrichedAddresses = enrichAddressesWithResidents(addressesWithAssignmentStatus)
-            return enrichedAddresses
+            enrichedAddresses = enrichAddressesWithResidents(addressesWithAssignmentStatus)
         } else {
             // Return basic address data if resident data not loaded yet
-            return addressesWithAssignmentStatus.map(addr => ({ ...addr, residents: [] }))
+            enrichedAddresses = addressesWithAssignmentStatus.map(addr => ({ ...addr, residents: [] }))
         }
-    }, [showAll, viewportAddresses, assignments, allResidents, allConsents])
+
+        // Apply text filter
+        if (filterText.trim()) {
+            const searchLower = filterText.toLowerCase().trim()
+            enrichedAddresses = enrichedAddresses.filter(addr => {
+                // Check address
+                const addressMatch = addr.street?.toLowerCase().includes(searchLower) ||
+                                   addr.city?.toLowerCase().includes(searchLower)
+
+                // Check resident names
+                const residentMatch = addr.residents?.some((r: any) =>
+                    r.firstName?.toLowerCase().includes(searchLower) ||
+                    r.lastName?.toLowerCase().includes(searchLower) ||
+                    `${r.firstName} ${r.lastName}`.toLowerCase().includes(searchLower)
+                )
+
+                return addressMatch || residentMatch
+            })
+        }
+
+        // Apply signature filter
+        if (signatureFilter !== 'all') {
+            enrichedAddresses = enrichedAddresses.filter(addr => {
+                const residents = addr.residents || []
+                if (residents.length === 0) {
+                    // No residents - treat as 'none'
+                    return signatureFilter === 'none'
+                }
+
+                const signedCount = residents.filter((r: any) => r.hasSigned).length
+                const totalCount = residents.length
+
+                if (signatureFilter === 'none') {
+                    return signedCount === 0
+                } else if (signatureFilter === 'some') {
+                    return signedCount > 0 && signedCount < totalCount
+                } else if (signatureFilter === 'complete') {
+                    return signedCount === totalCount
+                }
+
+                return true
+            })
+        }
+
+        return enrichedAddresses
+    }, [showAll, viewportAddresses, assignments, allResidents, allConsents, filterText, signatureFilter])
 
     useEffect(() => {
         if (user?.userId) {
@@ -390,6 +437,29 @@ export default function CanvassingMap() {
         }
     }
 
+    function getMarkerColor(address: any) {
+        // Dark purple for assigned addresses
+        if (address.isAssigned) {
+            return '#6a1b9a'
+        }
+
+        const residents = address.residents || []
+        if (residents.length === 0) {
+            return '#dc3545' // Red - no residents
+        }
+
+        const signedCount = residents.filter((r: any) => r.hasSigned).length
+        const totalCount = residents.length
+
+        if (signedCount === 0) {
+            return '#dc3545' // Red - no signatures
+        } else if (signedCount === totalCount) {
+            return '#28a745' // Green - all signed
+        } else {
+            return '#ffc107' // Yellow - some signed
+        }
+    }
+
 
     function handleAddressClick(address: any) {
         // Toggle selection - if clicking the same address, close the info window
@@ -428,8 +498,8 @@ export default function CanvassingMap() {
             <div style={{maxWidth: 1200, margin: '10px auto', padding: 12}}>
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
                     <h2>Canvassing Map</h2>
-                    <div style={{display: 'flex', gap: 8}}>
-                        <button 
+                    <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+                        <button
                             onClick={() => {
                                 console.log('Manual reload triggered')
                                 loadInitialData()
@@ -445,22 +515,98 @@ export default function CanvassingMap() {
                         >
                             Reload Data
                         </button>
-                    </div>
-                    <div>
                         <label style={{display: 'flex', alignItems: 'center', gap: 8, opacity: toggleLoading ? 0.6 : 1}}>
-                            <input 
-                                type='checkbox' 
-                                checked={showAll} 
+                            <input
+                                type='checkbox'
+                                checked={showAll}
                                 disabled={toggleLoading}
                                 onChange={(e) => handleShowAllToggle(e.target.checked)}
                             />
-                            Show All Homes (vs My Assignments Only)
+                            Show All Homes
                             {toggleLoading && (
                                 <span style={{color: '#007bff', fontSize: '12px', marginLeft: '8px'}}>
                                     🔄 Loading...
                                 </span>
                             )}
                         </label>
+                    </div>
+                </div>
+
+                {/* Filter Controls */}
+                <div style={{
+                    backgroundColor: '#f8f9fa',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    marginBottom: '16px'
+                }}>
+                    <div style={{marginBottom: '12px'}}>
+                        <label style={{display: 'block', marginBottom: '4px', fontWeight: 'bold'}}>
+                            Search Addresses or Names:
+                        </label>
+                        <input
+                            type="text"
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            placeholder="Type to filter by address or resident name..."
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                border: '1px solid #ccc',
+                                fontSize: '14px'
+                            }}
+                        />
+                    </div>
+
+                    <div>
+                        <label style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>
+                            Filter by Signature Status:
+                        </label>
+                        <div style={{display: 'flex', gap: '16px', flexWrap: 'wrap'}}>
+                            <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
+                                <input
+                                    type="radio"
+                                    name="signatureFilter"
+                                    value="all"
+                                    checked={signatureFilter === 'all'}
+                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
+                                />
+                                <span>All Addresses</span>
+                            </label>
+                            <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
+                                <input
+                                    type="radio"
+                                    name="signatureFilter"
+                                    value="none"
+                                    checked={signatureFilter === 'none'}
+                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
+                                />
+                                <span style={{color: '#dc3545'}}>⬤</span>
+                                <span>No Signatures</span>
+                            </label>
+                            <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
+                                <input
+                                    type="radio"
+                                    name="signatureFilter"
+                                    value="some"
+                                    checked={signatureFilter === 'some'}
+                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
+                                />
+                                <span style={{color: '#ffc107'}}>⬤</span>
+                                <span>Some Signatures</span>
+                            </label>
+                            <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
+                                <input
+                                    type="radio"
+                                    name="signatureFilter"
+                                    value="complete"
+                                    checked={signatureFilter === 'complete'}
+                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
+                                />
+                                <span style={{color: '#28a745'}}>⬤</span>
+                                <span>All Signatures</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -583,7 +729,7 @@ export default function CanvassingMap() {
                                     icon={{
                                         path: google.maps.SymbolPath.CIRCLE,
                                         scale: 8,
-                                        fillColor: address.isAssigned ? '#ff6b6b' : '#4ecdc4',
+                                        fillColor: getMarkerColor(address),
                                         fillOpacity: 0.8,
                                         strokeWeight: 2,
                                         strokeColor: 'white'
@@ -737,10 +883,29 @@ export default function CanvassingMap() {
 
                 <div style={{marginTop: 16, fontSize: 14, color: '#666'}}>
                     <p><strong>Legend:</strong></p>
-                    <p>🔵 Your current location</p>
-                    <p>🔴 Your assigned addresses</p>
-                    <p>🔵 Other addresses without consent forms (when "Show All" is enabled)</p>
-                    <p>Click on any address marker to record an interaction or view history.</p>
+                    <div style={{display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '8px'}}>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{color: '#4285f4', fontSize: '20px'}}>⬤</span>
+                            <span>Your current location</span>
+                        </div>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{color: '#6a1b9a', fontSize: '20px'}}>⬤</span>
+                            <span>Assigned addresses</span>
+                        </div>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{color: '#dc3545', fontSize: '20px'}}>⬤</span>
+                            <span>No signatures</span>
+                        </div>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{color: '#ffc107', fontSize: '20px'}}>⬤</span>
+                            <span>Some signatures</span>
+                        </div>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{color: '#28a745', fontSize: '20px'}}>⬤</span>
+                            <span>All signatures complete</span>
+                        </div>
+                    </div>
+                    <p style={{marginTop: '12px'}}>Click on any marker to view details, record an interaction, or view history.</p>
                 </div>
 
             </div>

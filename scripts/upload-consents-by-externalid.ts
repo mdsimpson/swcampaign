@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import { parse } from 'csv-parse/sync'
 import fetch from 'node-fetch'
 
-const GRAPHQL_ENDPOINT = "https://bwng3ppgdfhl5cnfzv3difc4vm.appsync-api.us-east-1.amazonaws.com/graphql"
+const GRAPHQL_ENDPOINT = "https://2evbycyqcrcadnfqs2q6vpuahu.appsync-api.us-east-1.amazonaws.com/graphql"
 const API_KEY = "da2-mgxvgdjuffbvpcz4gljvulnw4m"
 
 type ConsentRow = {

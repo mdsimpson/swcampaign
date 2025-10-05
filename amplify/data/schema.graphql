@@ -1,6 +1,8 @@
-# Generated GraphQL Schema from resource.ts
-# Auto-generated types and directives
+# Generated from resource.ts - for IDE/tooling support
+# This file is manually maintained to match amplify/data/resource.ts
+# Amplify auto-generates the actual schema from resource.ts
 
+# AWS Amplify directives
 directive @model(
   mutations: ModelMutationMap
   queries: ModelQueryMap
@@ -8,26 +10,16 @@ directive @model(
   timestamps: TimestampConfiguration
 ) on OBJECT
 
-directive @key(fields: [String!]!, name: String, queryField: String) on OBJECT
-
 directive @auth(rules: [AuthRule!]!) on OBJECT | FIELD_DEFINITION
-
-directive @connection(keyName: String, fields: [String!]!) on FIELD_DEFINITION
-
-directive @hasOne(keyName: String, fields: [String!]!) on FIELD_DEFINITION
-
-directive @hasMany(keyName: String, fields: [String!]!) on FIELD_DEFINITION
-
-directive @belongsTo(keyName: String, fields: [String!]!) on FIELD_DEFINITION
+directive @hasOne(fields: [String!]!) on FIELD_DEFINITION
+directive @hasMany(fields: [String!]!) on FIELD_DEFINITION
+directive @belongsTo(fields: [String!]!) on FIELD_DEFINITION
 
 input AuthRule {
   allow: AuthStrategy!
   provider: AuthProvider
   ownerField: String
-  identityClaim: String
-  groupClaim: String
   groups: [String]
-  groupsField: String
   operations: [ModelOperation]
 }
 
@@ -40,8 +32,6 @@ enum AuthStrategy {
 
 enum AuthProvider {
   apiKey
-  iam
-  oidc
   userPools
 }
 
@@ -67,13 +57,6 @@ input ModelSubscriptionMap {
   onCreate: [String]
   onUpdate: [String]
   onDelete: [String]
-  level: ModelSubscriptionLevel
-}
-
-enum ModelSubscriptionLevel {
-  off
-  public
-  on
 }
 
 input TimestampConfiguration {
@@ -81,19 +64,15 @@ input TimestampConfiguration {
   updatedAt: String
 }
 
+# Scalar types
+scalar AWSDateTime
+
 # Enums
 enum RegistrationStatus {
   SUBMITTED
   VERIFIED
   ACCEPTED
   REJECTED
-}
-
-enum PersonRole {
-  PRIMARY_OWNER
-  SECONDARY_OWNER
-  RENTER
-  OTHER
 }
 
 enum AssignmentStatus {
@@ -104,16 +83,13 @@ enum AssignmentStatus {
 }
 
 # Models
-type Registration @model @auth(rules: [
-  {allow: groups, groups: ["Administrator"], operations: [read, update, delete]},
-  {allow: public, provider: apiKey, operations: [create]}
-]) {
+type Registration @model {
   id: ID!
   email: String!
   firstName: String!
   lastName: String!
   street: String!
-  mobile: String
+  mobile: String!
   submittedAt: AWSDateTime!
   status: RegistrationStatus
   notes: String
@@ -121,64 +97,53 @@ type Registration @model @auth(rules: [
   updatedAt: AWSDateTime!
 }
 
-type Home @model @auth(rules: [
-  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
-  {allow: groups, groups: ["Canvasser"], operations: [read, update]},
-  {allow: groups, groups: ["Member"], operations: [read]},
-  {allow: public, provider: apiKey, operations: [create, read]}
-]) {
+type Address @model {
   id: ID!
-  unitNumber: String
+  externalId: String
   street: String!
   city: String!
   state: String
-  postalCode: String
-  mailingStreet: String
-  mailingCity: String
-  mailingState: String
-  mailingPostalCode: String
-  absenteeOwner: Boolean
+  zip: String
   lat: Float
   lng: Float
   notes: String
-  residents: [Person] @hasMany(fields: ["id"])
-  assignments: [Assignment] @hasMany(fields: ["id"])
-  interactions: [InteractionRecord] @hasMany(fields: ["id"])
-  consents: [Consent] @hasMany(fields: ["id"])
+  residents: [Resident!]! @hasMany
+  assignments: [Assignment!]! @hasMany
+  interactions: [InteractionRecord!]! @hasMany
+  consents: [Consent!]! @hasMany
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
 }
 
-type Person @model @auth(rules: [
-  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
-  {allow: groups, groups: ["Canvasser"], operations: [read, update]},
-  {allow: groups, groups: ["Member"], operations: [read]},
-  {allow: public, provider: apiKey, operations: [create, read]}
-]) {
+type Resident @model {
   id: ID!
-  homeId: ID!
-  home: Home @belongsTo(fields: ["homeId"])
-  role: PersonRole
+  personId: String
+  externalId: String
+  addressId: ID!
+  address: Address @belongsTo
   firstName: String
   lastName: String
-  email: String
-  mobilePhone: String
+  occupantType: String
+  contactEmail: String
+  additionalEmail: String
+  cellPhone: String
+  cellPhoneAlert: String
+  unitPhone: String
+  workPhone: String
+  isAbsentee: Boolean
   hasSigned: Boolean
   signedAt: AWSDateTime
-  consents: [Consent] @hasMany(fields: ["id"])
+  consent: Consent @hasOne
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
 }
 
-type Consent @model @auth(rules: [
-  {allow: groups, groups: ["Administrator"], operations: [create, read, update, delete]},
-  {allow: groups, groups: ["Organizer"], operations: [read]}
-]) {
+type Consent @model {
   id: ID!
-  personId: ID!
-  person: Person @belongsTo(fields: ["personId"])
-  homeId: ID!
-  home: Home @belongsTo(fields: ["homeId"])
+  residentId: ID!
+  resident: Resident @belongsTo
+  addressId: ID!
+  address: Address @belongsTo
   recordedBy: String
   recordedAt: AWSDateTime!
   source: String
@@ -186,28 +151,22 @@ type Consent @model @auth(rules: [
   updatedAt: AWSDateTime!
 }
 
-type Volunteer @model @auth(rules: [
-  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
-  {allow: owner, operations: [read]}
-]) {
+type Volunteer @model {
   id: ID!
   userSub: String!
   displayName: String
   email: String
-  assignments: [Assignment] @hasMany(fields: ["id"])
+  assignments: [Assignment!]! @hasMany
   createdAt: AWSDateTime!
   updatedAt: AWSDateTime!
 }
 
-type Assignment @model @auth(rules: [
-  {allow: groups, groups: ["Administrator", "Organizer"], operations: [create, read, update, delete]},
-  {allow: groups, groups: ["Canvasser"], operations: [create, read, update]}
-]) {
+type Assignment @model {
   id: ID!
-  homeId: ID!
-  home: Home @belongsTo(fields: ["homeId"])
+  addressId: ID!
+  address: Address @belongsTo
   volunteerId: ID!
-  volunteer: Volunteer @belongsTo(fields: ["volunteerId"])
+  volunteer: Volunteer @belongsTo
   assignedAt: AWSDateTime
   status: AssignmentStatus
   lastContactAt: AWSDateTime
@@ -216,13 +175,11 @@ type Assignment @model @auth(rules: [
   updatedAt: AWSDateTime!
 }
 
-type InteractionRecord @model @auth(rules: [
-  {allow: groups, groups: ["Administrator", "Organizer", "Canvasser"], operations: [create, read, update]}
-]) {
+type InteractionRecord @model {
   id: ID!
-  homeId: ID!
-  home: Home @belongsTo(fields: ["homeId"])
-  participantPersonIds: String
+  addressId: ID!
+  address: Address @belongsTo
+  participantResidentIds: String
   spokeToHomeowner: Boolean
   spokeToOther: Boolean
   leftFlyer: Boolean
@@ -234,10 +191,7 @@ type InteractionRecord @model @auth(rules: [
   updatedAt: AWSDateTime!
 }
 
-type UserProfile @model @auth(rules: [
-  {allow: owner, operations: [read, update]},
-  {allow: groups, groups: ["Administrator"], operations: [read, update, delete]}
-]) {
+type UserProfile @model {
   id: ID!
   sub: String!
   email: String
@@ -250,5 +204,658 @@ type UserProfile @model @auth(rules: [
   updatedAt: AWSDateTime!
 }
 
-# Scalar types
-scalar AWSDateTime
+# Query type
+type Query {
+  getRegistration(id: ID!): Registration
+  listRegistrations(filter: ModelRegistrationFilterInput, limit: Int, nextToken: String): ModelRegistrationConnection
+
+  getAddress(id: ID!): Address
+  listAddresses(filter: ModelAddressFilterInput, limit: Int, nextToken: String): ModelAddressConnection
+
+  getResident(id: ID!): Resident
+  listResidents(filter: ModelResidentFilterInput, limit: Int, nextToken: String): ModelResidentConnection
+
+  getConsent(id: ID!): Consent
+  listConsents(filter: ModelConsentFilterInput, limit: Int, nextToken: String): ModelConsentConnection
+
+  getVolunteer(id: ID!): Volunteer
+  listVolunteers(filter: ModelVolunteerFilterInput, limit: Int, nextToken: String): ModelVolunteerConnection
+
+  getAssignment(id: ID!): Assignment
+  listAssignments(filter: ModelAssignmentFilterInput, limit: Int, nextToken: String): ModelAssignmentConnection
+
+  getInteractionRecord(id: ID!): InteractionRecord
+  listInteractionRecords(filter: ModelInteractionRecordFilterInput, limit: Int, nextToken: String): ModelInteractionRecordConnection
+
+  getUserProfile(id: ID!): UserProfile
+  listUserProfiles(filter: ModelUserProfileFilterInput, limit: Int, nextToken: String): ModelUserProfileConnection
+}
+
+# Mutation type
+type Mutation {
+  createRegistration(input: CreateRegistrationInput!, condition: ModelRegistrationConditionInput): Registration
+  updateRegistration(input: UpdateRegistrationInput!, condition: ModelRegistrationConditionInput): Registration
+  deleteRegistration(input: DeleteRegistrationInput!, condition: ModelRegistrationConditionInput): Registration
+
+  createAddress(input: CreateAddressInput!, condition: ModelAddressConditionInput): Address
+  updateAddress(input: UpdateAddressInput!, condition: ModelAddressConditionInput): Address
+  deleteAddress(input: DeleteAddressInput!, condition: ModelAddressConditionInput): Address
+
+  createResident(input: CreateResidentInput!, condition: ModelResidentConditionInput): Resident
+  updateResident(input: UpdateResidentInput!, condition: ModelResidentConditionInput): Resident
+  deleteResident(input: DeleteResidentInput!, condition: ModelResidentConditionInput): Resident
+
+  createConsent(input: CreateConsentInput!, condition: ModelConsentConditionInput): Consent
+  updateConsent(input: UpdateConsentInput!, condition: ModelConsentConditionInput): Consent
+  deleteConsent(input: DeleteConsentInput!, condition: ModelConsentConditionInput): Consent
+
+  createVolunteer(input: CreateVolunteerInput!, condition: ModelVolunteerConditionInput): Volunteer
+  updateVolunteer(input: UpdateVolunteerInput!, condition: ModelVolunteerConditionInput): Volunteer
+  deleteVolunteer(input: DeleteVolunteerInput!, condition: ModelVolunteerConditionInput): Volunteer
+
+  createAssignment(input: CreateAssignmentInput!, condition: ModelAssignmentConditionInput): Assignment
+  updateAssignment(input: UpdateAssignmentInput!, condition: ModelAssignmentConditionInput): Assignment
+  deleteAssignment(input: DeleteAssignmentInput!, condition: ModelAssignmentConditionInput): Assignment
+
+  createInteractionRecord(input: CreateInteractionRecordInput!, condition: ModelInteractionRecordConditionInput): InteractionRecord
+  updateInteractionRecord(input: UpdateInteractionRecordInput!, condition: ModelInteractionRecordConditionInput): InteractionRecord
+  deleteInteractionRecord(input: DeleteInteractionRecordInput!, condition: ModelInteractionRecordConditionInput): InteractionRecord
+
+  createUserProfile(input: CreateUserProfileInput!, condition: ModelUserProfileConditionInput): UserProfile
+  updateUserProfile(input: UpdateUserProfileInput!, condition: ModelUserProfileConditionInput): UserProfile
+  deleteUserProfile(input: DeleteUserProfileInput!, condition: ModelUserProfileConditionInput): UserProfile
+}
+
+# Subscription type
+type Subscription {
+  onCreateRegistration(filter: ModelSubscriptionRegistrationFilterInput): Registration @aws_subscribe(mutations: ["createRegistration"])
+  onUpdateRegistration(filter: ModelSubscriptionRegistrationFilterInput): Registration @aws_subscribe(mutations: ["updateRegistration"])
+  onDeleteRegistration(filter: ModelSubscriptionRegistrationFilterInput): Registration @aws_subscribe(mutations: ["deleteRegistration"])
+
+  onCreateAddress(filter: ModelSubscriptionAddressFilterInput): Address @aws_subscribe(mutations: ["createAddress"])
+  onUpdateAddress(filter: ModelSubscriptionAddressFilterInput): Address @aws_subscribe(mutations: ["updateAddress"])
+  onDeleteAddress(filter: ModelSubscriptionAddressFilterInput): Address @aws_subscribe(mutations: ["deleteAddress"])
+
+  onCreateResident(filter: ModelSubscriptionResidentFilterInput): Resident @aws_subscribe(mutations: ["createResident"])
+  onUpdateResident(filter: ModelSubscriptionResidentFilterInput): Resident @aws_subscribe(mutations: ["updateResident"])
+  onDeleteResident(filter: ModelSubscriptionResidentFilterInput): Resident @aws_subscribe(mutations: ["deleteResident"])
+
+  onCreateConsent(filter: ModelSubscriptionConsentFilterInput): Consent @aws_subscribe(mutations: ["createConsent"])
+  onUpdateConsent(filter: ModelSubscriptionConsentFilterInput): Consent @aws_subscribe(mutations: ["updateConsent"])
+  onDeleteConsent(filter: ModelSubscriptionConsentFilterInput): Consent @aws_subscribe(mutations: ["deleteConsent"])
+
+  onCreateVolunteer(filter: ModelSubscriptionVolunteerFilterInput): Volunteer @aws_subscribe(mutations: ["createVolunteer"])
+  onUpdateVolunteer(filter: ModelSubscriptionVolunteerFilterInput): Volunteer @aws_subscribe(mutations: ["updateVolunteer"])
+  onDeleteVolunteer(filter: ModelSubscriptionVolunteerFilterInput): Volunteer @aws_subscribe(mutations: ["deleteVolunteer"])
+
+  onCreateAssignment(filter: ModelSubscriptionAssignmentFilterInput): Assignment @aws_subscribe(mutations: ["createAssignment"])
+  onUpdateAssignment(filter: ModelSubscriptionAssignmentFilterInput): Assignment @aws_subscribe(mutations: ["updateAssignment"])
+  onDeleteAssignment(filter: ModelSubscriptionAssignmentFilterInput): Assignment @aws_subscribe(mutations: ["deleteAssignment"])
+
+  onCreateInteractionRecord(filter: ModelSubscriptionInteractionRecordFilterInput): InteractionRecord @aws_subscribe(mutations: ["createInteractionRecord"])
+  onUpdateInteractionRecord(filter: ModelSubscriptionInteractionRecordFilterInput): InteractionRecord @aws_subscribe(mutations: ["updateInteractionRecord"])
+  onDeleteInteractionRecord(filter: ModelSubscriptionInteractionRecordFilterInput): InteractionRecord @aws_subscribe(mutations: ["deleteInteractionRecord"])
+
+  onCreateUserProfile(filter: ModelSubscriptionUserProfileFilterInput): UserProfile @aws_subscribe(mutations: ["createUserProfile"])
+  onUpdateUserProfile(filter: ModelSubscriptionUserProfileFilterInput): UserProfile @aws_subscribe(mutations: ["updateUserProfile"])
+  onDeleteUserProfile(filter: ModelSubscriptionUserProfileFilterInput): UserProfile @aws_subscribe(mutations: ["deleteUserProfile"])
+}
+
+# Input types for create operations
+input CreateRegistrationInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  street: String!
+  mobile: String!
+  submittedAt: AWSDateTime!
+  status: RegistrationStatus
+  notes: String
+}
+
+input CreateAddressInput {
+  externalId: String
+  street: String!
+  city: String!
+  state: String
+  zip: String
+  lat: Float
+  lng: Float
+  notes: String
+}
+
+input CreateResidentInput {
+  personId: String
+  externalId: String
+  addressId: ID!
+  firstName: String
+  lastName: String
+  occupantType: String
+  contactEmail: String
+  additionalEmail: String
+  cellPhone: String
+  cellPhoneAlert: String
+  unitPhone: String
+  workPhone: String
+  isAbsentee: Boolean
+  hasSigned: Boolean
+  signedAt: AWSDateTime
+}
+
+input CreateConsentInput {
+  residentId: ID!
+  addressId: ID!
+  recordedBy: String
+  recordedAt: AWSDateTime!
+  source: String
+}
+
+input CreateVolunteerInput {
+  userSub: String!
+  displayName: String
+  email: String
+}
+
+input CreateAssignmentInput {
+  addressId: ID!
+  volunteerId: ID!
+  assignedAt: AWSDateTime
+  status: AssignmentStatus
+  lastContactAt: AWSDateTime
+  notes: String
+}
+
+input CreateInteractionRecordInput {
+  addressId: ID!
+  participantResidentIds: String
+  spokeToHomeowner: Boolean
+  spokeToOther: Boolean
+  leftFlyer: Boolean
+  notes: String
+  lat: Float
+  lng: Float
+  createdAt: AWSDateTime
+  createdBy: String
+}
+
+input CreateUserProfileInput {
+  sub: String!
+  email: String
+  firstName: String
+  lastName: String
+  street: String
+  mobile: String
+  roleCache: String
+}
+
+# Input types for update operations
+input UpdateRegistrationInput {
+  id: ID!
+  email: String
+  firstName: String
+  lastName: String
+  street: String
+  mobile: String
+  submittedAt: AWSDateTime
+  status: RegistrationStatus
+  notes: String
+}
+
+input UpdateAddressInput {
+  id: ID!
+  externalId: String
+  street: String
+  city: String
+  state: String
+  zip: String
+  lat: Float
+  lng: Float
+  notes: String
+}
+
+input UpdateResidentInput {
+  id: ID!
+  personId: String
+  externalId: String
+  addressId: ID
+  firstName: String
+  lastName: String
+  occupantType: String
+  contactEmail: String
+  additionalEmail: String
+  cellPhone: String
+  cellPhoneAlert: String
+  unitPhone: String
+  workPhone: String
+  isAbsentee: Boolean
+  hasSigned: Boolean
+  signedAt: AWSDateTime
+}
+
+input UpdateConsentInput {
+  id: ID!
+  residentId: ID
+  addressId: ID
+  recordedBy: String
+  recordedAt: AWSDateTime
+  source: String
+}
+
+input UpdateVolunteerInput {
+  id: ID!
+  userSub: String
+  displayName: String
+  email: String
+}
+
+input UpdateAssignmentInput {
+  id: ID!
+  addressId: ID
+  volunteerId: ID
+  assignedAt: AWSDateTime
+  status: AssignmentStatus
+  lastContactAt: AWSDateTime
+  notes: String
+}
+
+input UpdateInteractionRecordInput {
+  id: ID!
+  addressId: ID
+  participantResidentIds: String
+  spokeToHomeowner: Boolean
+  spokeToOther: Boolean
+  leftFlyer: Boolean
+  notes: String
+  lat: Float
+  lng: Float
+  createdAt: AWSDateTime
+  createdBy: String
+}
+
+input UpdateUserProfileInput {
+  id: ID!
+  sub: String
+  email: String
+  firstName: String
+  lastName: String
+  street: String
+  mobile: String
+  roleCache: String
+}
+
+# Input types for delete operations
+input DeleteRegistrationInput {
+  id: ID!
+}
+
+input DeleteAddressInput {
+  id: ID!
+}
+
+input DeleteResidentInput {
+  id: ID!
+}
+
+input DeleteConsentInput {
+  id: ID!
+}
+
+input DeleteVolunteerInput {
+  id: ID!
+}
+
+input DeleteAssignmentInput {
+  id: ID!
+}
+
+input DeleteInteractionRecordInput {
+  id: ID!
+}
+
+input DeleteUserProfileInput {
+  id: ID!
+}
+
+# Filter input types
+input ModelRegistrationFilterInput {
+  id: ModelIDInput
+  email: ModelStringInput
+  status: ModelRegistrationStatusInput
+  and: [ModelRegistrationFilterInput]
+  or: [ModelRegistrationFilterInput]
+  not: ModelRegistrationFilterInput
+}
+
+input ModelAddressFilterInput {
+  id: ModelIDInput
+  externalId: ModelStringInput
+  street: ModelStringInput
+  city: ModelStringInput
+  and: [ModelAddressFilterInput]
+  or: [ModelAddressFilterInput]
+  not: ModelAddressFilterInput
+}
+
+input ModelResidentFilterInput {
+  id: ModelIDInput
+  personId: ModelStringInput
+  externalId: ModelStringInput
+  addressId: ModelIDInput
+  firstName: ModelStringInput
+  lastName: ModelStringInput
+  isAbsentee: ModelBooleanInput
+  hasSigned: ModelBooleanInput
+  and: [ModelResidentFilterInput]
+  or: [ModelResidentFilterInput]
+  not: ModelResidentFilterInput
+}
+
+input ModelConsentFilterInput {
+  id: ModelIDInput
+  residentId: ModelIDInput
+  addressId: ModelIDInput
+  and: [ModelConsentFilterInput]
+  or: [ModelConsentFilterInput]
+  not: ModelConsentFilterInput
+}
+
+input ModelVolunteerFilterInput {
+  id: ModelIDInput
+  userSub: ModelStringInput
+  email: ModelStringInput
+  and: [ModelVolunteerFilterInput]
+  or: [ModelVolunteerFilterInput]
+  not: ModelVolunteerFilterInput
+}
+
+input ModelAssignmentFilterInput {
+  id: ModelIDInput
+  addressId: ModelIDInput
+  volunteerId: ModelIDInput
+  status: ModelAssignmentStatusInput
+  and: [ModelAssignmentFilterInput]
+  or: [ModelAssignmentFilterInput]
+  not: ModelAssignmentFilterInput
+}
+
+input ModelInteractionRecordFilterInput {
+  id: ModelIDInput
+  addressId: ModelIDInput
+  and: [ModelInteractionRecordFilterInput]
+  or: [ModelInteractionRecordFilterInput]
+  not: ModelInteractionRecordFilterInput
+}
+
+input ModelUserProfileFilterInput {
+  id: ModelIDInput
+  sub: ModelStringInput
+  email: ModelStringInput
+  and: [ModelUserProfileFilterInput]
+  or: [ModelUserProfileFilterInput]
+  not: ModelUserProfileFilterInput
+}
+
+# Condition input types
+input ModelRegistrationConditionInput {
+  email: ModelStringInput
+  and: [ModelRegistrationConditionInput]
+  or: [ModelRegistrationConditionInput]
+  not: ModelRegistrationConditionInput
+}
+
+input ModelAddressConditionInput {
+  street: ModelStringInput
+  and: [ModelAddressConditionInput]
+  or: [ModelAddressConditionInput]
+  not: ModelAddressConditionInput
+}
+
+input ModelResidentConditionInput {
+  firstName: ModelStringInput
+  and: [ModelResidentConditionInput]
+  or: [ModelResidentConditionInput]
+  not: ModelResidentConditionInput
+}
+
+input ModelConsentConditionInput {
+  residentId: ModelIDInput
+  and: [ModelConsentConditionInput]
+  or: [ModelConsentConditionInput]
+  not: ModelConsentConditionInput
+}
+
+input ModelVolunteerConditionInput {
+  userSub: ModelStringInput
+  and: [ModelVolunteerConditionInput]
+  or: [ModelVolunteerConditionInput]
+  not: ModelVolunteerConditionInput
+}
+
+input ModelAssignmentConditionInput {
+  addressId: ModelIDInput
+  and: [ModelAssignmentConditionInput]
+  or: [ModelAssignmentConditionInput]
+  not: ModelAssignmentConditionInput
+}
+
+input ModelInteractionRecordConditionInput {
+  addressId: ModelIDInput
+  and: [ModelInteractionRecordConditionInput]
+  or: [ModelInteractionRecordConditionInput]
+  not: ModelInteractionRecordConditionInput
+}
+
+input ModelUserProfileConditionInput {
+  sub: ModelStringInput
+  and: [ModelUserProfileConditionInput]
+  or: [ModelUserProfileConditionInput]
+  not: ModelUserProfileConditionInput
+}
+
+# Subscription filter input types
+input ModelSubscriptionRegistrationFilterInput {
+  id: ModelSubscriptionIDInput
+  email: ModelSubscriptionStringInput
+  and: [ModelSubscriptionRegistrationFilterInput]
+  or: [ModelSubscriptionRegistrationFilterInput]
+}
+
+input ModelSubscriptionAddressFilterInput {
+  id: ModelSubscriptionIDInput
+  street: ModelSubscriptionStringInput
+  and: [ModelSubscriptionAddressFilterInput]
+  or: [ModelSubscriptionAddressFilterInput]
+}
+
+input ModelSubscriptionResidentFilterInput {
+  id: ModelSubscriptionIDInput
+  firstName: ModelSubscriptionStringInput
+  and: [ModelSubscriptionResidentFilterInput]
+  or: [ModelSubscriptionResidentFilterInput]
+}
+
+input ModelSubscriptionConsentFilterInput {
+  id: ModelSubscriptionIDInput
+  and: [ModelSubscriptionConsentFilterInput]
+  or: [ModelSubscriptionConsentFilterInput]
+}
+
+input ModelSubscriptionVolunteerFilterInput {
+  id: ModelSubscriptionIDInput
+  and: [ModelSubscriptionVolunteerFilterInput]
+  or: [ModelSubscriptionVolunteerFilterInput]
+}
+
+input ModelSubscriptionAssignmentFilterInput {
+  id: ModelSubscriptionIDInput
+  and: [ModelSubscriptionAssignmentFilterInput]
+  or: [ModelSubscriptionAssignmentFilterInput]
+}
+
+input ModelSubscriptionInteractionRecordFilterInput {
+  id: ModelSubscriptionIDInput
+  and: [ModelSubscriptionInteractionRecordFilterInput]
+  or: [ModelSubscriptionInteractionRecordFilterInput]
+}
+
+input ModelSubscriptionUserProfileFilterInput {
+  id: ModelSubscriptionIDInput
+  and: [ModelSubscriptionUserProfileFilterInput]
+  or: [ModelSubscriptionUserProfileFilterInput]
+}
+
+# Connection types for pagination
+type ModelRegistrationConnection {
+  items: [Registration]
+  nextToken: String
+}
+
+type ModelAddressConnection {
+  items: [Address]
+  nextToken: String
+}
+
+type ModelResidentConnection {
+  items: [Resident]
+  nextToken: String
+}
+
+type ModelConsentConnection {
+  items: [Consent]
+  nextToken: String
+}
+
+type ModelVolunteerConnection {
+  items: [Volunteer]
+  nextToken: String
+}
+
+type ModelAssignmentConnection {
+  items: [Assignment]
+  nextToken: String
+}
+
+type ModelInteractionRecordConnection {
+  items: [InteractionRecord]
+  nextToken: String
+}
+
+type ModelUserProfileConnection {
+  items: [UserProfile]
+  nextToken: String
+}
+
+# Scalar filter input types
+input ModelStringInput {
+  eq: String
+  ne: String
+  contains: String
+  notContains: String
+  beginsWith: String
+  between: [String]
+  in: [String]
+  notIn: [String]
+  attributeExists: Boolean
+}
+
+input ModelIDInput {
+  eq: ID
+  ne: ID
+  contains: ID
+  notContains: ID
+  beginsWith: ID
+  between: [ID]
+  in: [ID]
+  notIn: [ID]
+  attributeExists: Boolean
+}
+
+input ModelIntInput {
+  eq: Int
+  ne: Int
+  lt: Int
+  le: Int
+  gt: Int
+  ge: Int
+  between: [Int]
+  in: [Int]
+  notIn: [Int]
+  attributeExists: Boolean
+}
+
+input ModelFloatInput {
+  eq: Float
+  ne: Float
+  lt: Float
+  le: Float
+  gt: Float
+  ge: Float
+  between: [Float]
+  in: [Float]
+  notIn: [Float]
+  attributeExists: Boolean
+}
+
+input ModelBooleanInput {
+  eq: Boolean
+  ne: Boolean
+  attributeExists: Boolean
+}
+
+input ModelRegistrationStatusInput {
+  eq: RegistrationStatus
+  ne: RegistrationStatus
+}
+
+input ModelAssignmentStatusInput {
+  eq: AssignmentStatus
+  ne: AssignmentStatus
+}
+
+# Subscription scalar filter input types
+input ModelSubscriptionStringInput {
+  eq: String
+  ne: String
+  contains: String
+  notContains: String
+  beginsWith: String
+  in: [String]
+  notIn: [String]
+}
+
+input ModelSubscriptionIDInput {
+  eq: ID
+  ne: ID
+  contains: ID
+  notContains: ID
+  beginsWith: ID
+  in: [ID]
+  notIn: [ID]
+}
+
+input ModelSubscriptionIntInput {
+  eq: Int
+  ne: Int
+  lt: Int
+  le: Int
+  gt: Int
+  ge: Int
+  in: [Int]
+  notIn: [Int]
+}
+
+input ModelSubscriptionFloatInput {
+  eq: Float
+  ne: Float
+  lt: Float
+  le: Float
+  gt: Float
+  ge: Float
+  in: [Float]
+  notIn: [Float]
+}
+
+input ModelSubscriptionBooleanInput {
+  eq: Boolean
+  ne: Boolean
+}
