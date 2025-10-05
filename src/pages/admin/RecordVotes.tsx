@@ -85,17 +85,36 @@ export default function RecordConsents() {
         let notFound = 0
 
         for (const line of lines) {
-            const [personId] = line.split(',').map(s => s.trim())
-            if (!personId) continue
+            // CSV format: person_id,expanded_name,expanded_email,expanded_street,resident_street,resident_first_name,resident_last_name,resident_email,match_type
+            const parts = line.split(',').map(s => s.trim())
+            if (parts.length < 7) continue
 
-            // Find resident by externalId (matches person_id from CSV)
+            const firstName = parts[5]
+            const lastName = parts[6]
+            const street = parts[4] || parts[3] // Try resident_street first, then expanded_street
+
+            if (!firstName || !lastName || !street) continue
+
+            // Find resident by first name, last name, and street
             const residents = await client.models.Resident.list({
-                filter: { externalId: { eq: personId } }
+                filter: {
+                    and: [
+                        { firstName: { eq: firstName } },
+                        { lastName: { eq: lastName } }
+                    ]
+                }
             })
 
-            if (residents.data.length > 0) {
-                const resident = residents.data[0]
+            // Filter by address street (client-side since we can't join in the filter)
+            const matchedResidents = await Promise.all(
+                residents.data.map(async (resident) => {
+                    const address = await client.models.Address.get({ id: resident.addressId! })
+                    return address.data?.street.toLowerCase() === street.toLowerCase() ? resident : null
+                })
+            )
+            const resident = matchedResidents.find(r => r !== null)
 
+            if (resident) {
                 if (!resident.hasSigned) {
                     await recordConsent(resident.id, resident.addressId!, false)
                     newRecords++
@@ -159,7 +178,7 @@ export default function RecordConsents() {
 
                 <div>
                     <h3>Bulk Upload Consents (CSV)</h3>
-                    <p>CSV format: first column must be person_id (matches externalId in database)</p>
+                    <p>CSV format: person_id, expanded_name, expanded_email, expanded_street, resident_street, resident_first_name, resident_last_name, resident_email, match_type</p>
                     <input 
                         type='file'
                         accept='.csv'
