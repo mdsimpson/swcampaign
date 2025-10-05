@@ -13,6 +13,8 @@
     "fresh-import": "tsx scripts/fresh-import-homeowners.ts",
     "safe-import": "tsx scripts/safe-import-homeowners.ts",
     "import:votes": "tsx scripts/import-votes.ts",
+    "import:consents": "tsx scripts/import-consents.ts",
+    "import:consents:production": "tsx scripts/import-consents-production.ts",
     "seed:admin": "tsx scripts/seed-admin.ts",
     "seed:admin:production": "tsx scripts/seed-admin-production.ts",
     "import:production": "tsx scripts/import-production-data.ts",
