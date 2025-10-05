@@ -104,20 +104,28 @@ export default function RecordConsents() {
         const rows = parsed.data as any[]
         setUploadProgress({ current: 0, total: rows.length })
 
-        // DEBUG: Show sample residents from database
-        const sampleResidents = await client.models.Resident.list({ limit: 5 })
-        console.log('=== SAMPLE RESIDENTS IN DATABASE ===')
-        for (const r of sampleResidents.data) {
-            console.log(`"${r.firstName}" "${r.lastName}" (ID: ${r.id})`)
-        }
-        console.log('=== END SAMPLE ===')
-        console.log('')
+        // Load ALL residents (like /organize page does)
+        setStatus('Loading all residents from database...')
+        let allResidents: any[] = []
+        let residentsNextToken = null
+        do {
+            const residentsResult = await client.models.Resident.list({
+                limit: 1000,
+                nextToken: residentsNextToken
+            })
+            allResidents.push(...residentsResult.data)
+            residentsNextToken = residentsResult.nextToken
+        } while (residentsNextToken)
+
+        console.log(`=== Loaded ${allResidents.length} total residents from database ===`)
 
         let processed = 0
         let newRecords = 0
         let alreadySigned = 0
         let notFound = 0
         const errors: string[] = []
+
+        setStatus('Processing consent records...')
 
         for (const row of rows) {
             const firstName = row.resident_first_name?.trim()
@@ -130,25 +138,22 @@ export default function RecordConsents() {
             }
 
             try {
-                // Find resident by first name, last name
-                const residents = await client.models.Resident.list({
-                    filter: {
-                        and: [
-                            { firstName: { eq: firstName } },
-                            { lastName: { eq: lastName } }
-                        ]
-                    }
-                })
+                // Find resident by name (client-side filtering like /organize page)
+                const nameMatches = allResidents.filter(r =>
+                    r.firstName?.toLowerCase() === firstName?.toLowerCase() &&
+                    r.lastName?.toLowerCase() === lastName?.toLowerCase()
+                )
 
                 if (processed < 5) {
                     console.log(`[${processed + 1}] Searching: ${firstName} ${lastName} at ${street}`)
-                    console.log(`   Found ${residents.data.length} name matches`)
+                    console.log(`   Found ${nameMatches.length} name matches`)
                 }
 
-                // Filter by address street (client-side since we can't join in the filter)
+                // Find the one with matching address
                 let foundResident = null
                 const normalizedCsvStreet = normalizeStreet(street)
-                for (const resident of residents.data) {
+
+                for (const resident of nameMatches) {
                     const address = await client.models.Address.get({ id: resident.addressId! })
                     if (processed < 5 && address.data) {
                         console.log(`   Comparing: "${normalizedCsvStreet}" vs "${normalizeStreet(address.data.street)}"`)
