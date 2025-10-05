@@ -2,6 +2,7 @@ import Header from '../../components/Header'
 import {useEffect, useState} from 'react'
 import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
+import Papa from 'papaparse'
 
 export default function RecordConsents() {
     const [searchTerm, setSearchTerm] = useState('')
@@ -76,59 +77,84 @@ export default function RecordConsents() {
 
         setUploadStatus('Processing...')
         const text = await selectedFile.text()
-        const lines = text.split('\n').filter(line => line.trim()).slice(1) // Skip header
 
-        setUploadProgress({ current: 0, total: lines.length })
+        // Parse CSV properly with papaparse
+        const parsed = Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true
+        })
+
+        const rows = parsed.data as any[]
+        setUploadProgress({ current: 0, total: rows.length })
 
         let processed = 0
         let newRecords = 0
+        let alreadySigned = 0
         let notFound = 0
+        const errors: string[] = []
 
-        for (const line of lines) {
-            // CSV format: person_id,expanded_name,expanded_email,expanded_street,resident_street,resident_first_name,resident_last_name,resident_email,match_type
-            const parts = line.split(',').map(s => s.trim())
-            if (parts.length < 7) continue
+        for (const row of rows) {
+            const firstName = row.resident_first_name?.trim()
+            const lastName = row.resident_last_name?.trim()
+            const street = row.resident_street?.trim() || row.expanded_street?.trim()
 
-            const firstName = parts[5]
-            const lastName = parts[6]
-            const street = parts[4] || parts[3] // Try resident_street first, then expanded_street
-
-            if (!firstName || !lastName || !street) continue
-
-            // Find resident by first name, last name, and street
-            const residents = await client.models.Resident.list({
-                filter: {
-                    and: [
-                        { firstName: { eq: firstName } },
-                        { lastName: { eq: lastName } }
-                    ]
-                }
-            })
-
-            // Filter by address street (client-side since we can't join in the filter)
-            const matchedResidents = await Promise.all(
-                residents.data.map(async (resident) => {
-                    const address = await client.models.Address.get({ id: resident.addressId! })
-                    return address.data?.street.toLowerCase() === street.toLowerCase() ? resident : null
-                })
-            )
-            const resident = matchedResidents.find(r => r !== null)
-
-            if (resident) {
-                if (!resident.hasSigned) {
-                    await recordConsent(resident.id, resident.addressId!, false)
-                    newRecords++
-                }
-            } else {
-                notFound++
+            if (!firstName || !lastName || !street) {
+                processed++
+                continue
             }
+
+            try {
+                // Find resident by first name, last name
+                const residents = await client.models.Resident.list({
+                    filter: {
+                        and: [
+                            { firstName: { eq: firstName } },
+                            { lastName: { eq: lastName } }
+                        ]
+                    }
+                })
+
+                // Filter by address street (client-side since we can't join in the filter)
+                let foundResident = null
+                for (const resident of residents.data) {
+                    const address = await client.models.Address.get({ id: resident.addressId! })
+                    if (address.data?.street.toLowerCase() === street.toLowerCase()) {
+                        foundResident = resident
+                        break
+                    }
+                }
+
+                if (foundResident) {
+                    if (foundResident.hasSigned) {
+                        alreadySigned++
+                    } else {
+                        await recordConsent(foundResident.id, foundResident.addressId!, false)
+                        newRecords++
+                    }
+                } else {
+                    notFound++
+                    errors.push(`${firstName} ${lastName} at ${street}`)
+                }
+            } catch (err) {
+                console.error(`Error processing ${firstName} ${lastName}:`, err)
+                errors.push(`${firstName} ${lastName} - Error: ${err}`)
+            }
+
             processed++
-            setUploadProgress({ current: processed, total: lines.length })
+            setUploadProgress({ current: processed, total: rows.length })
         }
 
-        setUploadStatus(`Processed ${processed} entries, ${newRecords} new consents recorded, ${notFound} not found.`)
+        await loadAddresses() // Refresh the data
+        setUploadStatus(`Processed ${processed} entries, ${newRecords} new consents recorded, ${alreadySigned} already signed, ${notFound} not found.`)
         setUploadProgress({ current: 0, total: 0 })
         setSelectedFile(null)
+
+        if (errors.length > 0 && errors.length <= 20) {
+            console.log('Not found:', errors)
+        } else if (errors.length > 20) {
+            console.log('Not found (first 20):', errors.slice(0, 20))
+            console.log(`... and ${errors.length - 20} more`)
+        }
     }
 
     return (
