@@ -5,7 +5,7 @@ import fetch from 'node-fetch'
 
 // Current production endpoint (from amplify_outputs.json)
 const GRAPHQL_ENDPOINT = "https://bwng3ppgdfhl5cnfzv3difc4vm.appsync-api.us-east-1.amazonaws.com/graphql"
-const API_KEY = "da2-ngrxku5bhzezhih2pxgitb6mtq"
+const API_KEY = "da2-mgxvgdjuffbvpcz4gljvulnw4m"
 
 async function graphqlRequest(query: string, variables: any = {}) {
     const response = await fetch(GRAPHQL_ENDPOINT, {

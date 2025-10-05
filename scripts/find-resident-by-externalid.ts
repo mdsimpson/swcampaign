@@ -1,4 +1,4 @@
-// Sample residents from database to see what data exists
+// Find resident by externalId
 import fetch from 'node-fetch'
 
 const GRAPHQL_ENDPOINT = "https://bwng3ppgdfhl5cnfzv3difc4vm.appsync-api.us-east-1.amazonaws.com/graphql"
@@ -23,11 +23,12 @@ async function graphqlRequest(query: string, variables: any = {}) {
 }
 
 async function main() {
-    console.log('📋 Sampling residents from database...\n')
+    const externalId = process.argv[2] || '7'
+    console.log(`🔍 Searching for resident with externalId: ${externalId}\n`)
 
     const query = `
-        query ListResidents($limit: Int) {
-            listResidents(limit: $limit) {
+        query ListResidents($filter: ModelResidentFilterInput) {
+            listResidents(filter: $filter) {
                 items {
                     id
                     firstName
@@ -41,21 +42,23 @@ async function main() {
     `
 
     try {
-        const data = await graphqlRequest(query, { limit: 10 })
+        const data = await graphqlRequest(query, {
+            filter: { externalId: { eq: externalId } }
+        })
         const residents = data.listResidents.items
 
-        console.log(`Total fetched: ${residents.length}\n`)
+        console.log(`Found ${residents.length} resident(s)\n`)
 
         for (const resident of residents) {
             console.log(`${resident.firstName} ${resident.lastName}`)
             console.log(`  ID: ${resident.id}`)
-            console.log(`  External ID: ${resident.externalId || 'N/A'}`)
+            console.log(`  External ID: ${resident.externalId}`)
             console.log(`  Address ID: ${resident.addressId}`)
             console.log(`  Has Signed: ${resident.hasSigned ? 'YES' : 'NO'}`)
             console.log('')
         }
     } catch (err) {
-        console.error('Failed to fetch residents:', err)
+        console.error('Failed to fetch resident:', err)
     }
 }
 
