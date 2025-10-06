@@ -36,7 +36,11 @@ export default function CanvassingMap() {
     const [hasInitialBounds, setHasInitialBounds] = useState(false) // Track if we've set initial bounds
     const [toggleLoading, setToggleLoading] = useState(false) // Track toggle loading state
     const [filterText, setFilterText] = useState('') // Text filter for addresses/names
-    const [signatureFilter, setSignatureFilter] = useState<'all' | 'none' | 'some' | 'complete'>('all') // Signature status filter
+    const [signatureFilters, setSignatureFilters] = useState({
+        none: true,
+        some: true,
+        complete: true
+    }) // Signature status filters (checkboxes)
 
     const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
 
@@ -98,32 +102,38 @@ export default function CanvassingMap() {
             })
         }
 
-        // Apply signature filter
-        if (signatureFilter !== 'all') {
+        // Apply signature filters (checkboxes - show if ANY selected filter matches)
+        const hasAnyFilterEnabled = signatureFilters.none || signatureFilters.some || signatureFilters.complete
+
+        if (hasAnyFilterEnabled) {
             enrichedAddresses = enrichedAddresses.filter(addr => {
                 const residents = addr.residents || []
+
                 if (residents.length === 0) {
                     // No residents - treat as 'none'
-                    return signatureFilter === 'none'
+                    return signatureFilters.none
                 }
 
                 const signedCount = residents.filter((r: any) => r.hasSigned).length
                 const totalCount = residents.length
 
-                if (signatureFilter === 'none') {
-                    return signedCount === 0
-                } else if (signatureFilter === 'some') {
-                    return signedCount > 0 && signedCount < totalCount
-                } else if (signatureFilter === 'complete') {
-                    return signedCount === totalCount
+                // Check if this address matches ANY of the enabled filters
+                if (signedCount === 0 && signatureFilters.none) {
+                    return true
+                }
+                if (signedCount > 0 && signedCount < totalCount && signatureFilters.some) {
+                    return true
+                }
+                if (signedCount === totalCount && signatureFilters.complete) {
+                    return true
                 }
 
-                return true
+                return false
             })
         }
 
         return enrichedAddresses
-    }, [showAll, viewportAddresses, assignments, allResidents, allConsents, filterText, signatureFilter])
+    }, [showAll, viewportAddresses, assignments, allResidents, allConsents, filterText, signatureFilters])
 
     useEffect(() => {
         if (user?.userId) {
@@ -646,43 +656,36 @@ export default function CanvassingMap() {
                         <div style={{display: 'flex', gap: '16px', flexWrap: 'wrap'}}>
                             <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
                                 <input
-                                    type="radio"
-                                    name="signatureFilter"
-                                    value="all"
-                                    checked={signatureFilter === 'all'}
-                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
-                                />
-                                <span>All Addresses</span>
-                            </label>
-                            <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
-                                <input
-                                    type="radio"
-                                    name="signatureFilter"
-                                    value="none"
-                                    checked={signatureFilter === 'none'}
-                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
+                                    type="checkbox"
+                                    checked={signatureFilters.none}
+                                    onChange={(e) => setSignatureFilters({
+                                        ...signatureFilters,
+                                        none: e.target.checked
+                                    })}
                                 />
                                 <span style={{color: '#dc3545'}}>⬤</span>
                                 <span>No Signatures</span>
                             </label>
                             <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
                                 <input
-                                    type="radio"
-                                    name="signatureFilter"
-                                    value="some"
-                                    checked={signatureFilter === 'some'}
-                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
+                                    type="checkbox"
+                                    checked={signatureFilters.some}
+                                    onChange={(e) => setSignatureFilters({
+                                        ...signatureFilters,
+                                        some: e.target.checked
+                                    })}
                                 />
                                 <span style={{color: '#ffc107'}}>⬤</span>
                                 <span>Some Signatures</span>
                             </label>
                             <label style={{display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'}}>
                                 <input
-                                    type="radio"
-                                    name="signatureFilter"
-                                    value="complete"
-                                    checked={signatureFilter === 'complete'}
-                                    onChange={(e) => setSignatureFilter(e.target.value as any)}
+                                    type="checkbox"
+                                    checked={signatureFilters.complete}
+                                    onChange={(e) => setSignatureFilters({
+                                        ...signatureFilters,
+                                        complete: e.target.checked
+                                    })}
                                 />
                                 <span style={{color: '#28a745'}}>⬤</span>
                                 <span>All Signatures</span>
