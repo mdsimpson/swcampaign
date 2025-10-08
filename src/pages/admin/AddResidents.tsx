@@ -70,15 +70,16 @@ export default function AddResidents() {
                 const personId = row.person_id?.trim()
                 const street = row.Street?.trim()
                 const lastName = row['Occupant Last Name']?.trim()
-                const firstName = row['Occupant First Name']?.trim()
+                const firstName = row['Occupant First Name']?.trim() || ''
 
-                if (!personId || !street || !firstName || !lastName) {
+                // Only personId, street, and lastName are required (firstName can be blank for LLCs)
+                if (!personId || !street || !lastName) {
                     skipped++
                     skippedList.push({
                         personId: personId || 'N/A',
-                        name: `${firstName || ''} ${lastName || ''}`.trim() || 'N/A',
+                        name: `${firstName} ${lastName}`.trim() || 'N/A',
                         street: street || 'N/A',
-                        reason: 'Missing required fields'
+                        reason: 'Missing required fields (person_id, Street, or Last Name)'
                     })
                     processed++
                     continue
