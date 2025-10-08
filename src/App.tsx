@@ -19,6 +19,7 @@ import RecordConsents from './pages/admin/RecordVotes'
 import DataManagement from './pages/admin/DataManagement'
 import MoveFormerOwners from './pages/admin/MoveFormerOwners'
 import AddResidents from './pages/admin/AddResidents'
+import ExportUnsigned from './pages/admin/ExportUnsigned'
 import Organize from './pages/organizer/Organize'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 
@@ -95,6 +96,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <AddResidents/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/export-unsigned' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <ExportUnsigned/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>
