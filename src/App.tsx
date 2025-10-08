@@ -18,6 +18,7 @@ import AbsenteeInteractions from './pages/AbsenteeInteractions'
 import RecordConsents from './pages/admin/RecordVotes'
 import DataManagement from './pages/admin/DataManagement'
 import MoveFormerOwners from './pages/admin/MoveFormerOwners'
+import AddResidents from './pages/admin/AddResidents'
 import Organize from './pages/organizer/Organize'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 
@@ -87,6 +88,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <MoveFormerOwners/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/add-residents' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <AddResidents/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>
