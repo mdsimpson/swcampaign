@@ -61,6 +61,30 @@ const schema = a.schema({
         allow.publicApiKey().to(['create','read','update','delete']) // Allow import scripts, bulk operations, and consent uploads
     ]),
 
+    FormerResident: a.model({
+        personId: a.string(),
+        externalId: a.string(),
+        addressId: a.id(),
+        firstName: a.string(),
+        lastName: a.string(),
+        occupantType: a.string(),
+        contactEmail: a.string(),
+        additionalEmail: a.string(),
+        cellPhone: a.string(),
+        cellPhoneAlert: a.string(),
+        unitPhone: a.string(),
+        workPhone: a.string(),
+        isAbsentee: a.boolean(),
+        hasSigned: a.boolean(),
+        signedAt: a.datetime(),
+        movedAt: a.datetime(), // When they were moved to this table
+        movedReason: a.string().default('former_owner'), // Why they were moved
+    }).authorization(allow => [
+        allow.groups(['Administrator']).to(['create','read','update','delete']),
+        allow.groups(['Organizer']).to(['read']),
+        allow.publicApiKey().to(['create','read','delete']) // Allow import scripts
+    ]),
+
     Consent: a.model({
         residentId: a.id().required(),
         resident: a.belongsTo('Resident','residentId'),

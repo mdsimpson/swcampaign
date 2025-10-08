@@ -138,6 +138,29 @@ type Resident @model {
   updatedAt: AWSDateTime!
 }
 
+type FormerResident @model {
+  id: ID!
+  personId: String
+  externalId: String
+  addressId: ID
+  firstName: String
+  lastName: String
+  occupantType: String
+  contactEmail: String
+  additionalEmail: String
+  cellPhone: String
+  cellPhoneAlert: String
+  unitPhone: String
+  workPhone: String
+  isAbsentee: Boolean
+  hasSigned: Boolean
+  signedAt: AWSDateTime
+  movedAt: AWSDateTime
+  movedReason: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
 type Consent @model {
   id: ID!
   residentId: ID!
@@ -216,6 +239,9 @@ type Query {
   getResident(id: ID!): Resident
   listResidents(filter: ModelResidentFilterInput, limit: Int, nextToken: String): ModelResidentConnection
 
+  getFormerResident(id: ID!): FormerResident
+  listFormerResidents(filter: ModelFormerResidentFilterInput, limit: Int, nextToken: String): ModelFormerResidentConnection
+
   getConsent(id: ID!): Consent
   listConsents(filter: ModelConsentFilterInput, limit: Int, nextToken: String): ModelConsentConnection
 
@@ -245,6 +271,10 @@ type Mutation {
   createResident(input: CreateResidentInput!, condition: ModelResidentConditionInput): Resident
   updateResident(input: UpdateResidentInput!, condition: ModelResidentConditionInput): Resident
   deleteResident(input: DeleteResidentInput!, condition: ModelResidentConditionInput): Resident
+
+  createFormerResident(input: CreateFormerResidentInput!, condition: ModelFormerResidentConditionInput): FormerResident
+  updateFormerResident(input: UpdateFormerResidentInput!, condition: ModelFormerResidentConditionInput): FormerResident
+  deleteFormerResident(input: DeleteFormerResidentInput!, condition: ModelFormerResidentConditionInput): FormerResident
 
   createConsent(input: CreateConsentInput!, condition: ModelConsentConditionInput): Consent
   updateConsent(input: UpdateConsentInput!, condition: ModelConsentConditionInput): Consent
@@ -280,6 +310,10 @@ type Subscription {
   onCreateResident(filter: ModelSubscriptionResidentFilterInput): Resident @aws_subscribe(mutations: ["createResident"])
   onUpdateResident(filter: ModelSubscriptionResidentFilterInput): Resident @aws_subscribe(mutations: ["updateResident"])
   onDeleteResident(filter: ModelSubscriptionResidentFilterInput): Resident @aws_subscribe(mutations: ["deleteResident"])
+
+  onCreateFormerResident(filter: ModelSubscriptionFormerResidentFilterInput): FormerResident @aws_subscribe(mutations: ["createFormerResident"])
+  onUpdateFormerResident(filter: ModelSubscriptionFormerResidentFilterInput): FormerResident @aws_subscribe(mutations: ["updateFormerResident"])
+  onDeleteFormerResident(filter: ModelSubscriptionFormerResidentFilterInput): FormerResident @aws_subscribe(mutations: ["deleteFormerResident"])
 
   onCreateConsent(filter: ModelSubscriptionConsentFilterInput): Consent @aws_subscribe(mutations: ["createConsent"])
   onUpdateConsent(filter: ModelSubscriptionConsentFilterInput): Consent @aws_subscribe(mutations: ["updateConsent"])
@@ -341,6 +375,26 @@ input CreateResidentInput {
   isAbsentee: Boolean
   hasSigned: Boolean
   signedAt: AWSDateTime
+}
+
+input CreateFormerResidentInput {
+  personId: String
+  externalId: String
+  addressId: ID
+  firstName: String
+  lastName: String
+  occupantType: String
+  contactEmail: String
+  additionalEmail: String
+  cellPhone: String
+  cellPhoneAlert: String
+  unitPhone: String
+  workPhone: String
+  isAbsentee: Boolean
+  hasSigned: Boolean
+  signedAt: AWSDateTime
+  movedAt: AWSDateTime
+  movedReason: String
 }
 
 input CreateConsentInput {
@@ -434,6 +488,27 @@ input UpdateResidentInput {
   signedAt: AWSDateTime
 }
 
+input UpdateFormerResidentInput {
+  id: ID!
+  personId: String
+  externalId: String
+  addressId: ID
+  firstName: String
+  lastName: String
+  occupantType: String
+  contactEmail: String
+  additionalEmail: String
+  cellPhone: String
+  cellPhoneAlert: String
+  unitPhone: String
+  workPhone: String
+  isAbsentee: Boolean
+  hasSigned: Boolean
+  signedAt: AWSDateTime
+  movedAt: AWSDateTime
+  movedReason: String
+}
+
 input UpdateConsentInput {
   id: ID!
   residentId: ID
@@ -499,6 +574,10 @@ input DeleteResidentInput {
   id: ID!
 }
 
+input DeleteFormerResidentInput {
+  id: ID!
+}
+
 input DeleteConsentInput {
   id: ID!
 }
@@ -551,6 +630,20 @@ input ModelResidentFilterInput {
   and: [ModelResidentFilterInput]
   or: [ModelResidentFilterInput]
   not: ModelResidentFilterInput
+}
+
+input ModelFormerResidentFilterInput {
+  id: ModelIDInput
+  personId: ModelStringInput
+  externalId: ModelStringInput
+  addressId: ModelIDInput
+  firstName: ModelStringInput
+  lastName: ModelStringInput
+  isAbsentee: ModelBooleanInput
+  hasSigned: ModelBooleanInput
+  and: [ModelFormerResidentFilterInput]
+  or: [ModelFormerResidentFilterInput]
+  not: ModelFormerResidentFilterInput
 }
 
 input ModelConsentFilterInput {
@@ -620,6 +713,13 @@ input ModelResidentConditionInput {
   not: ModelResidentConditionInput
 }
 
+input ModelFormerResidentConditionInput {
+  firstName: ModelStringInput
+  and: [ModelFormerResidentConditionInput]
+  or: [ModelFormerResidentConditionInput]
+  not: ModelFormerResidentConditionInput
+}
+
 input ModelConsentConditionInput {
   residentId: ModelIDInput
   and: [ModelConsentConditionInput]
@@ -677,6 +777,13 @@ input ModelSubscriptionResidentFilterInput {
   or: [ModelSubscriptionResidentFilterInput]
 }
 
+input ModelSubscriptionFormerResidentFilterInput {
+  id: ModelSubscriptionIDInput
+  firstName: ModelSubscriptionStringInput
+  and: [ModelSubscriptionFormerResidentFilterInput]
+  or: [ModelSubscriptionFormerResidentFilterInput]
+}
+
 input ModelSubscriptionConsentFilterInput {
   id: ModelSubscriptionIDInput
   and: [ModelSubscriptionConsentFilterInput]
@@ -720,6 +827,11 @@ type ModelAddressConnection {
 
 type ModelResidentConnection {
   items: [Resident]
+  nextToken: String
+}
+
+type ModelFormerResidentConnection {
+  items: [FormerResident]
   nextToken: String
 }
 
