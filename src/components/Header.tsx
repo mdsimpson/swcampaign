@@ -6,6 +6,7 @@ import {fetchAuthSession} from 'aws-amplify/auth'
 export default function Header() {
     const {signOut, user} = useAuthenticator(ctx => [ctx.user])
     const [userGroups, setUserGroups] = useState<string[]>([])
+    const [adminMenuOpen, setAdminMenuOpen] = useState(false)
 
     useEffect(() => {
         async function getUserGroups() {
@@ -38,9 +39,130 @@ export default function Header() {
                 {isCanvasser && <Link to='/absentee'>Absentee</Link>}
                 {isOrganizer && <Link to='/reports'>Reports</Link>}
                 {isOrganizer && <Link to='/organize'>Organize</Link>}
-                {isAdmin && <Link to='/admin/enroll'>Enroll</Link>}
-                {isAdmin && <Link to='/admin/consents'>Consents</Link>}
-                {isAdmin && <Link to='/admin/residents'>Residents</Link>}
+                {isAdmin && (
+                    <div style={{position: 'relative'}}>
+                        <button
+                            onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                            onBlur={() => setTimeout(() => setAdminMenuOpen(false), 200)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'inherit',
+                                cursor: 'pointer',
+                                fontSize: 'inherit',
+                                padding: 0,
+                                textDecoration: 'none'
+                            }}
+                        >
+                            Admin ▾
+                        </button>
+                        {adminMenuOpen && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                marginTop: 8,
+                                backgroundColor: 'white',
+                                border: '1px solid #ddd',
+                                borderRadius: 4,
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                minWidth: 180,
+                                zIndex: 1000
+                            }}>
+                                <Link
+                                    to='/admin/enroll'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Enroll Members
+                                </Link>
+                                <Link
+                                    to='/admin/consents'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Record Consents
+                                </Link>
+                                <Link
+                                    to='/admin/residents'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Manage Residents
+                                </Link>
+                                <Link
+                                    to='/admin/data'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Data Management
+                                </Link>
+                                <Link
+                                    to='/admin/add-residents'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Add Residents
+                                </Link>
+                                <Link
+                                    to='/admin/move-former-owners'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Move Former Owners
+                                </Link>
+                                <Link
+                                    to='/admin/export-unsigned'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit'
+                                    }}
+                                >
+                                    Export Unsigned
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                )}
                 {isMember && <Link to='/profile'>Profile</Link>}
                 {user && userGroups.length === 0 && (
                     <span style={{
