@@ -861,7 +861,20 @@ export default function CanvassingMap() {
                                     {/* Content */}
                                     <div style={{paddingRight: '20px'}}>
                                         <h4 style={{margin: '0 0 8px 0', fontSize: '16px'}}>{selectedAddress.street}</h4>
-                                        
+
+                                        {/* Deed holder information */}
+                                        {selectedAddress.deed && (
+                                            <div style={{
+                                                margin: '0 0 12px 0',
+                                                padding: '6px 8px',
+                                                backgroundColor: '#f8f9fa',
+                                                borderLeft: '3px solid #007bff',
+                                                fontSize: '12px'
+                                            }}>
+                                                <strong>Deed:</strong> {selectedAddress.deed}
+                                            </div>
+                                        )}
+
                                         {/* Show ALL residents and their consent status */}
                                         <div style={{margin: '0 0 12px 0', fontSize: '13px'}}>
                                             {selectedAddress.residents && selectedAddress.residents.length > 0 ? (

@@ -154,10 +154,23 @@ export default function Header() {
                                         display: 'block',
                                         padding: '8px 12px',
                                         textDecoration: 'none',
-                                        color: 'inherit'
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
                                     }}
                                 >
                                     Export Unsigned
+                                </Link>
+                                <Link
+                                    to='/admin/upload-deed-data'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit'
+                                    }}
+                                >
+                                    Upload Deed Data
                                 </Link>
                             </div>
                         )}

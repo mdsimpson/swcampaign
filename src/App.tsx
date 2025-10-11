@@ -20,6 +20,7 @@ import DataManagement from './pages/admin/DataManagement'
 import MoveFormerOwners from './pages/admin/MoveFormerOwners'
 import AddResidents from './pages/admin/AddResidents'
 import ExportUnsigned from './pages/admin/ExportUnsigned'
+import UploadDeedData from './pages/admin/UploadDeedData'
 import Organize from './pages/organizer/Organize'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 
@@ -103,6 +104,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <ExportUnsigned/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/upload-deed-data' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <UploadDeedData/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>

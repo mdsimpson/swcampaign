@@ -24,6 +24,7 @@ const schema = a.schema({
         zip: a.string(),
         lat: a.float(),
         lng: a.float(),
+        deed: a.string(), // Deed holder name from parcel data
         notes: a.string(),
         residents: a.hasMany('Resident','addressId'),
         assignments: a.hasMany('Assignment','addressId'),
