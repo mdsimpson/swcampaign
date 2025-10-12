@@ -109,6 +109,19 @@ export default function Header() {
                                     Manage Residents
                                 </Link>
                                 <Link
+                                    to='/admin/addresses'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Manage Addresses
+                                </Link>
+                                <Link
                                     to='/admin/data'
                                     onClick={() => setAdminMenuOpen(false)}
                                     style={{

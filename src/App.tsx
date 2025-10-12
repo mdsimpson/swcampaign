@@ -9,6 +9,7 @@ import VerifyEmail from './pages/VerifyEmail'
 import ResetPassword from './pages/ResetPassword'
 import EnrollMembers from './pages/admin/EnrollMembers'
 import ResidentsPage from './pages/admin/ResidentsPage'
+import EditAddresses from './pages/admin/EditAddresses'
 import UserProfile from './pages/UserProfile'
 import Reports from './pages/Reports'
 import CanvassingMap from './pages/CanvassingMap'
@@ -76,6 +77,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <ResidentsPage/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/addresses' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <EditAddresses/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>
