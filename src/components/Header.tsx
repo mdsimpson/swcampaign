@@ -2,11 +2,16 @@ import {Link} from 'react-router-dom'
 import {useAuthenticator} from '@aws-amplify/ui-react'
 import {useEffect, useState} from 'react'
 import {fetchAuthSession} from 'aws-amplify/auth'
+import {generateClient} from 'aws-amplify/data'
+import type {Schema} from '../../amplify/data/resource'
 
 export default function Header() {
     const {signOut, user} = useAuthenticator(ctx => [ctx.user])
     const [userGroups, setUserGroups] = useState<string[]>([])
     const [adminMenuOpen, setAdminMenuOpen] = useState(false)
+    const [dataAsOfDate, setDataAsOfDate] = useState<string | null>(null)
+
+    const client = generateClient<Schema>()
 
     useEffect(() => {
         async function getUserGroups() {
@@ -24,6 +29,28 @@ export default function Header() {
         getUserGroups()
     }, [user])
 
+    useEffect(() => {
+        loadDataAsOfDate()
+    }, [])
+
+    async function loadDataAsOfDate() {
+        try {
+            const result = await client.models.SystemConfig.list({
+                filter: {
+                    configKey: {
+                        eq: 'dataAsOfDate'
+                    }
+                }
+            })
+
+            if (result.data.length > 0 && result.data[0].configValue) {
+                setDataAsOfDate(result.data[0].configValue)
+            }
+        } catch (error) {
+            console.error('Failed to load data as of date:', error)
+        }
+    }
+
     const hasRole = (role: string) => userGroups.includes(role)
     const isCanvasser = hasRole('Canvasser') || hasRole('Organizer') || hasRole('Administrator')
     const isOrganizer = hasRole('Organizer') || hasRole('Administrator')
@@ -33,12 +60,24 @@ export default function Header() {
     return (
         <header style={{display: 'flex', alignItems: 'center', gap: 16, padding: 12, borderBottom: '1px solid #eee'}}>
             <img src='/logo.png' alt='SWHOA' style={{height: 40}}/>
+            {dataAsOfDate && (
+                <div style={{
+                    fontSize: '0.85em',
+                    color: '#666',
+                    fontStyle: 'italic',
+                    paddingLeft: 8,
+                    borderLeft: '1px solid #ddd'
+                }}>
+                    Data as of {new Date(dataAsOfDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </div>
+            )}
             <nav style={{display: 'flex', gap: 12, alignItems: 'center'}}>
                 <Link to='/'>Home</Link>
                 {isCanvasser && <Link to='/canvass'>Canvass</Link>}
                 {isCanvasser && <Link to='/absentee'>Absentee</Link>}
                 {isOrganizer && <Link to='/reports'>Reports</Link>}
                 {isOrganizer && <Link to='/organize'>Organize</Link>}
+                {isOrganizer && <Link to='/members'>Members</Link>}
                 {isAdmin && (
                     <div style={{position: 'relative'}}>
                         <button
@@ -180,10 +219,23 @@ export default function Header() {
                                         display: 'block',
                                         padding: '8px 12px',
                                         textDecoration: 'none',
-                                        color: 'inherit'
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
                                     }}
                                 >
                                     Upload Deed Data
+                                </Link>
+                                <Link
+                                    to='/admin/set-data-date'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit'
+                                    }}
+                                >
+                                    Set Data Date
                                 </Link>
                             </div>
                         )}

@@ -10,6 +10,7 @@ import ResetPassword from './pages/ResetPassword'
 import EnrollMembers from './pages/admin/EnrollMembers'
 import ResidentsPage from './pages/admin/ResidentsPage'
 import EditAddresses from './pages/admin/EditAddresses'
+import Members from './pages/Members'
 import UserProfile from './pages/UserProfile'
 import Reports from './pages/Reports'
 import CanvassingMap from './pages/CanvassingMap'
@@ -22,6 +23,7 @@ import MoveFormerOwners from './pages/admin/MoveFormerOwners'
 import AddResidents from './pages/admin/AddResidents'
 import ExportUnsigned from './pages/admin/ExportUnsigned'
 import UploadDeedData from './pages/admin/UploadDeedData'
+import SetDataDate from './pages/admin/SetDataDate'
 import Organize from './pages/organizer/Organize'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 
@@ -71,6 +73,13 @@ export default function App() {
             <Route path='/interact' element={<Authenticator><InteractionForm/></Authenticator>}/>
             <Route path='/history' element={<Authenticator><InteractionHistory/></Authenticator>}/>
             <Route path='/absentee' element={<Authenticator><AbsenteeInteractions/></Authenticator>}/>
+            <Route path='/members' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Organizer', 'Administrator']}>
+                        <Members/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
             <Route path='/admin/enroll' element={<Authenticator><EnrollMembers/></Authenticator>}/>
             <Route path='/admin/consents' element={<Authenticator><RecordConsents/></Authenticator>}/>
             <Route path='/admin/residents' element={
@@ -119,6 +128,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <UploadDeedData/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/set-data-date' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <SetDataDate/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>

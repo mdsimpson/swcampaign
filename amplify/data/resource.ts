@@ -157,6 +157,27 @@ const schema = a.schema({
         allow.ownerDefinedIn('sub').to(['read','update']),
         allow.groups(['Administrator']).to(['read','update','delete','create'])
     ]),
+
+    NonEnrolledMember: a.model({
+        email: a.string().required(),
+        firstName: a.string().required(),
+        lastName: a.string().required(),
+        addedAt: a.datetime().required(),
+        addedBy: a.string(), // sub of administrator who added them
+    }).authorization(allow => [
+        allow.groups(['Administrator','Organizer']).to(['read']),
+        allow.groups(['Administrator']).to(['create','update','delete'])
+    ]),
+
+    SystemConfig: a.model({
+        configKey: a.string().required(), // e.g., "dataAsOfDate"
+        configValue: a.string(), // The value (date string, etc.)
+        updatedAt: a.datetime(),
+        updatedBy: a.string(),
+    }).authorization(allow => [
+        allow.groups(['Administrator','Organizer','Canvasser','Member']).to(['read']),
+        allow.groups(['Administrator']).to(['create','update','delete'])
+    ]),
 })
 
 export type Schema = ClientSchema<typeof schema>
