@@ -165,8 +165,8 @@ const schema = a.schema({
         addedAt: a.datetime().required(),
         addedBy: a.string(), // sub of administrator who added them
     }).authorization(allow => [
-        allow.groups(['Administrator','Organizer']).to(['read']),
-        allow.groups(['Administrator']).to(['create','update','delete'])
+        allow.groups(['Administrator']).to(['create','read','update','delete']),
+        allow.groups(['Organizer']).to(['read'])
     ]),
 
     SystemConfig: a.model({
@@ -175,8 +175,8 @@ const schema = a.schema({
         updatedAt: a.datetime(),
         updatedBy: a.string(),
     }).authorization(allow => [
-        allow.groups(['Administrator','Organizer','Canvasser','Member']).to(['read']),
-        allow.groups(['Administrator']).to(['create','update','delete'])
+        allow.groups(['Administrator']).to(['create','read','update','delete']),
+        allow.groups(['Organizer','Canvasser','Member']).to(['read'])
     ]),
 })
 
