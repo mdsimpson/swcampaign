@@ -141,7 +141,11 @@ export default function SetDataDate() {
                         </div>
 
                         <div style={{marginBottom: 16, color: '#666', fontSize: '0.9em'}}>
-                            <strong>Preview:</strong> Data as of {dataDate ? new Date(dataDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '(no date set)'}
+                            <strong>Preview:</strong> Data as of {dataDate ? (() => {
+                                const [year, month, day] = dataDate.split('-').map(Number)
+                                const shortYear = year % 100
+                                return `${month}/${day}/${shortYear}`
+                            })() : '(no date set)'}
                         </div>
 
                         <div style={{display: 'flex', gap: 12}}>

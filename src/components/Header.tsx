@@ -60,17 +60,22 @@ export default function Header() {
     return (
         <header style={{display: 'flex', alignItems: 'center', gap: 16, padding: 12, borderBottom: '1px solid #eee'}}>
             <img src='/vote.jpg' alt='SWHOA' style={{height: 40}}/>
-            {dataAsOfDate && (
-                <div style={{
-                    fontSize: '0.85em',
-                    color: '#666',
-                    fontStyle: 'italic',
-                    paddingLeft: 8,
-                    borderLeft: '1px solid #ddd'
-                }}>
-                    Data as of {new Date(dataAsOfDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </div>
-            )}
+            {dataAsOfDate && (() => {
+                // Parse date string manually to avoid timezone issues
+                const [year, month, day] = dataAsOfDate.split('-').map(Number)
+                const shortYear = year % 100
+                return (
+                    <div style={{
+                        fontSize: '0.85em',
+                        color: '#666',
+                        fontStyle: 'italic',
+                        paddingLeft: 8,
+                        borderLeft: '1px solid #ddd'
+                    }}>
+                        Data as of {month}/{day}/{shortYear}
+                    </div>
+                )
+            })()}
             <nav style={{display: 'flex', gap: 12, alignItems: 'center'}}>
                 <Link to='/'>Home</Link>
                 {isCanvasser && <Link to='/canvass'>Canvass</Link>}
