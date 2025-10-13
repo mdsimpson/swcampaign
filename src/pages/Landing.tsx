@@ -39,7 +39,7 @@ export default function Landing() {
     return (
         <div style={{maxWidth: 900, margin: '40px auto', padding: 16}}>
             <div style={{textAlign: 'center'}}>
-                <img src='/logo.png' alt='Vote to End SWHOA' style={{maxWidth: 220}}/>
+                <img src='/vote.jpg' alt='Vote to End SWHOA' style={{maxWidth: 220}}/>
                 <h1>Vote to End SWHOA</h1>
                 <p>Log in or register to participate.</p>
             </div>

@@ -12,7 +12,7 @@ Notes about passwords:
 
 ## External Landing Page
 
-* It will display the `logo.png`
+* It will display the `vote.jpg`
 * It will contain some basic text about the project.
 * It will contain a login form. When the user successfully logs in, he is navigated to the `Internal Landing Page`.
 * it will contain a link to the `Sign-up for Login Page` and invite users without a login to click that link to

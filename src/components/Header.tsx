@@ -59,7 +59,7 @@ export default function Header() {
 
     return (
         <header style={{display: 'flex', alignItems: 'center', gap: 16, padding: 12, borderBottom: '1px solid #eee'}}>
-            <img src='/logo.png' alt='SWHOA' style={{height: 40}}/>
+            <img src='/vote.jpg' alt='SWHOA' style={{height: 40}}/>
             {dataAsOfDate && (
                 <div style={{
                     fontSize: '0.85em',
