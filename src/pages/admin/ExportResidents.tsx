@@ -61,8 +61,10 @@ export default function ExportResidents() {
             const residents = allResidents
                 .map(resident => {
                     const address = addressMap.get(resident.addressId)
+                    // Use personId if available, otherwise fall back to externalId (deprecated field)
+                    const personIdValue = resident.personId || resident.externalId || ''
                     return {
-                        personId: resident.personId || '',
+                        personId: personIdValue,
                         firstName: resident.firstName || '',
                         lastName: resident.lastName || '',
                         street: address?.street || '',
