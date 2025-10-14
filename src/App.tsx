@@ -22,6 +22,7 @@ import DataManagement from './pages/admin/DataManagement'
 import MoveFormerOwners from './pages/admin/MoveFormerOwners'
 import AddResidents from './pages/admin/AddResidents'
 import ExportUnsigned from './pages/admin/ExportUnsigned'
+import ExportResidents from './pages/admin/ExportResidents'
 import UploadDeedData from './pages/admin/UploadDeedData'
 import SetDataDate from './pages/admin/SetDataDate'
 import Organize from './pages/organizer/Organize'
@@ -121,6 +122,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <ExportUnsigned/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/export-residents' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <ExportResidents/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>

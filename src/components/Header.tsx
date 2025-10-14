@@ -218,6 +218,19 @@ export default function Header() {
                                     Export Unsigned
                                 </Link>
                                 <Link
+                                    to='/admin/export-residents'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Export Residents
+                                </Link>
+                                <Link
                                     to='/admin/upload-deed-data'
                                     onClick={() => setAdminMenuOpen(false)}
                                     style={{
