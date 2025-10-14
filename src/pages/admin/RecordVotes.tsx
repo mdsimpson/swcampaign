@@ -306,7 +306,7 @@ export default function RecordConsents() {
 
             for (const row of rows) {
                 const personId = row.person_id?.trim()
-                const email = row.expanded_email?.trim()
+                const email = row.email?.trim()
                 const submissionId = row.submission_id?.trim() || row.Number?.trim() // Handle both column names
 
                 if (!personId) {
@@ -690,7 +690,7 @@ export default function RecordConsents() {
                                     onChange={(e) => setUploadFormat('simple')}
                                     style={{marginRight: 8}}
                                 />
-                                <strong>Simple format:</strong> person_id, expanded_name, expanded_email (optional: submission_id or Number)
+                                <strong>Simple format:</strong> person_id, submission_id, email (extra columns ignored)
                             </label>
                             <label style={{display: 'block'}}>
                                 <input
