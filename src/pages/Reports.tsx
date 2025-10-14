@@ -118,9 +118,12 @@ export default function Reports() {
                 residents.some(r => r.addressId === addr.id && r.isAbsentee)
             ).length
             
+            // Count unique residents who have signed (not total consent records)
+            const residentsWithConsents = new Set(consents.map(c => c.residentId))
+
             // Calculate addresses with all consents (group by physical address)
             let addressesWithAllConsents = 0
-            
+
             // Group all address IDs by physical address
             const addressGroups = new Map()
             allAddresses.forEach(addr => {
@@ -130,22 +133,26 @@ export default function Reports() {
                 }
                 addressGroups.get(key).push(addr.id)
             })
-            
+
             // Check each unique physical address
             for (const [addressKey, addressIdList] of addressGroups) {
                 // Get all residents at this physical address (across all duplicate IDs)
                 const addressResidents = residents.filter(r => addressIdList.includes(r.addressId))
-                const addressConsents = consents.filter(c => addressIdList.includes(c.addressId))
-                
+
                 // Deduplicate residents by name
-                const uniqueResidents = addressResidents.filter((resident, index, self) => 
-                    index === self.findIndex(r => 
-                        r.firstName === resident.firstName && 
+                const uniqueResidents = addressResidents.filter((resident, index, self) =>
+                    index === self.findIndex(r =>
+                        r.firstName === resident.firstName &&
                         r.lastName === resident.lastName
                     )
                 )
-                
-                if (uniqueResidents.length > 0 && addressConsents.length >= uniqueResidents.length) {
+
+                // Check if ALL residents at this address have at least one consent
+                const allSigned = uniqueResidents.length > 0 && uniqueResidents.every(resident =>
+                    residentsWithConsents.has(resident.id)
+                )
+
+                if (allSigned) {
                     addressesWithAllConsents++
                 }
             }
@@ -191,7 +198,7 @@ export default function Reports() {
                 totalResidents: residents.length,
                 absenteeAddresses,
                 addressesWithAllConsents,
-                totalConsents: consents.length,
+                totalConsents: residentsWithConsents.size,
                 activeAssignments: assignments.filter(a => a.status !== 'DONE').length,
                 completedAssignments: assignments.filter(a => a.status === 'DONE').length,
                 totalInteractions: interactions.length,
