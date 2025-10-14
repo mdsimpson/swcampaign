@@ -30,6 +30,7 @@ export default function RecordConsents() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploadStatus, setUploadStatus] = useState('')
     const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
+    const [uploadFormat, setUploadFormat] = useState<'full' | 'simple'>('full')
 
     useEffect(() => {
         loadAddresses()
@@ -259,6 +260,144 @@ export default function RecordConsents() {
         const rows = parsed.data as any[]
         setUploadProgress({ current: 0, total: rows.length })
 
+        // Handle simple format (person_id, expanded_name, expanded_email)
+        if (uploadFormat === 'simple') {
+            setUploadStatus('Loading all residents from database...')
+            let allResidents: any[] = []
+            let residentsNextToken = null
+            do {
+                const residentsResult = await client.models.Resident.list({
+                    limit: 1000,
+                    nextToken: residentsNextToken
+                })
+                allResidents.push(...residentsResult.data)
+                residentsNextToken = residentsResult.nextToken
+            } while (residentsNextToken)
+
+            console.log(`=== Loaded ${allResidents.length} total residents from database ===`)
+
+            // Load existing consents
+            setUploadStatus('Loading existing consents...')
+            let allConsents: any[] = []
+            let consentsNextToken = null
+            do {
+                const consentsResult = await client.models.Consent.list({
+                    limit: 1000,
+                    nextToken: consentsNextToken
+                })
+                allConsents.push(...consentsResult.data)
+                consentsNextToken = consentsResult.nextToken
+            } while (consentsNextToken)
+
+            const residentsWithConsents = new Set(allConsents.map(c => c.residentId))
+            console.log(`=== Found ${residentsWithConsents.size} residents with existing consents ===`)
+
+            let processed = 0
+            let newRecords = 0
+            let alreadySigned = 0
+            let emailsUpdated = 0
+            let notFound = 0
+            let skippedMissingData = 0
+            const errors: string[] = []
+
+            setUploadStatus('Processing consent records...')
+
+            for (const row of rows) {
+                const personId = row.person_id?.trim()
+                const email = row.expanded_email?.trim()
+
+                if (!personId) {
+                    skippedMissingData++
+                    processed++
+                    continue
+                }
+
+                try {
+                    // Find resident by personId or externalId
+                    const foundResident = allResidents.find(r =>
+                        r.personId === personId || r.externalId === personId
+                    )
+
+                    if (foundResident) {
+                        // Check if resident already has consent
+                        if (residentsWithConsents.has(foundResident.id)) {
+                            // Update email if needed
+                            const existingConsent = allConsents.find(c => c.residentId === foundResident.id)
+                            if (email && existingConsent && !existingConsent.email) {
+                                await client.models.Consent.update({
+                                    id: existingConsent.id,
+                                    email: email
+                                })
+                                emailsUpdated++
+                            }
+                            alreadySigned++
+                        } else {
+                            // Create new consent
+                            await client.models.Consent.create({
+                                residentId: foundResident.id,
+                                addressId: foundResident.addressId!,
+                                recordedAt: new Date().toISOString(),
+                                source: 'csv-upload',
+                                email: email || null
+                            })
+                            await client.models.Resident.update({
+                                id: foundResident.id,
+                                hasSigned: true,
+                                signedAt: new Date().toISOString()
+                            })
+                            residentsWithConsents.add(foundResident.id)
+                            newRecords++
+                        }
+                    } else {
+                        notFound++
+                        errors.push(`person_id: ${personId}`)
+                    }
+                } catch (err) {
+                    console.error(`Error processing person_id ${personId}:`, err)
+                    errors.push(`person_id ${personId} - Error: ${err}`)
+                }
+
+                processed++
+                setUploadProgress({ current: processed, total: rows.length })
+            }
+
+            await loadAddresses()
+
+            const statusParts = [
+                `${rows.length} rows in CSV`,
+                `${newRecords} new consents created`,
+                `${alreadySigned} already signed${emailsUpdated > 0 ? ` (${emailsUpdated} emails updated)` : ''}`,
+                `${notFound} not found in DB`,
+                `${skippedMissingData} missing person_id`
+            ]
+
+            const finalStatus = `✅ ${statusParts.join(' | ')}`
+            setUploadStatus(finalStatus)
+            setUploadProgress({ current: 0, total: 0 })
+            setSelectedFile(null)
+
+            console.log('\n' + '='.repeat(80))
+            console.log('UPLOAD SUMMARY:')
+            console.log('='.repeat(80))
+            console.log(`Total rows in CSV: ${rows.length}`)
+            console.log(`New consents created: ${newRecords}`)
+            console.log(`Already signed (skipped): ${alreadySigned}`)
+            console.log(`Emails updated: ${emailsUpdated}`)
+            console.log(`Not found in database: ${notFound}`)
+            console.log(`Missing person_id (skipped): ${skippedMissingData}`)
+            console.log('='.repeat(80))
+
+            if (errors.length > 0 && errors.length <= 20) {
+                console.log('\nNot found in database:', errors)
+            } else if (errors.length > 20) {
+                console.log('\nNot found in database (first 20):', errors.slice(0, 20))
+                console.log(`... and ${errors.length - 20} more`)
+            }
+
+            return
+        }
+
+        // Original full format logic below
         // Load ALL residents (like /organize page does)
         setUploadStatus('Loading all residents from database...')
         let allResidents: any[] = []
@@ -490,8 +629,34 @@ export default function RecordConsents() {
 
                 <div>
                     <h3>Bulk Upload Consents (CSV)</h3>
-                    <p>CSV format: person_id, expanded_name, expanded_email, expanded_street, resident_street, resident_first_name, resident_last_name, resident_email, match_type</p>
-                    <input 
+
+                    <div style={{marginBottom: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 4}}>
+                        <strong>Select CSV Format:</strong>
+                        <div style={{marginTop: 8}}>
+                            <label style={{display: 'block', marginBottom: 8}}>
+                                <input
+                                    type='radio'
+                                    value='simple'
+                                    checked={uploadFormat === 'simple'}
+                                    onChange={(e) => setUploadFormat('simple')}
+                                    style={{marginRight: 8}}
+                                />
+                                <strong>Simple format:</strong> person_id, expanded_name, expanded_email
+                            </label>
+                            <label style={{display: 'block'}}>
+                                <input
+                                    type='radio'
+                                    value='full'
+                                    checked={uploadFormat === 'full'}
+                                    onChange={(e) => setUploadFormat('full')}
+                                    style={{marginRight: 8}}
+                                />
+                                <strong>Full format:</strong> person_id, expanded_name, expanded_email, expanded_street, resident_street, resident_first_name, resident_last_name, resident_email, match_type
+                            </label>
+                        </div>
+                    </div>
+
+                    <input
                         type='file'
                         accept='.csv'
                         onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
