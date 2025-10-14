@@ -112,6 +112,7 @@ async function main() {
             }
 
             const input = {
+                personId: resident.person_id,
                 externalId: resident.person_id,
                 addressId: newAddressId,
                 firstName: resident['Occupant First Name'] || null,

@@ -200,6 +200,7 @@ export default function DataManagement() {
                     }
 
                     await client.models.Resident.create({
+                        personId: resident.person_id,
                         externalId: resident.person_id,
                         addressId: newAddressId,
                         firstName: resident['Occupant First Name'] || null,
