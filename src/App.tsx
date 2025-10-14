@@ -23,6 +23,7 @@ import MoveFormerOwners from './pages/admin/MoveFormerOwners'
 import AddResidents from './pages/admin/AddResidents'
 import ExportUnsigned from './pages/admin/ExportUnsigned'
 import ExportResidents from './pages/admin/ExportResidents'
+import ExportSigned from './pages/admin/ExportSigned'
 import SyncPersonIds from './pages/admin/SyncPersonIds'
 import UploadDeedData from './pages/admin/UploadDeedData'
 import SetDataDate from './pages/admin/SetDataDate'
@@ -130,6 +131,13 @@ export default function App() {
                 <Authenticator>
                     <RoleProtectedRoute requiredRoles={['Administrator']}>
                         <ExportResidents/>
+                    </RoleProtectedRoute>
+                </Authenticator>
+            }/>
+            <Route path='/admin/export-signed' element={
+                <Authenticator>
+                    <RoleProtectedRoute requiredRoles={['Administrator']}>
+                        <ExportSigned/>
                     </RoleProtectedRoute>
                 </Authenticator>
             }/>

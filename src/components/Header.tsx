@@ -231,6 +231,19 @@ export default function Header() {
                                     Export Residents
                                 </Link>
                                 <Link
+                                    to='/admin/export-signed'
+                                    onClick={() => setAdminMenuOpen(false)}
+                                    style={{
+                                        display: 'block',
+                                        padding: '8px 12px',
+                                        textDecoration: 'none',
+                                        color: 'inherit',
+                                        borderBottom: '1px solid #eee'
+                                    }}
+                                >
+                                    Export Signed
+                                </Link>
+                                <Link
                                     to='/admin/sync-person-ids'
                                     onClick={() => setAdminMenuOpen(false)}
                                     style={{

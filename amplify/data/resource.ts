@@ -95,6 +95,7 @@ const schema = a.schema({
         recordedAt: a.datetime().required(),
         source: a.string(), // manual | bulk-upload | csv-upload
         email: a.string(), // Email from consent CSV upload (resident_email or expanded_email)
+        submissionId: a.string(), // Submission ID from consent form uploads
     }).authorization(allow => [
         allow.groups(['Administrator']).to(['create','read','update','delete']),
         allow.groups(['Organizer']).to(['read']),

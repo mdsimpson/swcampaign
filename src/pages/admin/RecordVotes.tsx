@@ -307,6 +307,7 @@ export default function RecordConsents() {
             for (const row of rows) {
                 const personId = row.person_id?.trim()
                 const email = row.expanded_email?.trim()
+                const submissionId = row.submission_id?.trim() || row.Number?.trim() // Handle both column names
 
                 if (!personId) {
                     skippedMissingData++
@@ -323,14 +324,26 @@ export default function RecordConsents() {
                     if (foundResident) {
                         // Check if resident already has consent
                         if (residentsWithConsents.has(foundResident.id)) {
-                            // Update email if needed
+                            // Update email and/or submissionId if needed
                             const existingConsent = allConsents.find(c => c.residentId === foundResident.id)
-                            if (email && existingConsent && !existingConsent.email) {
-                                await client.models.Consent.update({
-                                    id: existingConsent.id,
-                                    email: email
-                                })
-                                emailsUpdated++
+                            if (existingConsent) {
+                                const updates: any = { id: existingConsent.id }
+                                let needsUpdate = false
+
+                                if (email && !existingConsent.email) {
+                                    updates.email = email
+                                    needsUpdate = true
+                                }
+
+                                if (submissionId && !existingConsent.submissionId) {
+                                    updates.submissionId = submissionId
+                                    needsUpdate = true
+                                }
+
+                                if (needsUpdate) {
+                                    await client.models.Consent.update(updates)
+                                    emailsUpdated++
+                                }
                             }
                             alreadySigned++
                         } else {
@@ -340,7 +353,8 @@ export default function RecordConsents() {
                                 addressId: foundResident.addressId!,
                                 recordedAt: new Date().toISOString(),
                                 source: 'csv-upload',
-                                email: email || null
+                                email: email || null,
+                                submissionId: submissionId || null
                             })
                             await client.models.Resident.update({
                                 id: foundResident.id,
@@ -458,6 +472,7 @@ export default function RecordConsents() {
             const lastName = row.resident_last_name?.trim()
             const street = row.resident_street?.trim() || row.expanded_street?.trim()
             const email = row.resident_email?.trim() || row.expanded_email?.trim() // Capture email from CSV
+            const submissionId = row.submission_id?.trim() || row.Number?.trim() // Handle both column names
 
             if (!firstName || !lastName || !street) {
                 skippedMissingData++
@@ -511,14 +526,26 @@ export default function RecordConsents() {
 
                     // Check if resident already has consent
                     if (residentsWithConsents.has(foundResident.id)) {
-                        // Update email if needed
+                        // Update email and/or submissionId if needed
                         const existingConsent = allConsents.find(c => c.residentId === foundResident.id)
-                        if (email && existingConsent && !existingConsent.email) {
-                            await client.models.Consent.update({
-                                id: existingConsent.id,
-                                email: email
-                            })
-                            emailsUpdated++
+                        if (existingConsent) {
+                            const updates: any = { id: existingConsent.id }
+                            let needsUpdate = false
+
+                            if (email && !existingConsent.email) {
+                                updates.email = email
+                                needsUpdate = true
+                            }
+
+                            if (submissionId && !existingConsent.submissionId) {
+                                updates.submissionId = submissionId
+                                needsUpdate = true
+                            }
+
+                            if (needsUpdate) {
+                                await client.models.Consent.update(updates)
+                                emailsUpdated++
+                            }
                         }
                         alreadySigned++
                     } else {
@@ -528,7 +555,8 @@ export default function RecordConsents() {
                             addressId: foundResident.addressId!,
                             recordedAt: new Date().toISOString(),
                             source: 'csv-upload',
-                            email: email || null
+                            email: email || null,
+                            submissionId: submissionId || null
                         })
                         await client.models.Resident.update({
                             id: foundResident.id,
@@ -662,7 +690,7 @@ export default function RecordConsents() {
                                     onChange={(e) => setUploadFormat('simple')}
                                     style={{marginRight: 8}}
                                 />
-                                <strong>Simple format:</strong> person_id, expanded_name, expanded_email
+                                <strong>Simple format:</strong> person_id, expanded_name, expanded_email (optional: submission_id or Number)
                             </label>
                             <label style={{display: 'block'}}>
                                 <input
@@ -672,8 +700,11 @@ export default function RecordConsents() {
                                     onChange={(e) => setUploadFormat('full')}
                                     style={{marginRight: 8}}
                                 />
-                                <strong>Full format:</strong> person_id, expanded_name, expanded_email, expanded_street, resident_street, resident_first_name, resident_last_name, resident_email, match_type
+                                <strong>Full format:</strong> person_id, expanded_name, expanded_email, expanded_street, resident_street, resident_first_name, resident_last_name, resident_email, match_type (optional: submission_id or Number)
                             </label>
+                        </div>
+                        <div style={{marginTop: 8, fontSize: '0.9em', color: '#666'}}>
+                            💡 Re-uploading files will update existing consents with missing email or submission_id values without creating duplicates.
                         </div>
                     </div>
 
