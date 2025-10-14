@@ -31,6 +31,8 @@ export default function RecordConsents() {
     const [uploadStatus, setUploadStatus] = useState('')
     const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
     const [uploadFormat, setUploadFormat] = useState<'full' | 'simple'>('full')
+    const [notFoundRecords, setNotFoundRecords] = useState<string[]>([])
+    const [uploadResults, setUploadResults] = useState<any>(null)
 
     useEffect(() => {
         loadAddresses()
@@ -375,6 +377,15 @@ export default function RecordConsents() {
             setUploadStatus(finalStatus)
             setUploadProgress({ current: 0, total: 0 })
             setSelectedFile(null)
+            setNotFoundRecords(errors)
+            setUploadResults({
+                totalRows: rows.length,
+                newRecords,
+                alreadySigned,
+                emailsUpdated,
+                notFound,
+                skippedMissingData
+            })
 
             console.log('\n' + '='.repeat(80))
             console.log('UPLOAD SUMMARY:')
@@ -559,6 +570,16 @@ export default function RecordConsents() {
         setUploadStatus(finalStatus)
         setUploadProgress({ current: 0, total: 0 })
         setSelectedFile(null)
+        setNotFoundRecords(errors)
+        setUploadResults({
+            totalRows: rows.length,
+            newRecords,
+            alreadySigned,
+            emailsUpdated,
+            notFound,
+            skippedDuplicates,
+            skippedMissingData
+        })
 
         console.log('\n' + '='.repeat(80))
         console.log('UPLOAD SUMMARY:')
@@ -659,7 +680,11 @@ export default function RecordConsents() {
                     <input
                         type='file'
                         accept='.csv'
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        onChange={(e) => {
+                            setSelectedFile(e.target.files?.[0] || null)
+                            setNotFoundRecords([])
+                            setUploadResults(null)
+                        }}
                         style={{marginBottom: 12}}
                     />
                     <button
@@ -698,6 +723,50 @@ export default function RecordConsents() {
                         </div>
                     )}
                     {uploadStatus && uploadProgress.total === 0 && <p style={{marginTop: 8, color: '#666'}}>{uploadStatus}</p>}
+
+                    {/* Display upload results */}
+                    {uploadResults && (
+                        <div style={{marginTop: 16, padding: 16, backgroundColor: '#f8f9fa', borderRadius: 4}}>
+                            <h4>Upload Summary</h4>
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                                <div>Total rows in CSV: <strong>{uploadResults.totalRows}</strong></div>
+                                <div style={{color: '#28a745'}}>New consents: <strong>{uploadResults.newRecords}</strong></div>
+                                <div>Already signed: <strong>{uploadResults.alreadySigned}</strong></div>
+                                <div>Emails updated: <strong>{uploadResults.emailsUpdated}</strong></div>
+                                <div style={{color: '#dc3545'}}>Not found: <strong>{uploadResults.notFound}</strong></div>
+                                {uploadResults.skippedDuplicates !== undefined && (
+                                    <div>Duplicates skipped: <strong>{uploadResults.skippedDuplicates}</strong></div>
+                                )}
+                                <div>Missing data: <strong>{uploadResults.skippedMissingData}</strong></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Display not found records */}
+                    {notFoundRecords.length > 0 && (
+                        <div style={{marginTop: 16, padding: 16, backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: 4}}>
+                            <h4 style={{marginTop: 0, color: '#856404'}}>⚠️ Records Not Found in Database ({notFoundRecords.length})</h4>
+                            <div style={{
+                                maxHeight: 300,
+                                overflowY: 'auto',
+                                backgroundColor: 'white',
+                                padding: 12,
+                                borderRadius: 4,
+                                border: '1px solid #ddd'
+                            }}>
+                                {notFoundRecords.map((record, index) => (
+                                    <div key={index} style={{
+                                        padding: '4px 0',
+                                        borderBottom: index < notFoundRecords.length - 1 ? '1px solid #eee' : 'none',
+                                        fontFamily: 'monospace',
+                                        fontSize: '0.9em'
+                                    }}>
+                                        {record}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{marginTop: 32, paddingTop: 24, borderTop: '2px solid #ddd'}}>
