@@ -14,22 +14,51 @@ export default function ExportResidents() {
             setExporting(true)
             setMessage(null)
 
-            // Fetch all residents with their addresses
-            const residentsResult = await client.models.Resident.list()
+            // Fetch all residents with pagination
+            const allResidents: any[] = []
+            let nextToken: string | null | undefined = null
 
-            if (!residentsResult.data || residentsResult.data.length === 0) {
+            do {
+                const residentsResult = await client.models.Resident.list({
+                    limit: 1000,
+                    nextToken: nextToken as string | undefined
+                })
+
+                if (residentsResult.data) {
+                    allResidents.push(...residentsResult.data)
+                }
+
+                nextToken = residentsResult.nextToken
+            } while (nextToken)
+
+            if (allResidents.length === 0) {
                 setMessage({ type: 'error', text: 'No residents found to export.' })
                 return
             }
 
-            // Fetch all addresses
-            const addressesResult = await client.models.Address.list()
+            // Fetch all addresses with pagination
+            const allAddresses: any[] = []
+            nextToken = null
+
+            do {
+                const addressesResult = await client.models.Address.list({
+                    limit: 1000,
+                    nextToken: nextToken as string | undefined
+                })
+
+                if (addressesResult.data) {
+                    allAddresses.push(...addressesResult.data)
+                }
+
+                nextToken = addressesResult.nextToken
+            } while (nextToken)
+
             const addressMap = new Map(
-                addressesResult.data.map(addr => [addr.id, addr])
+                allAddresses.map(addr => [addr.id, addr])
             )
 
             // Combine resident and address data
-            const residents = residentsResult.data
+            const residents = allResidents
                 .map(resident => {
                     const address = addressMap.get(resident.addressId)
                     return {
@@ -40,7 +69,7 @@ export default function ExportResidents() {
                         city: address?.city || '',
                         state: address?.state || '',
                         zip: address?.zip || '',
-                        addressId: resident.addressId || '',
+                        addressId: address?.externalId || '', // Use externalId (numeric) not UUID
                         contactEmail: resident.contactEmail || ''
                     }
                 })
