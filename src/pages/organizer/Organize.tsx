@@ -28,7 +28,7 @@ export default function Organize() {
         return {
             searchTerm: params.get('address') || '',
             residentFilter: params.get('resident') || '',
-            statusFilter: params.get('status') || 'all',
+            statusFilter: params.get('status') || 'incomplete',
             assignmentFilter: params.get('assignment') || 'all',
             page: parseInt(params.get('page') || '1')
         }
@@ -592,7 +592,7 @@ export default function Organize() {
         // Clear all filter state
         setSearchTerm('')
         setResidentFilter('')
-        setStatusFilter('all')
+        setStatusFilter('incomplete')
         setAssignmentFilter('all')
         setCurrentPage(1)
         setSelectedAddresses(new Set())
