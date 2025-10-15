@@ -281,15 +281,26 @@ export default function CanvassingMap() {
             
             const ne = bounds.getNorthEast()
             const sw = bounds.getSouthWest()
-            
+
+            console.log('[CanvassingMap] Map bounds:', {
+                ne: { lat: ne.lat(), lng: ne.lng() },
+                sw: { lat: sw.lat(), lng: sw.lng() }
+            })
+
             // Filter addresses within viewport bounds
             const addressesInViewport = allAddresses.filter(address => {
                 if (!address.lat || !address.lng) return false
-                
-                return address.lat >= sw.lat() && 
-                       address.lat <= ne.lat() && 
-                       address.lng >= sw.lng() && 
+
+                return address.lat >= sw.lat() &&
+                       address.lat <= ne.lat() &&
+                       address.lng >= sw.lng() &&
                        address.lng <= ne.lng()
+            })
+
+            console.log('[CanvassingMap] Addresses filtered by bounds:', {
+                beforeFilter: allAddresses.length,
+                afterFilter: addressesInViewport.length,
+                sampleAddress: allAddresses[0] ? { lat: allAddresses[0].lat, lng: allAddresses[0].lng } : null
             })
             
             // Deduplicate addresses in viewport by street address, keeping the first one found

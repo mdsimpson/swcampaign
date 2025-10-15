@@ -248,19 +248,37 @@ export default function RecordConsents() {
     }
 
     async function handleFileUpload() {
-        if (!selectedFile) return
+        if (!selectedFile) {
+            setUploadStatus('❌ No file selected')
+            return
+        }
 
-        setUploadStatus('Processing...')
-        const text = await selectedFile.text()
+        try {
+            setUploadStatus('Reading file...')
+            const text = await selectedFile.text()
 
-        // Parse CSV properly with papaparse
-        const parsed = Papa.parse(text, {
-            header: true,
-            skipEmptyLines: true
-        })
+            // Parse CSV properly with papaparse
+            const parsed = Papa.parse(text, {
+                header: true,
+                skipEmptyLines: true
+            })
 
-        const rows = parsed.data as any[]
-        setUploadProgress({ current: 0, total: rows.length })
+            const rows = parsed.data as any[]
+
+            if (rows.length === 0) {
+                setUploadStatus('❌ CSV file is empty')
+                setUploadProgress({ current: 0, total: 0 })
+                return
+            }
+
+            setUploadProgress({ current: 0, total: rows.length })
+        } catch (error) {
+            console.error('Error reading file:', error)
+            setUploadStatus('❌ Error reading file. Please try selecting the file again.')
+            setUploadProgress({ current: 0, total: 0 })
+            setSelectedFile(null)
+            return
+        }
 
         // Handle simple format (person_id, expanded_name, expanded_email)
         if (uploadFormat === 'simple') {
