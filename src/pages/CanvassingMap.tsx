@@ -42,7 +42,9 @@ export default function CanvassingMap() {
         complete: true
     }) // Signature status filters (checkboxes)
 
-    const client = generateClient<Schema>()  // Use authenticated access instead of apiKey
+    const client = generateClient<Schema>({
+        authMode: 'apiKey'
+    })
 
     // Calculate which addresses to display based on filters
     const displayAddresses = useMemo(() => {
