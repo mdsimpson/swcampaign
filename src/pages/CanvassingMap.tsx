@@ -48,6 +48,12 @@ export default function CanvassingMap() {
 
     // Calculate which addresses to display based on filters
     const displayAddresses = useMemo(() => {
+        console.log('[CanvassingMap] displayAddresses useMemo triggered:', {
+            viewportAddressesLength: viewportAddresses.length,
+            showAll: showAll,
+            assignmentsLength: assignments.length
+        })
+
         if (!viewportAddresses.length) {
             return []
         }
@@ -57,11 +63,13 @@ export default function CanvassingMap() {
         if (showAll) {
             // Show all addresses in viewport
             filteredAddresses = viewportAddresses
+            console.log('[CanvassingMap] Showing all addresses:', filteredAddresses.length)
         } else {
             // Show only assigned addresses in viewport
             filteredAddresses = viewportAddresses.filter(h =>
                 assignments.some(a => a.addressId === h.id)
             )
+            console.log('[CanvassingMap] Showing assigned addresses only:', filteredAddresses.length)
         }
 
         // Remove duplicates by address ID to prevent multiple markers at same location
@@ -297,8 +305,13 @@ export default function CanvassingMap() {
                 }
             }
             
+            console.log('[CanvassingMap] Viewport addresses:', {
+                total: uniqueViewportAddresses.length,
+                showAll: showAll,
+                allAddressesCount: allAddresses.length
+            })
             setViewportAddresses(uniqueViewportAddresses)
-            
+
         } catch (error) {
             console.error('Error loading viewport addresses:', error)
         } finally {
@@ -326,6 +339,11 @@ export default function CanvassingMap() {
                 )
             ])
             
+            console.log('[CanvassingMap] Loaded data:', {
+                addresses: loadedAddresses.length,
+                residents: loadedResidents.length,
+                consents: loadedConsents.length
+            })
             setAllAddresses(loadedAddresses)
             setAllResidents(loadedResidents)
             setAllConsents(loadedConsents)
