@@ -24,7 +24,7 @@ export default function CanvassingMap() {
     const [allAddresses, setAllAddresses] = useState<any[]>([]) // All addresses in database
     const [viewportAddresses, setViewportAddresses] = useState<any[]>([]) // Addresses in current viewport
     const [assignments, setAssignments] = useState<any[]>([])
-    const [showAll, setShowAll] = useState(false)
+    const [showAll, setShowAll] = useState(true)
     const [selectedAddress, setSelectedAddress] = useState<any>(null)
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
     const [mapsLoaded, setMapsLoaded] = useState(false)
