@@ -154,11 +154,33 @@ export default function CanvassingMap() {
 
     // Load addresses when map viewport changes OR when initial data loads
     useEffect(() => {
-        if (mapInstance && mapsLoaded && allAddresses.length > 0) {
-            // Load viewport addresses immediately when data is ready
+        if (mapInstance && mapsLoaded && allAddresses.length > 0 && !hasInitialBounds) {
+            // On first load, fit map to show all addresses instead of loading viewport
+            const bounds = new google.maps.LatLngBounds()
+            let hasValidAddresses = false
+
+            // Add all addresses to bounds
+            allAddresses.forEach(address => {
+                if (address.lat && address.lng) {
+                    bounds.extend(new google.maps.LatLng(address.lat, address.lng))
+                    hasValidAddresses = true
+                }
+            })
+
+            if (hasValidAddresses) {
+                mapInstance.fitBounds(bounds)
+                setHasInitialBounds(true)
+
+                // After bounds are set, load viewport addresses
+                setTimeout(() => {
+                    loadAddressesInViewport()
+                }, 500)
+            }
+        } else if (mapInstance && mapsLoaded && allAddresses.length > 0 && hasInitialBounds) {
+            // After initial bounds are set, load viewport addresses normally
             loadAddressesInViewport()
         }
-    }, [mapInstance, mapsLoaded, allAddresses])
+    }, [mapInstance, mapsLoaded, allAddresses, hasInitialBounds])
 
     // Also load viewport when map first loads with initial assignments (for proper bounds fitting)
     useEffect(() => {
@@ -208,43 +230,7 @@ export default function CanvassingMap() {
         setViewportChangeTimeout(timeout)
     }, [viewportChangeTimeout])
 
-    // Auto-fit map bounds to show all markers (ONLY on initial load)
-    useEffect(() => {
-        if (mapInstance && mapsLoaded && displayAddresses.length > 0 && !hasInitialBounds) {
-            
-            const bounds = new google.maps.LatLngBounds()
-            let hasValidMarkers = false
-            
-            // Add all address markers to bounds
-            displayAddresses.forEach(address => {
-                if (address.lat && address.lng) {
-                    bounds.extend(new google.maps.LatLng(address.lat, address.lng))
-                    hasValidMarkers = true
-                }
-            })
-            
-            // Add user location if available
-            if (userLocation) {
-                bounds.extend(new google.maps.LatLng(userLocation.lat, userLocation.lng))
-                hasValidMarkers = true
-            }
-            
-            // Only fit bounds if we have at least one valid marker
-            if (hasValidMarkers) {
-                mapInstance.fitBounds(bounds)
-                setHasInitialBounds(true) // Mark that we've set initial bounds
-                
-                // Add a listener to prevent over-zooming on single markers
-                const listener = google.maps.event.addListenerOnce(mapInstance, 'bounds_changed', () => {
-                    const currentZoom = mapInstance.getZoom()
-                    if (currentZoom && currentZoom > 18) {
-                        mapInstance.setZoom(18) // Max zoom level to prevent too close zoom
-                    }
-                })
-                
-            }
-        }
-    }, [mapInstance, mapsLoaded, displayAddresses, userLocation, hasInitialBounds])
+    // No longer needed - bounds fitting is handled in the earlier useEffect
 
 
     // Load addresses that are currently visible in the map viewport
