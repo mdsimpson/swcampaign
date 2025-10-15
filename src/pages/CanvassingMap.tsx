@@ -451,11 +451,6 @@ export default function CanvassingMap() {
     }
 
     function getMarkerColor(address: any) {
-        // Dark purple for assigned addresses
-        if (address.isAssigned) {
-            return '#6a1b9a'
-        }
-
         const residents = address.residents || []
         if (residents.length === 0) {
             return '#dc3545' // Red - no residents
@@ -573,53 +568,106 @@ export default function CanvassingMap() {
         <div>
             <Header/>
             <div style={{maxWidth: 1200, margin: '10px auto', padding: 12}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
-                    <h2>Canvassing Map</h2>
-                    <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
-                        <button
-                            onClick={() => {
-                                console.log('Manual reload triggered')
-                                loadInitialData()
-                            }}
-                            style={{
-                                backgroundColor: '#007bff',
-                                color: 'white',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: 4,
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Reload Data
-                        </button>
-                        <button
-                            onClick={exportToCSV}
-                            disabled={displayAddresses.length === 0}
-                            style={{
-                                backgroundColor: displayAddresses.length > 0 ? '#28a745' : '#6c757d',
-                                color: 'white',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: 4,
-                                cursor: displayAddresses.length > 0 ? 'pointer' : 'not-allowed'
-                            }}
-                        >
-                            📥 Export to CSV
-                        </button>
-                        <label style={{display: 'flex', alignItems: 'center', gap: 8, opacity: toggleLoading ? 0.6 : 1}}>
+                <div style={{marginBottom: 16}}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
+                        <h2 style={{margin: 0}}>Canvassing Map</h2>
+                        <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+                            <button
+                                onClick={() => {
+                                    console.log('Manual reload triggered')
+                                    loadInitialData()
+                                }}
+                                style={{
+                                    backgroundColor: '#007bff',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: 4,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Reload Data
+                            </button>
+                            <button
+                                onClick={exportToCSV}
+                                disabled={displayAddresses.length === 0}
+                                style={{
+                                    backgroundColor: displayAddresses.length > 0 ? '#28a745' : '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: 4,
+                                    cursor: displayAddresses.length > 0 ? 'pointer' : 'not-allowed'
+                                }}
+                            >
+                                Export to CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* View Mode Toggle */}
+                    <div style={{
+                        display: 'flex',
+                        gap: '12px',
+                        padding: '12px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '8px',
+                        alignItems: 'center'
+                    }}>
+                        <strong style={{fontSize: '14px', color: '#495057'}}>View:</strong>
+                        <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            backgroundColor: !showAll ? '#007bff' : 'white',
+                            color: !showAll ? 'white' : '#495057',
+                            border: !showAll ? '2px solid #007bff' : '2px solid #dee2e6',
+                            fontWeight: !showAll ? 'bold' : 'normal',
+                            transition: 'all 0.2s',
+                            fontSize: '14px'
+                        }}>
                             <input
-                                type='checkbox'
+                                type='radio'
+                                name='viewMode'
+                                checked={!showAll}
+                                disabled={toggleLoading}
+                                onChange={() => handleShowAllToggle(false)}
+                                style={{margin: 0}}
+                            />
+                            My Assignments Only
+                        </label>
+                        <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            backgroundColor: showAll ? '#007bff' : 'white',
+                            color: showAll ? 'white' : '#495057',
+                            border: showAll ? '2px solid #007bff' : '2px solid #dee2e6',
+                            fontWeight: showAll ? 'bold' : 'normal',
+                            transition: 'all 0.2s',
+                            fontSize: '14px'
+                        }}>
+                            <input
+                                type='radio'
+                                name='viewMode'
                                 checked={showAll}
                                 disabled={toggleLoading}
-                                onChange={(e) => handleShowAllToggle(e.target.checked)}
+                                onChange={() => handleShowAllToggle(true)}
+                                style={{margin: 0}}
                             />
-                            Show All Homes
-                            {toggleLoading && (
-                                <span style={{color: '#007bff', fontSize: '12px', marginLeft: '8px'}}>
-                                    🔄 Loading...
-                                </span>
-                            )}
+                            All Homes in Area
                         </label>
+                        {toggleLoading && (
+                            <span style={{color: '#007bff', fontSize: '12px', marginLeft: '8px'}}>
+                                Loading...
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -694,24 +742,24 @@ export default function CanvassingMap() {
                     </div>
                 </div>
 
-                <div style={{marginBottom: 16}}>
-                    <p>
+                <div style={{marginBottom: 16, padding: '10px', backgroundColor: '#e7f3ff', borderRadius: '6px', border: '1px solid #b3d9ff'}}>
+                    <p style={{margin: 0, fontSize: '14px', color: '#004085'}}>
                         {dataLoading ? (
                             <span style={{color: '#007bff'}}>
-                                🔄 Loading marker data...
+                                Loading marker data...
                             </span>
                         ) : viewportLoading ? (
                             <span style={{color: '#007bff'}}>
-                                🗺️ Loading addresses in view...
+                                Loading addresses in view...
                             </span>
                         ) : toggleLoading ? (
                             <span style={{color: '#007bff'}}>
-                                🔄 Updating map view...
+                                Updating map view...
                             </span>
                         ) : (
-                            showAll ? 
-                                `Showing ${displayAddresses.length} unique addresses in view (all homes)` : 
-                                `Showing ${displayAddresses.length} of your assigned addresses in view`
+                            showAll ?
+                                `Viewing ${displayAddresses.length} homes in current map area` :
+                                `Viewing ${displayAddresses.length} of your assigned homes in current map area`
                         )}
                     </p>
                 </div>
@@ -984,10 +1032,6 @@ export default function CanvassingMap() {
                         <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                             <span style={{color: '#4285f4', fontSize: '20px'}}>⬤</span>
                             <span>Your current location</span>
-                        </div>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                            <span style={{color: '#6a1b9a', fontSize: '20px'}}>⬤</span>
-                            <span>Assigned addresses</span>
                         </div>
                         <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                             <span style={{color: '#dc3545', fontSize: '20px'}}>⬤</span>
