@@ -197,8 +197,24 @@ export default function InternalHome() {
                             <span>Addresses with All Consents Signed</span>
                             <span>{statsLoaded ? `${stats.addressesWithAllConsents} / ${targetConsentsNeeded} (${consentProgressPercent.toFixed(1)}%)` : ''}</span>
                         </div>
-                        <div style={{backgroundColor: '#e0e0e0', borderRadius: 4, height: 20}}>
+                        <div style={{
+                            position: 'relative',
+                            backgroundColor: '#e0e0e0',
+                            borderRadius: 4,
+                            height: 20,
+                            overflow: 'hidden'
+                        }}>
+                            {/* Light green background for 80-100% section */}
                             <div style={{
+                                position: 'absolute',
+                                left: '80%',
+                                width: '20%',
+                                height: '100%',
+                                backgroundColor: '#c8e6c9'
+                            }}/>
+                            {/* Progress bar */}
+                            <div style={{
+                                position: 'relative',
                                 backgroundColor: progressToTarget >= 100 ? '#4caf50' : '#ff9800',
                                 width: `${Math.min(progressToTarget, 100)}%`,
                                 height: '100%',

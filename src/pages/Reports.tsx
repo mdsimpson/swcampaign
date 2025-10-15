@@ -315,7 +315,7 @@ export default function Reports() {
                                 <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Addresses Complete</h4>
                                 <div style={{fontSize: '2em', fontWeight: 'bold', color: '#ffc107'}}>{reportData.addressesWithAllConsents}</div>
                                 <div style={{fontSize: '0.9em', color: '#666'}}>
-                                    {Math.round((reportData.addressesWithAllConsents / (reportData.totalAddresses - reportData.absenteeAddresses)) * 100)}% of eligible
+                                    {Math.round((reportData.addressesWithAllConsents / reportData.totalAddresses) * 100)}%
                                 </div>
                             </div>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
@@ -396,10 +396,10 @@ export default function Reports() {
                         <div>
                             <h4>Progress Summary</h4>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8}}>
-                                <p><strong>Target:</strong> 80% of eligible addresses (non-absentee)</p>
-                                <p><strong>Eligible Addresses:</strong> {reportData.totalAddresses - reportData.absenteeAddresses}</p>
-                                <p><strong>Addresses Complete:</strong> {reportData.addressesWithAllConsents} ({Math.round((reportData.addressesWithAllConsents / (reportData.totalAddresses - reportData.absenteeAddresses)) * 100)}%)</p>
-                                <p><strong>Addresses Needed for 80%:</strong> {Math.max(0, Math.ceil((reportData.totalAddresses - reportData.absenteeAddresses) * 0.8) - reportData.addressesWithAllConsents)}</p>
+                                <p><strong>Total Addresses:</strong> {reportData.totalAddresses}</p>
+                                <p><strong>Addresses Complete:</strong> {reportData.addressesWithAllConsents} ({Math.round((reportData.addressesWithAllConsents / reportData.totalAddresses) * 100)}%)</p>
+                                <p><strong>Addresses Remaining:</strong> {reportData.totalAddresses - reportData.addressesWithAllConsents}</p>
+                                <p><strong>Absentee Addresses:</strong> {reportData.absenteeAddresses}</p>
                             </div>
                         </div>
                     </div>
