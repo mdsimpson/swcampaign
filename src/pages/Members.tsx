@@ -9,6 +9,8 @@ interface Member {
     email: string
     firstName: string
     lastName: string
+    street?: string
+    mobile?: string
     hasLogin: boolean
     isNonEnrolled?: boolean
 }
@@ -105,6 +107,8 @@ export default function Members() {
                     email: m.email || '',
                     firstName: m.firstName || '',
                     lastName: m.lastName || '',
+                    street: m.street || '',
+                    mobile: m.mobile || '',
                     hasLogin: true,
                     isNonEnrolled: false
                 })),
@@ -113,6 +117,8 @@ export default function Members() {
                     email: m.email || '',
                     firstName: m.firstName || '',
                     lastName: m.lastName || '',
+                    street: '',
+                    mobile: '',
                     hasLogin: false,
                     isNonEnrolled: true
                 }))
@@ -377,6 +383,8 @@ export default function Members() {
                             <tr style={{backgroundColor: '#f8f9fa'}}>
                                 <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Name</th>
                                 <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Email</th>
+                                <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Address</th>
+                                <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Phone</th>
                                 <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Status</th>
                                 {isAdmin && <th style={{border: '1px solid #ddd', padding: 8, textAlign: 'left'}}>Actions</th>}
                             </tr>
@@ -384,7 +392,7 @@ export default function Members() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={isAdmin ? 4 : 3} style={{
+                                    <td colSpan={isAdmin ? 6 : 5} style={{
                                         border: '1px solid #ddd',
                                         padding: 40,
                                         textAlign: 'center',
@@ -395,7 +403,7 @@ export default function Members() {
                                 </tr>
                             ) : members.length === 0 ? (
                                 <tr>
-                                    <td colSpan={isAdmin ? 4 : 3} style={{
+                                    <td colSpan={isAdmin ? 6 : 5} style={{
                                         border: '1px solid #ddd',
                                         padding: 40,
                                         textAlign: 'center',
@@ -411,6 +419,12 @@ export default function Members() {
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         {member.email}
+                                    </td>
+                                    <td style={{border: '1px solid #ddd', padding: 8}}>
+                                        {member.street || '-'}
+                                    </td>
+                                    <td style={{border: '1px solid #ddd', padding: 8}}>
+                                        {member.mobile || '-'}
                                     </td>
                                     <td style={{border: '1px solid #ddd', padding: 8}}>
                                         <span style={{
