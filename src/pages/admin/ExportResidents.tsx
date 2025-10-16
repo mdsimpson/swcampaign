@@ -76,12 +76,10 @@ export default function ExportResidents() {
                     }
                 })
                 .sort((a, b) => {
-                    // Sort by personId ascending
-                    const aId = a.personId
-                    const bId = b.personId
-                    if (aId < bId) return -1
-                    if (aId > bId) return 1
-                    return 0
+                    // Sort by personId as number (ascending)
+                    const aNum = parseInt(a.personId) || 0
+                    const bNum = parseInt(b.personId) || 0
+                    return aNum - bNum
                 })
 
             // Generate CSV content
