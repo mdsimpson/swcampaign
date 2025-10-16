@@ -192,6 +192,27 @@ export default function Members() {
         }
     }
 
+    function downloadEmails() {
+        // Get all emails, one per line
+        const emailList = members
+            .map(m => m.email)
+            .filter(email => email) // Remove any empty emails
+            .join('\n')
+
+        // Create a blob with the email list
+        const blob = new Blob([emailList], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+
+        // Create a download link and trigger it
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `member-emails-${new Date().toISOString().split('T')[0]}.txt`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+    }
+
     const enrolledCount = members.filter(m => m.hasLogin).length
     const nonEnrolledCount = members.filter(m => !m.hasLogin).length
 
@@ -199,8 +220,28 @@ export default function Members() {
         <div>
             <Header/>
             <div style={{maxWidth: 1200, margin: '20px auto', padding: 12}}>
-                <h2>Members</h2>
-                <p>View all enrolled members and manage non-enrolled contacts.</p>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
+                    <div>
+                        <h2 style={{margin: 0}}>Members</h2>
+                        <p style={{margin: '4px 0 0 0'}}>View all enrolled members and manage non-enrolled contacts.</p>
+                    </div>
+                    <button
+                        onClick={downloadEmails}
+                        disabled={members.length === 0}
+                        style={{
+                            backgroundColor: members.length > 0 ? '#007bff' : '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 20px',
+                            borderRadius: 4,
+                            cursor: members.length > 0 ? 'pointer' : 'not-allowed',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        📧 Download Emails
+                    </button>
+                </div>
 
                 {/* Stats */}
                 <div style={{
