@@ -582,6 +582,33 @@ export default function CanvassingMap() {
         <div>
             <Header/>
             <div style={{maxWidth: 1200, margin: '10px auto', padding: 12}}>
+                {/* Canvassing Brief Link */}
+                <div style={{
+                    backgroundColor: '#e3f2fd',
+                    border: '2px solid #2196f3',
+                    borderRadius: 8,
+                    padding: 16,
+                    marginBottom: 16,
+                    textAlign: 'center'
+                }}>
+                    <h3 style={{margin: '0 0 8px 0', color: '#1976d2', fontSize: '1.3em'}}>
+                        📋 Canvassing - What you need to know
+                    </h3>
+                    <a
+                        href="https://michaeldsimpson-stuff.s3.us-east-1.amazonaws.com/swhoa/Canvassing+Brief.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            color: '#1976d2',
+                            fontSize: '1.1em',
+                            fontWeight: 'bold',
+                            textDecoration: 'underline'
+                        }}
+                    >
+                        Read the Canvassing Brief (PDF)
+                    </a>
+                </div>
+
                 <div style={{marginBottom: 16}}>
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
                         <h2 style={{margin: 0}}>Canvassing Map</h2>

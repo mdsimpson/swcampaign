@@ -189,7 +189,34 @@ export default function InternalHome() {
             <Header/>
             <div style={{maxWidth: 900, margin: '20px auto', padding: 16}}>
                 <h2>Campaign Progress</h2>
-                
+
+                {/* Canvassing Brief Link */}
+                <div style={{
+                    backgroundColor: '#e3f2fd',
+                    border: '2px solid #2196f3',
+                    borderRadius: 8,
+                    padding: 16,
+                    marginBottom: 24,
+                    textAlign: 'center'
+                }}>
+                    <h3 style={{margin: '0 0 8px 0', color: '#1976d2', fontSize: '1.3em'}}>
+                        📋 Canvassing - What you need to know
+                    </h3>
+                    <a
+                        href="https://michaeldsimpson-stuff.s3.us-east-1.amazonaws.com/swhoa/Canvassing+Brief.pdf"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            color: '#1976d2',
+                            fontSize: '1.1em',
+                            fontWeight: 'bold',
+                            textDecoration: 'underline'
+                        }}
+                    >
+                        Read the Canvassing Brief (PDF)
+                    </a>
+                </div>
+
                 <div style={{marginBottom: 24}}>
                     <h3>Consent Form Progress</h3>
                     <div style={{marginBottom: 12}}>
