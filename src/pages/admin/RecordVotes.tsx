@@ -253,6 +253,8 @@ export default function RecordConsents() {
             return
         }
 
+        let rows: any[] = []
+
         try {
             setUploadStatus('Reading file...')
             const text = await selectedFile.text()
@@ -263,7 +265,7 @@ export default function RecordConsents() {
                 skipEmptyLines: true
             })
 
-            const rows = parsed.data as any[]
+            rows = parsed.data as any[]
 
             if (rows.length === 0) {
                 setUploadStatus('❌ CSV file is empty')
