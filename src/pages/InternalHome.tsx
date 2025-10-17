@@ -239,6 +239,15 @@ export default function InternalHome() {
                                 height: '100%',
                                 backgroundColor: '#c8e6c9'
                             }}/>
+                            {/* 80% marker line */}
+                            <div style={{
+                                position: 'absolute',
+                                left: '80%',
+                                width: '2px',
+                                height: '100%',
+                                backgroundColor: '#333',
+                                zIndex: 2
+                            }}/>
                             {/* Progress bar */}
                             <div style={{
                                 position: 'relative',
