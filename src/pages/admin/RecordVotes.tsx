@@ -410,7 +410,6 @@ export default function RecordConsents() {
             const finalStatus = `✅ ${statusParts.join(' | ')}`
             setUploadStatus(finalStatus)
             setUploadProgress({ current: 0, total: 0 })
-            setSelectedFile(null)
             setNotFoundRecords(errors)
             setUploadResults({
                 totalRows: rows.length,
@@ -617,7 +616,6 @@ export default function RecordConsents() {
         const finalStatus = `✅ ${statusParts.join(' | ')}`
         setUploadStatus(finalStatus)
         setUploadProgress({ current: 0, total: 0 })
-        setSelectedFile(null)
         setNotFoundRecords(errors)
         setUploadResults({
             totalRows: rows.length,

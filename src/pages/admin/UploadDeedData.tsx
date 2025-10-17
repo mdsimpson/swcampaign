@@ -178,7 +178,6 @@ export default function UploadDeedData() {
 
             setStatus(`✅ Complete! Updated ${updated}, Address not found ${addressNotFound}, Skipped ${skipped}`)
             setProgress({ current: 0, total: 0 })
-            setSelectedFile(null)
 
         } catch (error) {
             console.error('Error:', error)

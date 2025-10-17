@@ -228,8 +228,6 @@ export default function DataManagement() {
 
             setStatus(`✅ Import complete! ${addressCount} addresses and ${residentCount} residents imported.`)
             setProgress({ current: 0, total: 0 })
-            setAddressFile(null)
-            setResidentsFile(null)
             await getStats()
         } catch (error) {
             console.error('Error importing data:', error)

@@ -145,7 +145,6 @@ export default function AddResidents() {
 
             setStatus(`✅ Complete! Added ${added}, Address not found ${addressNotFound}, Skipped ${skipped}`)
             setProgress({ current: 0, total: 0 })
-            setSelectedFile(null)
 
         } catch (error) {
             console.error('Error:', error)

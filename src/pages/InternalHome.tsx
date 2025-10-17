@@ -242,7 +242,7 @@ export default function InternalHome() {
                             {/* Progress bar */}
                             <div style={{
                                 position: 'relative',
-                                backgroundColor: progressToTarget >= 100 ? '#4caf50' : '#ff9800',
+                                backgroundColor: progressToTarget >= 100 ? '#00e676' : '#ff9800',
                                 width: `${Math.min(progressToTarget, 100)}%`,
                                 height: '100%',
                                 borderRadius: 4,

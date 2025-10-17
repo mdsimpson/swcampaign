@@ -127,7 +127,6 @@ export default function MoveFormerOwners() {
 
             setStatus(`✅ Complete! Moved ${moved}, Not found ${notFound}, Errors ${errors}`)
             setProgress({ current: 0, total: 0 })
-            setSelectedFile(null)
 
         } catch (error) {
             console.error('Error:', error)
