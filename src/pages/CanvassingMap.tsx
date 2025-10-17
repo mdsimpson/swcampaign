@@ -991,7 +991,7 @@ export default function CanvassingMap() {
                                                                 <div style={{color: '#666', fontSize: '11px', marginTop: '1px'}}>
                                                                     {roleDisplay}
                                                                     {isAbsentee && ' (Absentee)'}
-                                                                    {resident.externalId && <span style={{color: '#999'}}> • ID: {resident.externalId}</span>}
+                                                                    {/* {resident.externalId && <span style={{color: '#999'}}> • ID: {resident.externalId}</span>} */}
                                                                 </div>
                                                             </div>
                                                             <div style={{marginLeft: '8px'}}>
