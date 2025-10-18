@@ -984,8 +984,8 @@ export default function CanvassingMap() {
                                                         }}>
                                                             <div style={{flex: 1}}>
                                                                 <div style={{color: '#333', fontWeight: 'bold'}}>
-                                                                    {resident.firstName && resident.lastName 
-                                                                        ? `${resident.firstName} ${resident.lastName}` 
+                                                                    {resident.firstName || resident.lastName
+                                                                        ? `${resident.firstName || ''} ${resident.lastName || ''}`.trim()
                                                                         : 'Unknown Resident'}
                                                                 </div>
                                                                 <div style={{color: '#666', fontSize: '11px', marginTop: '1px'}}>
