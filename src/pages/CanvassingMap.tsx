@@ -904,6 +904,11 @@ export default function CanvassingMap() {
                         )}
 
                         {mapsLoaded && displayAddresses.map(address => {
+                            // Check if this address has any active assignments
+                            const hasAssignment = allAssignments.some(a =>
+                                a.addressId === address.id && a.status === 'NOT_STARTED'
+                            )
+
                             return address.lat && address.lng && (
                                 <Marker
                                     key={address.id}
@@ -914,8 +919,8 @@ export default function CanvassingMap() {
                                         scale: 8,
                                         fillColor: getMarkerColor(address),
                                         fillOpacity: 0.8,
-                                        strokeWeight: 2,
-                                        strokeColor: 'white'
+                                        strokeWeight: hasAssignment ? 3 : 2,
+                                        strokeColor: hasAssignment ? '#333' : 'white'
                                     }}
                                 />
                             )
@@ -1125,6 +1130,17 @@ export default function CanvassingMap() {
                         <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                             <span style={{color: '#28a745', fontSize: '20px'}}>⬤</span>
                             <span>All signatures complete</span>
+                        </div>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{
+                                display: 'inline-block',
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                backgroundColor: '#dc3545',
+                                border: '3px solid #333'
+                            }}></span>
+                            <span>Has assigned canvasser</span>
                         </div>
                     </div>
                     <p style={{marginTop: '12px'}}>Click on any marker to view details, record an interaction, or view history.</p>
