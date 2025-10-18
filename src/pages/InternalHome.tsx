@@ -260,6 +260,30 @@ export default function InternalHome() {
                         </div>
                     </div>
 
+                    {/* Houses Left to Reach 80% */}
+                    {statsLoaded && (() => {
+                        const targetAt80Percent = Math.ceil(stats.totalAddresses * 0.8)
+                        const housesLeft = Math.max(0, targetAt80Percent - stats.addressesWithAllConsents)
+                        return (
+                            <div style={{
+                                backgroundColor: '#fff3cd',
+                                border: '2px solid #ffc107',
+                                borderRadius: 8,
+                                padding: '16px 24px',
+                                marginTop: 16,
+                                marginBottom: 16,
+                                textAlign: 'center'
+                            }}>
+                                <div style={{fontSize: '18px', fontWeight: 'bold', color: '#856404', marginBottom: 4}}>
+                                    Houses Left to Reach 80%
+                                </div>
+                                <div style={{fontSize: '48px', fontWeight: 'bold', color: '#856404'}}>
+                                    {housesLeft}
+                                </div>
+                            </div>
+                        )
+                    })()}
+
                     <div style={{display: 'flex', gap: 20, fontSize: 14}}>
                         <span>Total Addresses: {statsLoaded ? stats.totalAddresses : ''}</span>
                         <span>Total Individuals: {statsLoaded ? stats.totalResidents : ''}</span>
