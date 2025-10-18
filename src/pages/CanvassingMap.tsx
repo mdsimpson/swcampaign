@@ -1072,7 +1072,7 @@ export default function CanvassingMap() {
                                                 const assignedVolunteers = addressAssignments
                                                     .map(assignment => {
                                                         const volunteer = allVolunteers.find(v => v.id === assignment.volunteerId)
-                                                        return volunteer?.name || 'Unknown'
+                                                        return volunteer?.displayName || volunteer?.email || 'Unknown'
                                                     })
                                                     .filter((name, index, self) => self.indexOf(name) === index) // Remove duplicates
 
