@@ -33,6 +33,8 @@ export default function CanvassingMap() {
     const [viewportLoading, setViewportLoading] = useState(false)
     const [allResidents, setAllResidents] = useState<any[]>([]) // Cache all residents
     const [allConsents, setAllConsents] = useState<any[]>([]) // Cache all consents
+    const [allVolunteers, setAllVolunteers] = useState<any[]>([]) // Cache all volunteers
+    const [allAssignments, setAllAssignments] = useState<any[]>([]) // Cache ALL assignments (not just current user)
     const [hasInitialBounds, setHasInitialBounds] = useState(false) // Track if we've set initial bounds
     const [toggleLoading, setToggleLoading] = useState(false) // Track toggle loading state
     const [filterText, setFilterText] = useState('') // Text filter for addresses/names
@@ -341,31 +343,39 @@ export default function CanvassingMap() {
             setAllAddresses(loadedAddresses)
             setAllResidents(loadedResidents)
             setAllConsents(loadedConsents)
-            
-            // Step 2: Get all volunteers to find the current user's volunteer record
-            const volunteersResult = await client.models.Volunteer.list({ 
-                limit: QUERY_LIMITS.VOLUNTEERS_LIMIT 
-            })
-            
+
+            // Step 2: Get ALL volunteers and ALL assignments for everyone
+            const [volunteersResult, allAssignmentsResult] = await Promise.all([
+                client.models.Volunteer.list({
+                    limit: QUERY_LIMITS.VOLUNTEERS_LIMIT
+                }),
+                loadAllRecords(
+                    (config) => client.models.Assignment.list(config),
+                    1000 // Batch size for assignments
+                )
+            ])
+
+            const volunteers = volunteersResult.data
+            setAllVolunteers(volunteers)
+            setAllAssignments(allAssignmentsResult)
+
             // Find the volunteer record for the current user
-            const currentUserVolunteer = volunteersResult.data.find(v => 
+            const currentUserVolunteer = volunteers.find(v =>
                 v.userSub === user?.userId || v.userSub === user?.username
             )
-            
+
             if (!currentUserVolunteer) {
                 setAssignments([])
                 return
             }
-            
-            // Step 3: Get assignments for this volunteer
-            const assignmentsResult = await client.models.Assignment.list({
-                filter: { volunteerId: { eq: currentUserVolunteer.id } }
-            })
-            
-            const activeAssignments = assignmentsResult.data.filter(a => a.status === 'NOT_STARTED')
-            
-            // Step 4: Just store the assignments - we'll load address details on demand for viewport
-            setAssignments(activeAssignments)
+
+            // Step 3: Filter assignments for current user (for "My Assignments" view)
+            const userAssignments = allAssignmentsResult.filter(a =>
+                a.volunteerId === currentUserVolunteer.id && a.status === 'NOT_STARTED'
+            )
+
+            // Step 4: Just store the current user's assignments - we'll load address details on demand for viewport
+            setAssignments(userAssignments)
             
         } catch (error) {
             console.error('💥 Failed to load initial data:', error)
@@ -1017,7 +1027,7 @@ export default function CanvassingMap() {
                                             )}
                                         </div>
                                         <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-                                            <button 
+                                            <button
                                                 onClick={openInteractionForm}
                                                 style={{
                                                     backgroundColor: '#007bff',
@@ -1031,7 +1041,7 @@ export default function CanvassingMap() {
                                             >
                                                 Record Interaction
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => window.open(`/history?address=${encodeURIComponent(selectedAddress.street)}`, 'canvassingHistoryTab')}
                                                 style={{
                                                     backgroundColor: '#6c757d',
@@ -1046,6 +1056,36 @@ export default function CanvassingMap() {
                                                 View History
                                             </button>
                                         </div>
+
+                                        {/* Assignment information */}
+                                        {(() => {
+                                            const addressAssignments = allAssignments.filter(a =>
+                                                a.addressId === selectedAddress.id && a.status === 'NOT_STARTED'
+                                            )
+
+                                            if (addressAssignments.length > 0) {
+                                                const assignedVolunteers = addressAssignments
+                                                    .map(assignment => {
+                                                        const volunteer = allVolunteers.find(v => v.id === assignment.volunteerId)
+                                                        return volunteer?.name || 'Unknown'
+                                                    })
+                                                    .filter((name, index, self) => self.indexOf(name) === index) // Remove duplicates
+
+                                                return (
+                                                    <div style={{
+                                                        marginTop: '8px',
+                                                        paddingTop: '8px',
+                                                        borderTop: '1px solid #eee',
+                                                        fontSize: '10px',
+                                                        color: '#666',
+                                                        fontStyle: 'italic'
+                                                    }}>
+                                                        Assigned to: {assignedVolunteers.join(', ')}
+                                                    </div>
+                                                )
+                                            }
+                                            return null
+                                        })()}
                                     </div>
                                     
                                     {/* Arrow pointing down to marker */}
