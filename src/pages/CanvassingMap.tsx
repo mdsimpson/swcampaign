@@ -931,19 +931,21 @@ export default function CanvassingMap() {
                                 position={{lat: selectedAddress.lat, lng: selectedAddress.lng}}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
-                                <div style={{
-                                    position: 'relative',
-                                    backgroundColor: 'white',
-                                    border: '1px solid #ccc',
-                                    borderRadius: '8px',
-                                    padding: '12px',
-                                    minWidth: '250px',
-                                    maxWidth: '300px',
-                                    boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-                                    transform: 'translate(-50%, -100%)',
-                                    marginTop: '-10px',
-                                    zIndex: 1000
-                                }}>
+                                <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                        position: 'relative',
+                                        backgroundColor: 'white',
+                                        border: '1px solid #ccc',
+                                        borderRadius: '8px',
+                                        padding: '12px',
+                                        minWidth: '250px',
+                                        maxWidth: '300px',
+                                        boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                                        transform: 'translate(-50%, -100%)',
+                                        marginTop: '-10px',
+                                        zIndex: 1000
+                                    }}>
                                     {/* Close button */}
                                     <button
                                         onClick={() => setSelectedAddress(null)}
@@ -1033,7 +1035,10 @@ export default function CanvassingMap() {
                                         </div>
                                         <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
                                             <button
-                                                onClick={openInteractionForm}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    openInteractionForm()
+                                                }}
                                                 style={{
                                                     backgroundColor: '#007bff',
                                                     color: 'white',
@@ -1047,7 +1052,10 @@ export default function CanvassingMap() {
                                                 Record Interaction
                                             </button>
                                             <button
-                                                onClick={() => window.open(`/history?address=${encodeURIComponent(selectedAddress.street)}`, 'canvassingHistoryTab')}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    window.open(`/history?address=${encodeURIComponent(selectedAddress.street)}`, 'canvassingHistoryTab')
+                                                }}
                                                 style={{
                                                     backgroundColor: '#6c757d',
                                                     color: 'white',
