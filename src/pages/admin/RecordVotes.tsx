@@ -4,23 +4,6 @@ import {generateClient} from 'aws-amplify/data'
 import type {Schema} from '../../../amplify/data/resource'
 import Papa from 'papaparse'
 
-function normalizeStreet(street: string): string {
-    return street.toLowerCase()
-        .replace(/\bterrace\b/g, 'ter')
-        .replace(/\bcircle\b/g, 'cir')
-        .replace(/\bcourt\b/g, 'ct')
-        .replace(/\bdrive\b/g, 'dr')
-        .replace(/\bstreet\b/g, 'st')
-        .replace(/\bavenue\b/g, 'ave')
-        .replace(/\broad\b/g, 'rd')
-        .replace(/\blane\b/g, 'ln')
-        .replace(/\bsquare\b/g, 'sq')
-        .replace(/\bplace\b/g, 'pl')
-        .replace(/\bboulevard\b/g, 'blvd')
-        .replace(/\s+/g, ' ')
-        .trim()
-}
-
 export default function RecordConsents() {
     const [searchTerm, setSearchTerm] = useState('')
     const [addresses, setAddresses] = useState<any[]>([])
@@ -30,7 +13,6 @@ export default function RecordConsents() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [uploadStatus, setUploadStatus] = useState('')
     const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
-    const [uploadFormat, setUploadFormat] = useState<'full' | 'simple'>('full')
     const [notFoundRecords, setNotFoundRecords] = useState<string[]>([])
     const [uploadResults, setUploadResults] = useState<any>(null)
 
@@ -282,167 +264,7 @@ export default function RecordConsents() {
             return
         }
 
-        // Handle simple format (person_id, expanded_name, expanded_email)
-        if (uploadFormat === 'simple') {
-            setUploadStatus('Loading all residents from database...')
-            let allResidents: any[] = []
-            let residentsNextToken = null
-            do {
-                const residentsResult = await client.models.Resident.list({
-                    limit: 1000,
-                    nextToken: residentsNextToken
-                })
-                allResidents.push(...residentsResult.data)
-                residentsNextToken = residentsResult.nextToken
-            } while (residentsNextToken)
-
-            console.log(`=== Loaded ${allResidents.length} total residents from database ===`)
-
-            // Load existing consents
-            setUploadStatus('Loading existing consents...')
-            let allConsents: any[] = []
-            let consentsNextToken = null
-            do {
-                const consentsResult = await client.models.Consent.list({
-                    limit: 1000,
-                    nextToken: consentsNextToken
-                })
-                allConsents.push(...consentsResult.data)
-                consentsNextToken = consentsResult.nextToken
-            } while (consentsNextToken)
-
-            const residentsWithConsents = new Set(allConsents.map(c => c.residentId))
-            console.log(`=== Found ${residentsWithConsents.size} residents with existing consents ===`)
-
-            let processed = 0
-            let newRecords = 0
-            let alreadySigned = 0
-            let emailsUpdated = 0
-            let notFound = 0
-            let skippedMissingData = 0
-            const errors: string[] = []
-
-            setUploadStatus('Processing consent records...')
-
-            for (const row of rows) {
-                const personId = row.person_id?.trim()
-                const email = row.email?.trim()
-                const submissionId = row.submission_id?.trim() || row.Number?.trim() // Handle both column names
-
-                if (!personId) {
-                    skippedMissingData++
-                    processed++
-                    continue
-                }
-
-                try {
-                    // Find resident by personId or externalId
-                    const foundResident = allResidents.find(r =>
-                        r.personId === personId || r.externalId === personId
-                    )
-
-                    if (foundResident) {
-                        // Check if resident already has consent
-                        if (residentsWithConsents.has(foundResident.id)) {
-                            // Update email and/or submissionId if needed
-                            const existingConsent = allConsents.find(c => c.residentId === foundResident.id)
-                            if (existingConsent) {
-                                const updates: any = { id: existingConsent.id }
-                                let needsUpdate = false
-
-                                if (email && !existingConsent.email) {
-                                    updates.email = email
-                                    needsUpdate = true
-                                }
-
-                                if (submissionId && !existingConsent.submissionId) {
-                                    updates.submissionId = submissionId
-                                    needsUpdate = true
-                                }
-
-                                if (needsUpdate) {
-                                    await client.models.Consent.update(updates)
-                                    emailsUpdated++
-                                }
-                            }
-                            alreadySigned++
-                        } else {
-                            // Create new consent
-                            await client.models.Consent.create({
-                                residentId: foundResident.id,
-                                addressId: foundResident.addressId!,
-                                recordedAt: new Date().toISOString(),
-                                source: 'csv-upload',
-                                email: email || null,
-                                submissionId: submissionId || null
-                            })
-                            await client.models.Resident.update({
-                                id: foundResident.id,
-                                hasSigned: true,
-                                signedAt: new Date().toISOString()
-                            })
-                            residentsWithConsents.add(foundResident.id)
-                            newRecords++
-                        }
-                    } else {
-                        notFound++
-                        errors.push(`person_id: ${personId}`)
-                    }
-                } catch (err) {
-                    console.error(`Error processing person_id ${personId}:`, err)
-                    errors.push(`person_id ${personId} - Error: ${err}`)
-                }
-
-                processed++
-                setUploadProgress({ current: processed, total: rows.length })
-            }
-
-            await loadAddresses()
-
-            const statusParts = [
-                `${rows.length} rows in CSV`,
-                `${newRecords} new consents created`,
-                `${alreadySigned} already signed${emailsUpdated > 0 ? ` (${emailsUpdated} emails updated)` : ''}`,
-                `${notFound} not found in DB`,
-                `${skippedMissingData} missing person_id`
-            ]
-
-            const finalStatus = `✅ ${statusParts.join(' | ')}`
-            setUploadStatus(finalStatus)
-            setUploadProgress({ current: 0, total: 0 })
-            setNotFoundRecords(errors)
-            setUploadResults({
-                totalRows: rows.length,
-                newRecords,
-                alreadySigned,
-                emailsUpdated,
-                notFound,
-                skippedMissingData
-            })
-
-            console.log('\n' + '='.repeat(80))
-            console.log('UPLOAD SUMMARY:')
-            console.log('='.repeat(80))
-            console.log(`Total rows in CSV: ${rows.length}`)
-            console.log(`New consents created: ${newRecords}`)
-            console.log(`Already signed (skipped): ${alreadySigned}`)
-            console.log(`Emails updated: ${emailsUpdated}`)
-            console.log(`Not found in database: ${notFound}`)
-            console.log(`Missing person_id (skipped): ${skippedMissingData}`)
-            console.log('='.repeat(80))
-
-            if (errors.length > 0 && errors.length <= 20) {
-                console.log('\nNot found in database:', errors)
-            } else if (errors.length > 20) {
-                console.log('\nNot found in database (first 20):', errors.slice(0, 20))
-                console.log(`... and ${errors.length - 20} more`)
-            }
-
-            return
-        }
-
-        // Original full format logic below
-        // Load ALL residents (like /organize page does)
+        // Simple format: person_id, submission_id, email (extra columns ignored)
         setUploadStatus('Loading all residents from database...')
         let allResidents: any[] = []
         let residentsNextToken = null
@@ -457,7 +279,7 @@ export default function RecordConsents() {
 
         console.log(`=== Loaded ${allResidents.length} total residents from database ===`)
 
-        // Load existing consents to check which residents already have consents
+        // Load existing consents
         setUploadStatus('Loading existing consents...')
         let allConsents: any[] = []
         let consentsNextToken = null
@@ -470,7 +292,6 @@ export default function RecordConsents() {
             consentsNextToken = consentsResult.nextToken
         } while (consentsNextToken)
 
-        // Create a Set of residentIds that already have consents
         const residentsWithConsents = new Set(allConsents.map(c => c.residentId))
         console.log(`=== Found ${residentsWithConsents.size} residents with existing consents ===`)
 
@@ -480,69 +301,28 @@ export default function RecordConsents() {
         let emailsUpdated = 0
         let notFound = 0
         let skippedMissingData = 0
-        let skippedDuplicates = 0
         const errors: string[] = []
-        const processedInThisUpload = new Set<string>() // Track processed residents in this upload
 
         setUploadStatus('Processing consent records...')
 
         for (const row of rows) {
-            const firstName = row.resident_first_name?.trim()
-            const lastName = row.resident_last_name?.trim()
-            const street = row.resident_street?.trim() || row.expanded_street?.trim()
-            const email = row.resident_email?.trim() || row.expanded_email?.trim() // Capture email from CSV
+            const personId = row.person_id?.trim()
+            const email = row.email?.trim()
             const submissionId = row.submission_id?.trim() || row.Number?.trim() // Handle both column names
 
-            if (!firstName || !lastName || !street) {
+            if (!personId) {
                 skippedMissingData++
                 processed++
-                if (skippedMissingData <= 5) {
-                    console.log(`   ⚠️  SKIPPED (missing data): firstName="${firstName}", lastName="${lastName}", street="${street}"`)
-                }
                 continue
             }
 
             try {
-                // Find resident by name (client-side filtering like /organize page)
-                const nameMatches = allResidents.filter(r =>
-                    r.firstName?.toLowerCase() === firstName?.toLowerCase() &&
-                    r.lastName?.toLowerCase() === lastName?.toLowerCase()
+                // Find resident by personId or externalId
+                const foundResident = allResidents.find(r =>
+                    r.personId === personId || r.externalId === personId
                 )
 
-                if (processed < 5) {
-                    console.log(`[${processed + 1}] Searching: ${firstName} ${lastName} at ${street}`)
-                    console.log(`   Found ${nameMatches.length} name matches`)
-                }
-
-                // Find the one with matching address
-                let foundResident = null
-                const normalizedCsvStreet = normalizeStreet(street)
-
-                for (const resident of nameMatches) {
-                    const address = await client.models.Address.get({ id: resident.addressId! })
-                    if (processed < 5 && address.data) {
-                        console.log(`   Comparing: "${normalizedCsvStreet}" vs "${normalizeStreet(address.data.street)}"`)
-                    }
-                    if (address.data && normalizeStreet(address.data.street) === normalizedCsvStreet) {
-                        foundResident = resident
-                        break
-                    }
-                }
-
                 if (foundResident) {
-                    // Skip if we already processed this resident in this upload session
-                    if (processedInThisUpload.has(foundResident.id)) {
-                        skippedDuplicates++
-                        if (skippedDuplicates <= 10) {
-                            console.log(`   ⏭️  SKIPPED (duplicate in CSV): ${firstName} ${lastName}`)
-                        }
-                        processed++
-                        continue
-                    }
-
-                    // Mark as processed in this upload
-                    processedInThisUpload.add(foundResident.id)
-
                     // Check if resident already has consent
                     if (residentsWithConsents.has(foundResident.id)) {
                         // Update email and/or submissionId if needed
@@ -582,35 +362,30 @@ export default function RecordConsents() {
                             hasSigned: true,
                             signedAt: new Date().toISOString()
                         })
-                        residentsWithConsents.add(foundResident.id) // Track for this session
+                        residentsWithConsents.add(foundResident.id)
                         newRecords++
                     }
                 } else {
                     notFound++
-                    if (processed < 10) {
-                        console.log(`   ❌ NOT FOUND: ${firstName} ${lastName} at ${street}`)
-                    }
-                    errors.push(`${firstName} ${lastName} at ${street}`)
+                    errors.push(`person_id: ${personId}`)
                 }
             } catch (err) {
-                console.error(`Error processing ${firstName} ${lastName}:`, err)
-                errors.push(`${firstName} ${lastName} - Error: ${err}`)
+                console.error(`Error processing person_id ${personId}:`, err)
+                errors.push(`person_id ${personId} - Error: ${err}`)
             }
 
             processed++
             setUploadProgress({ current: processed, total: rows.length })
         }
 
-        await loadAddresses() // Refresh the data
+        await loadAddresses()
 
-        // Build detailed status message
         const statusParts = [
             `${rows.length} rows in CSV`,
             `${newRecords} new consents created`,
             `${alreadySigned} already signed${emailsUpdated > 0 ? ` (${emailsUpdated} emails updated)` : ''}`,
             `${notFound} not found in DB`,
-            `${skippedDuplicates} duplicates in CSV`,
-            `${skippedMissingData} missing data`
+            `${skippedMissingData} missing person_id`
         ]
 
         const finalStatus = `✅ ${statusParts.join(' | ')}`
@@ -623,7 +398,6 @@ export default function RecordConsents() {
             alreadySigned,
             emailsUpdated,
             notFound,
-            skippedDuplicates,
             skippedMissingData
         })
 
@@ -635,10 +409,7 @@ export default function RecordConsents() {
         console.log(`Already signed (skipped): ${alreadySigned}`)
         console.log(`Emails updated: ${emailsUpdated}`)
         console.log(`Not found in database: ${notFound}`)
-        console.log(`Duplicates in CSV (skipped): ${skippedDuplicates}`)
-        console.log(`Missing data (skipped): ${skippedMissingData}`)
-        console.log('='.repeat(80))
-        console.log(`Expected total consents: ${newRecords + alreadySigned}`)
+        console.log(`Missing person_id (skipped): ${skippedMissingData}`)
         console.log('='.repeat(80))
 
         if (errors.length > 0 && errors.length <= 20) {
@@ -698,28 +469,9 @@ export default function RecordConsents() {
                     <h3>Bulk Upload Consents (CSV)</h3>
 
                     <div style={{marginBottom: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 4}}>
-                        <strong>Select CSV Format:</strong>
-                        <div style={{marginTop: 8}}>
-                            <label style={{display: 'block', marginBottom: 8}}>
-                                <input
-                                    type='radio'
-                                    value='simple'
-                                    checked={uploadFormat === 'simple'}
-                                    onChange={(e) => setUploadFormat('simple')}
-                                    style={{marginRight: 8}}
-                                />
-                                <strong>Simple format:</strong> person_id, submission_id, email (extra columns ignored)
-                            </label>
-                            <label style={{display: 'block'}}>
-                                <input
-                                    type='radio'
-                                    value='full'
-                                    checked={uploadFormat === 'full'}
-                                    onChange={(e) => setUploadFormat('full')}
-                                    style={{marginRight: 8}}
-                                />
-                                <strong>Full format:</strong> person_id, expanded_name, expanded_email, expanded_street, resident_street, resident_first_name, resident_last_name, resident_email, match_type (optional: submission_id or Number)
-                            </label>
+                        <strong>CSV Format:</strong>
+                        <div style={{marginTop: 8, fontSize: '0.95em'}}>
+                            Required columns: <code>person_id</code>, <code>submission_id</code>, <code>email</code>
                         </div>
                         <div style={{marginTop: 8, fontSize: '0.9em', color: '#666'}}>
                             💡 Re-uploading files will update existing consents with missing email or submission_id values without creating duplicates.
