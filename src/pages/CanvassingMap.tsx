@@ -492,6 +492,11 @@ export default function CanvassingMap() {
         }
     }
 
+    function hasAbsenteeOwner(address: any) {
+        const residents = address.residents || []
+        return residents.some((r: any) => r.isAbsentee === true)
+    }
+
     function exportToCSV() {
         // Create CSV header
         const headers = ['Address', 'City', 'State', 'Zip', 'First Name', 'Last Name', 'Signed', 'Email']
@@ -909,13 +914,18 @@ export default function CanvassingMap() {
                                 a.addressId === address.id && a.status === 'NOT_STARTED'
                             )
 
+                            // Check if this address has absentee owners
+                            const isAbsentee = hasAbsenteeOwner(address)
+
                             return address.lat && address.lng && (
                                 <Marker
                                     key={address.id}
                                     position={{lat: address.lat, lng: address.lng}}
                                     onClick={() => handleAddressClick(address)}
                                     icon={{
-                                        path: google.maps.SymbolPath.CIRCLE,
+                                        path: isAbsentee
+                                            ? 'M -6,-6 L 6,-6 L 6,6 L -6,6 Z' // Square path for absentee
+                                            : google.maps.SymbolPath.CIRCLE,
                                         scale: 8,
                                         fillColor: getMarkerColor(address),
                                         fillOpacity: 0.8,
@@ -1149,6 +1159,15 @@ export default function CanvassingMap() {
                                 border: '3px solid #333'
                             }}></span>
                             <span>Has assigned canvasser</span>
+                        </div>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{
+                                display: 'inline-block',
+                                width: '16px',
+                                height: '16px',
+                                backgroundColor: '#dc3545'
+                            }}></span>
+                            <span>Has absentee owner(s)</span>
                         </div>
                     </div>
                     <p style={{marginTop: '12px'}}>Click on any marker to view details, record an interaction, or view history.</p>
