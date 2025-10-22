@@ -924,7 +924,7 @@ export default function CanvassingMap() {
                                     onClick={() => handleAddressClick(address)}
                                     icon={{
                                         path: isAbsentee
-                                            ? 'M -6,-6 L 6,-6 L 6,6 L -6,6 Z' // Square path for absentee
+                                            ? 'M -1,-1 L 1,-1 L 1,1 L -1,1 Z' // Square path for absentee
                                             : google.maps.SymbolPath.CIRCLE,
                                         scale: 8,
                                         fillColor: getMarkerColor(address),
