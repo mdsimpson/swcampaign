@@ -30,6 +30,7 @@ export default function CanvassingMap() {
     const [initialCenter, setInitialCenter] = useState<{lat: number, lng: number} | null>(null)
     const [userHeading, setUserHeading] = useState<number | null>(null)
     const [rotateMapEnabled, setRotateMapEnabled] = useState(false)
+    const [followModeEnabled, setFollowModeEnabled] = useState(false)
     const [mapsLoaded, setMapsLoaded] = useState(false)
     const [mapInstance, setMapInstance] = useState(null)
     const [dataLoading, setDataLoading] = useState(true)
@@ -171,6 +172,13 @@ export default function CanvassingMap() {
             mapInstance.setHeading(0)
         }
     }, [mapInstance, rotateMapEnabled, userHeading])
+
+    // Center map on user location when follow mode is enabled
+    useEffect(() => {
+        if (mapInstance && followModeEnabled && userLocation) {
+            mapInstance.panTo(userLocation)
+        }
+    }, [mapInstance, followModeEnabled, userLocation])
 
     // Load addresses when map viewport changes OR when initial data loads
     useEffect(() => {
@@ -684,6 +692,21 @@ export default function CanvassingMap() {
                                 title={rotateMapEnabled ? 'Compass mode active - map rotates with your direction' : 'Click to enable compass mode'}
                             >
                                 {rotateMapEnabled ? '🧭 Compass ON' : '🧭 Compass OFF'}
+                            </button>
+                            <button
+                                onClick={() => setFollowModeEnabled(!followModeEnabled)}
+                                style={{
+                                    backgroundColor: followModeEnabled ? '#17a2b8' : '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: 4,
+                                    cursor: 'pointer',
+                                    fontWeight: followModeEnabled ? 'bold' : 'normal'
+                                }}
+                                title={followModeEnabled ? 'Follow mode active - map centers on your location' : 'Click to enable follow mode'}
+                            >
+                                {followModeEnabled ? '📍 Follow ON' : '📍 Follow OFF'}
                             </button>
                             <button
                                 onClick={() => {
