@@ -28,6 +28,8 @@ export default function CanvassingMap() {
     const [selectedAddress, setSelectedAddress] = useState<any>(null)
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
     const [initialCenter, setInitialCenter] = useState<{lat: number, lng: number} | null>(null)
+    const [userHeading, setUserHeading] = useState<number | null>(null)
+    const [rotateMapEnabled, setRotateMapEnabled] = useState(false)
     const [mapsLoaded, setMapsLoaded] = useState(false)
     const [mapInstance, setMapInstance] = useState(null)
     const [dataLoading, setDataLoading] = useState(true)
@@ -159,6 +161,16 @@ export default function CanvassingMap() {
             }
         }
     }, [user])
+
+    // Apply map rotation when heading changes and rotation is enabled
+    useEffect(() => {
+        if (mapInstance && rotateMapEnabled && userHeading !== null) {
+            mapInstance.setHeading(userHeading)
+        } else if (mapInstance && !rotateMapEnabled) {
+            // Reset to north when rotation is disabled
+            mapInstance.setHeading(0)
+        }
+    }, [mapInstance, rotateMapEnabled, userHeading])
 
     // Load addresses when map viewport changes OR when initial data loads
     useEffect(() => {
@@ -477,6 +489,11 @@ export default function CanvassingMap() {
                     }
                     setUserLocation(newLocation)
 
+                    // Capture heading if available
+                    if (position.coords.heading !== null && position.coords.heading !== undefined) {
+                        setUserHeading(position.coords.heading)
+                    }
+
                     // Set initial center only once
                     if (!initialCenter) {
                         setInitialCenter(newLocation)
@@ -653,6 +670,21 @@ export default function CanvassingMap() {
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
                         <h2 style={{margin: 0}}>Canvassing Map</h2>
                         <div style={{display: 'flex', gap: 8, alignItems: 'center'}}>
+                            <button
+                                onClick={() => setRotateMapEnabled(!rotateMapEnabled)}
+                                style={{
+                                    backgroundColor: rotateMapEnabled ? '#17a2b8' : '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: 4,
+                                    cursor: 'pointer',
+                                    fontWeight: rotateMapEnabled ? 'bold' : 'normal'
+                                }}
+                                title={rotateMapEnabled ? 'Compass mode active - map rotates with your direction' : 'Click to enable compass mode'}
+                            >
+                                {rotateMapEnabled ? '🧭 Compass ON' : '🧭 Compass OFF'}
+                            </button>
                             <button
                                 onClick={() => {
                                     console.log('Manual reload triggered')
