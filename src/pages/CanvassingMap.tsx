@@ -27,6 +27,7 @@ export default function CanvassingMap() {
     const [showAll, setShowAll] = useState(true)
     const [selectedAddress, setSelectedAddress] = useState<any>(null)
     const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null)
+    const [initialCenter, setInitialCenter] = useState<{lat: number, lng: number} | null>(null)
     const [mapsLoaded, setMapsLoaded] = useState(false)
     const [mapInstance, setMapInstance] = useState(null)
     const [dataLoading, setDataLoading] = useState(true)
@@ -150,7 +151,12 @@ export default function CanvassingMap() {
     useEffect(() => {
         if (user?.userId) {
             loadInitialData() // Load assignments and all reference data
-            getUserLocation()
+            const cleanup = getUserLocation()
+
+            // Cleanup on unmount
+            return () => {
+                if (cleanup) cleanup()
+            }
         }
     }, [user])
 
@@ -462,15 +468,34 @@ export default function CanvassingMap() {
 
     function getUserLocation() {
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
+            // Watch position for continuous updates
+            const watchId = navigator.geolocation.watchPosition(
                 (position) => {
-                    setUserLocation({
+                    const newLocation = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
-                    })
+                    }
+                    setUserLocation(newLocation)
+
+                    // Set initial center only once
+                    if (!initialCenter) {
+                        setInitialCenter(newLocation)
+                    }
                 },
-                () => {}
+                (error) => {
+                    console.error('Error watching location:', error)
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 5000,
+                    timeout: 10000
+                }
             )
+
+            // Return cleanup function
+            return () => {
+                navigator.geolocation.clearWatch(watchId)
+            }
         }
     }
 
@@ -863,7 +888,7 @@ export default function CanvassingMap() {
                 >
                     <GoogleMap
                         mapContainerStyle={mapContainerStyle}
-                        center={userLocation || center}
+                        center={initialCenter || center}
                         zoom={12}
                         options={{
                             disableDefaultUI: false,
