@@ -691,7 +691,7 @@ export default function CanvassingMap() {
                                 }}
                                 title={rotateMapEnabled ? 'Compass mode active - map rotates with your direction' : 'Click to enable compass mode'}
                             >
-                                {rotateMapEnabled ? '🧭 Compass ON' : '🧭 Compass OFF'}
+                                {rotateMapEnabled ? '🧭 Compass is On' : '🧭 Compass is Off'}
                             </button>
                             <button
                                 onClick={() => setFollowModeEnabled(!followModeEnabled)}
@@ -706,7 +706,7 @@ export default function CanvassingMap() {
                                 }}
                                 title={followModeEnabled ? 'Follow mode active - map centers on your location' : 'Click to enable follow mode'}
                             >
-                                {followModeEnabled ? '📍 Follow ON' : '📍 Follow OFF'}
+                                {followModeEnabled ? '📍 Follow is On' : '📍 Follow is Off'}
                             </button>
                             <button
                                 onClick={() => {
