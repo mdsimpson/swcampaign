@@ -513,10 +513,8 @@ export default function CanvassingMap() {
                         setUserHeading(position.coords.heading)
                     }
 
-                    // Set initial center only once
-                    if (!initialCenter) {
-                        setInitialCenter(newLocation)
-                    }
+                    // Set initial center only once (but don't use it to control the map)
+                    setInitialCenter(prev => prev || newLocation)
                 },
                 (error) => {
                     console.error('Error watching location:', error)
@@ -1010,7 +1008,8 @@ export default function CanvassingMap() {
                 >
                     <GoogleMap
                         mapContainerStyle={mapContainerStyle}
-                        center={initialCenter || center}
+                        center={undefined}
+                        defaultCenter={center}
                         zoom={12}
                         options={{
                             disableDefaultUI: false,
