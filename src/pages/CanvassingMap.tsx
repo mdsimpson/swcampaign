@@ -175,10 +175,17 @@ export default function CanvassingMap() {
 
     // Center map on user location when follow mode is enabled
     useEffect(() => {
-        if (mapInstance && followModeEnabled && userLocation) {
-            mapInstance.panTo(userLocation)
-        }
-    }, [mapInstance, followModeEnabled, userLocation])
+        if (!mapInstance || !followModeEnabled) return
+
+        // Set up interval to pan to user location while follow mode is active
+        const followInterval = setInterval(() => {
+            if (userLocation && followModeEnabled) {
+                mapInstance.panTo(userLocation)
+            }
+        }, 1000) // Update every second instead of every location change
+
+        return () => clearInterval(followInterval)
+    }, [mapInstance, followModeEnabled])
 
     // Load addresses when map viewport changes OR when initial data loads
     useEffect(() => {
