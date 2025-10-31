@@ -1004,12 +1004,12 @@ export default function CanvassingMap() {
                             const isAbsentee = hasAbsenteeOwner(address)
                             const hasUnconfirmed = hasUnconfirmedSignature(address)
 
-                            // Determine marker shape: triangle for unconfirmed, square for absentee, circle otherwise
+                            // Determine marker shape: square for absentee (priority), triangle for unconfirmed, circle otherwise
                             let markerPath
-                            if (hasUnconfirmed) {
-                                markerPath = 'M 0,-1.2 L 1.04,0.6 L -1.04,0.6 Z' // Equilateral triangle pointing up
-                            } else if (isAbsentee) {
+                            if (isAbsentee) {
                                 markerPath = 'M -1,-1 L 1,-1 L 1,1 L -1,1 Z' // Square path for absentee
+                            } else if (hasUnconfirmed) {
+                                markerPath = 'M 0,-1.2 L 1.04,0.6 L -1.04,0.6 Z' // Equilateral triangle pointing up
                             } else {
                                 markerPath = google.maps.SymbolPath.CIRCLE
                             }
