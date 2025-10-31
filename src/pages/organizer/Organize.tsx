@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import {fetchAuthSession} from 'aws-amplify/auth'
 import {CognitoIdentityProviderClient, ListUsersCommand, AdminListGroupsForUserCommand} from '@aws-sdk/client-cognito-identity-provider'
 import { QUERY_LIMITS, loadAllRecords, createPaginationConfig } from '../../config/queries'
+import {useAuthenticator} from '@aws-amplify/ui-react'
 
 // Get User Pool ID - use production ID when deployed, sandbox when local
 const USER_POOL_ID = window.location.hostname === 'swhoa.michael-simpson.com' 
@@ -13,14 +14,16 @@ const USER_POOL_ID = window.location.hostname === 'swhoa.michael-simpson.com'
     : 'us-east-1_GrxwbZK9I'  // Sandbox User Pool ID
 
 export default function Organize() {
+    const {user} = useAuthenticator(ctx => [ctx.user])
     const location = useLocation()
     const navigate = useNavigate()
-    
+
     const [addresses, setAddresses] = useState<any[]>([])
     const [volunteers, setVolunteers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedAddresses, setSelectedAddresses] = useState<Set<string>>(new Set())
     const [assignToVolunteer, setAssignToVolunteer] = useState('')
+    const [currentUserVolunteer, setCurrentUserVolunteer] = useState<any>(null)
     
     // Initialize filter state from URL params
     const initializeFiltersFromURL = () => {
@@ -558,6 +561,12 @@ export default function Organize() {
                         id: v.id 
                     })))
                     setVolunteers(allVolunteers)
+
+                    // Find current user's volunteer record
+                    const currentVol = allVolunteers.find(v =>
+                        v.userSub === user?.userId || v.userSub === user?.username
+                    )
+                    setCurrentUserVolunteer(currentVol)
                 } catch (error) {
                     console.error('Failed to load volunteers:', error)
                 }
@@ -899,6 +908,45 @@ export default function Organize() {
         }
     }
 
+    async function removeMyAssignments() {
+        if (!currentUserVolunteer) {
+            alert('Current user volunteer record not found.')
+            return
+        }
+
+        if (!confirm(`Remove all of your canvassing assignments? This cannot be undone.`)) {
+            return
+        }
+
+        try {
+            const client = generateClient<Schema>()
+
+            // Find all NOT_STARTED assignments for current user
+            const myAssignments = await loadAllRecords(
+                (config) => client.models.Assignment.list({
+                    ...config,
+                    filter: {
+                        volunteerId: { eq: currentUserVolunteer.id },
+                        status: { eq: 'NOT_STARTED' }
+                    }
+                })
+            )
+
+            // Delete all assignments
+            for (const assignment of myAssignments) {
+                await client.models.Assignment.delete({ id: assignment.id })
+            }
+
+            alert(`Removed ${myAssignments.length} assignment(s)`)
+
+            // Reload data
+            await loadData()
+        } catch (error) {
+            console.error('Failed to remove assignments:', error)
+            alert('Failed to remove assignments. Please try again.')
+        }
+    }
+
     return (
         <div>
             <Header/>
@@ -1088,6 +1136,22 @@ export default function Organize() {
                             }}
                         >
                             Unassign Selected
+                        </button>
+
+                        <button
+                            onClick={removeMyAssignments}
+                            disabled={!currentUserVolunteer}
+                            style={{
+                                backgroundColor: currentUserVolunteer ? '#ffc107' : '#6c757d',
+                                color: '#333',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: 4,
+                                cursor: currentUserVolunteer ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Remove My Assignments
                         </button>
                     </div>
                 </div>
