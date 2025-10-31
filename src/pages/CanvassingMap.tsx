@@ -444,6 +444,7 @@ export default function CanvassingMap() {
                 return {
                     ...resident,
                     hasSigned: !!consent,
+                    signatureStatus: consent?.signatureStatus || null,
                     consentEmail: consent?.email || null
                 }
             })
@@ -545,6 +546,11 @@ export default function CanvassingMap() {
     function hasAbsenteeOwner(address: any) {
         const residents = address.residents || []
         return residents.some((r: any) => r.isAbsentee === true)
+    }
+
+    function hasUnconfirmedSignature(address: any) {
+        const residents = address.residents || []
+        return residents.some((r: any) => r.signatureStatus === 'Unconfirmed')
     }
 
     function exportToCSV() {
@@ -994,8 +1000,19 @@ export default function CanvassingMap() {
                                 a.addressId === address.id && a.status === 'NOT_STARTED'
                             )
 
-                            // Check if this address has absentee owners
+                            // Check if this address has absentee owners or unconfirmed signatures
                             const isAbsentee = hasAbsenteeOwner(address)
+                            const hasUnconfirmed = hasUnconfirmedSignature(address)
+
+                            // Determine marker shape: triangle for unconfirmed, square for absentee, circle otherwise
+                            let markerPath
+                            if (hasUnconfirmed) {
+                                markerPath = 'M 0,-1.2 L 1.04,0.6 L -1.04,0.6 Z' // Equilateral triangle pointing up
+                            } else if (isAbsentee) {
+                                markerPath = 'M -1,-1 L 1,-1 L 1,1 L -1,1 Z' // Square path for absentee
+                            } else {
+                                markerPath = google.maps.SymbolPath.CIRCLE
+                            }
 
                             return address.lat && address.lng && (
                                 <Marker
@@ -1003,11 +1020,9 @@ export default function CanvassingMap() {
                                     position={{lat: address.lat, lng: address.lng}}
                                     onClick={() => handleAddressClick(address)}
                                     icon={{
-                                        path: isAbsentee
-                                            ? 'M -1,-1 L 1,-1 L 1,1 L -1,1 Z' // Square path for absentee
-                                            : google.maps.SymbolPath.CIRCLE,
+                                        path: markerPath,
                                         scale: 8,
-                                        fillColor: getMarkerColor(address),
+                                        fillColor: hasUnconfirmed ? '#ffc107' : getMarkerColor(address),
                                         fillOpacity: 0.8,
                                         strokeWeight: hasAssignment ? 3 : 2,
                                         strokeColor: hasAssignment ? '#333' : 'white'
@@ -1105,13 +1120,13 @@ export default function CanvassingMap() {
                                                                 <span style={{
                                                                     fontSize: '11px',
                                                                     fontWeight: 'bold',
-                                                                    color: resident.hasSigned ? '#28a745' : (isAbsentee ? '#ffc107' : '#dc3545'),
-                                                                    backgroundColor: resident.hasSigned ? '#d4edda' : (isAbsentee ? '#fff3cd' : '#f8d7da'),
+                                                                    color: resident.signatureStatus === 'Unconfirmed' ? '#ffc107' : (resident.hasSigned ? '#28a745' : (isAbsentee ? '#ffc107' : '#dc3545')),
+                                                                    backgroundColor: resident.signatureStatus === 'Unconfirmed' ? '#fff3cd' : (resident.hasSigned ? '#d4edda' : (isAbsentee ? '#fff3cd' : '#f8d7da')),
                                                                     padding: '3px 8px',
                                                                     borderRadius: '4px',
-                                                                    border: `1px solid ${resident.hasSigned ? '#28a745' : (isAbsentee ? '#ffc107' : '#dc3545')}`
+                                                                    border: `1px solid ${resident.signatureStatus === 'Unconfirmed' ? '#ffc107' : (resident.hasSigned ? '#28a745' : (isAbsentee ? '#ffc107' : '#dc3545'))}`
                                                                 }}>
-                                                                    {resident.hasSigned ? '✓ SIGNED' : (isAbsentee ? '📮 ABSENTEE' : '✗ NOT SIGNED')}
+                                                                    {resident.signatureStatus === 'Unconfirmed' ? '⚠ UNCONFIRMED' : (resident.hasSigned ? '✓ SIGNED' : (isAbsentee ? '📮 ABSENTEE' : '✗ NOT SIGNED'))}
                                                                 </span>
                                                             </div>
                                                         </div>

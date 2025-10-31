@@ -16,6 +16,12 @@ export default function RecordConsents() {
     const [notFoundRecords, setNotFoundRecords] = useState<string[]>([])
     const [uploadResults, setUploadResults] = useState<any>(null)
 
+    const [selectedUnconfirmedFile, setSelectedUnconfirmedFile] = useState<File | null>(null)
+    const [unconfirmedUploadStatus, setUnconfirmedUploadStatus] = useState('')
+    const [unconfirmedUploadProgress, setUnconfirmedUploadProgress] = useState({ current: 0, total: 0 })
+    const [unconfirmedNotFoundRecords, setUnconfirmedNotFoundRecords] = useState<string[]>([])
+    const [unconfirmedUploadResults, setUnconfirmedUploadResults] = useState<any>(null)
+
     useEffect(() => {
         loadAddresses()
     }, [])
@@ -420,6 +426,191 @@ export default function RecordConsents() {
         }
     }
 
+    async function handleUnconfirmedFileUpload() {
+        if (!selectedUnconfirmedFile) {
+            setUnconfirmedUploadStatus('❌ No file selected')
+            return
+        }
+
+        let rows: any[] = []
+
+        try {
+            setUnconfirmedUploadStatus('Reading file...')
+            const text = await selectedUnconfirmedFile.text()
+
+            // Parse CSV properly with papaparse
+            const parsed = Papa.parse(text, {
+                header: true,
+                skipEmptyLines: true
+            })
+
+            rows = parsed.data as any[]
+
+            if (rows.length === 0) {
+                setUnconfirmedUploadStatus('❌ CSV file is empty')
+                setUnconfirmedUploadProgress({ current: 0, total: 0 })
+                return
+            }
+
+            setUnconfirmedUploadProgress({ current: 0, total: rows.length })
+        } catch (error) {
+            console.error('Error reading file:', error)
+            setUnconfirmedUploadStatus('❌ Error reading file. Please try selecting the file again.')
+            setUnconfirmedUploadProgress({ current: 0, total: 0 })
+            setSelectedUnconfirmedFile(null)
+            return
+        }
+
+        // Simple format: person_id, submission_id, email (extra columns ignored)
+        setUnconfirmedUploadStatus('Loading all residents from database...')
+        let allResidents: any[] = []
+        let residentsNextToken = null
+        do {
+            const residentsResult = await client.models.Resident.list({
+                limit: 1000,
+                nextToken: residentsNextToken
+            })
+            allResidents.push(...residentsResult.data)
+            residentsNextToken = residentsResult.nextToken
+        } while (residentsNextToken)
+
+        console.log(`=== Loaded ${allResidents.length} total residents from database ===`)
+
+        // Load existing consents
+        setUnconfirmedUploadStatus('Loading existing consents...')
+        let allConsents: any[] = []
+        let consentsNextToken = null
+        do {
+            const consentsResult = await client.models.Consent.list({
+                limit: 1000,
+                nextToken: consentsNextToken
+            })
+            allConsents.push(...consentsResult.data)
+            consentsNextToken = consentsResult.nextToken
+        } while (consentsNextToken)
+
+        const existingConsentsByResident = new Map(allConsents.map(c => [c.residentId, c]))
+        console.log(`=== Found ${existingConsentsByResident.size} residents with existing consents ===`)
+
+        let processed = 0
+        let newRecords = 0
+        let statusUpdated = 0
+        let notFound = 0
+        let skippedMissingData = 0
+        const errors: string[] = []
+
+        setUnconfirmedUploadStatus('Processing unconfirmed consent records...')
+
+        for (const row of rows) {
+            const personId = row.person_id?.trim()
+            const email = row.email?.trim()
+            const submissionId = row.submission_id?.trim() || row.Number?.trim()
+
+            if (!personId) {
+                skippedMissingData++
+                processed++
+                continue
+            }
+
+            try {
+                // Find resident by personId or externalId
+                const foundResident = allResidents.find(r =>
+                    r.personId === personId || r.externalId === personId
+                )
+
+                if (foundResident) {
+                    // Check if resident already has consent
+                    const existingConsent = existingConsentsByResident.get(foundResident.id)
+
+                    if (existingConsent) {
+                        // Update existing consent to Unconfirmed status
+                        const updates: any = {
+                            id: existingConsent.id,
+                            signatureStatus: 'Unconfirmed'
+                        }
+
+                        if (email && !existingConsent.email) {
+                            updates.email = email
+                        }
+
+                        if (submissionId && !existingConsent.submissionId) {
+                            updates.submissionId = submissionId
+                        }
+
+                        await client.models.Consent.update(updates)
+                        statusUpdated++
+                    } else {
+                        // Create new consent with Unconfirmed status
+                        await client.models.Consent.create({
+                            residentId: foundResident.id,
+                            addressId: foundResident.addressId!,
+                            recordedAt: new Date().toISOString(),
+                            source: 'csv-upload',
+                            email: email || null,
+                            submissionId: submissionId || null,
+                            signatureStatus: 'Unconfirmed'
+                        })
+                        await client.models.Resident.update({
+                            id: foundResident.id,
+                            hasSigned: true,
+                            signedAt: new Date().toISOString()
+                        })
+                        existingConsentsByResident.set(foundResident.id, { residentId: foundResident.id })
+                        newRecords++
+                    }
+                } else {
+                    notFound++
+                    errors.push(`person_id: ${personId}`)
+                }
+            } catch (err) {
+                console.error(`Error processing person_id ${personId}:`, err)
+                errors.push(`person_id ${personId} - Error: ${err}`)
+            }
+
+            processed++
+            setUnconfirmedUploadProgress({ current: processed, total: rows.length })
+        }
+
+        await loadAddresses()
+
+        const statusParts = [
+            `${rows.length} rows in CSV`,
+            `${newRecords} new unconfirmed consents created`,
+            `${statusUpdated} existing consents updated to Unconfirmed`,
+            `${notFound} not found in DB`,
+            `${skippedMissingData} missing person_id`
+        ]
+
+        const finalStatus = `✅ ${statusParts.join(' | ')}`
+        setUnconfirmedUploadStatus(finalStatus)
+        setUnconfirmedUploadProgress({ current: 0, total: 0 })
+        setUnconfirmedNotFoundRecords(errors)
+        setUnconfirmedUploadResults({
+            totalRows: rows.length,
+            newRecords,
+            statusUpdated,
+            notFound,
+            skippedMissingData
+        })
+
+        console.log('\n' + '='.repeat(80))
+        console.log('UNCONFIRMED UPLOAD SUMMARY:')
+        console.log('='.repeat(80))
+        console.log(`Total rows in CSV: ${rows.length}`)
+        console.log(`New unconfirmed consents created: ${newRecords}`)
+        console.log(`Existing consents updated to Unconfirmed: ${statusUpdated}`)
+        console.log(`Not found in database: ${notFound}`)
+        console.log(`Missing person_id (skipped): ${skippedMissingData}`)
+        console.log('='.repeat(80))
+
+        if (errors.length > 0 && errors.length <= 20) {
+            console.log('\nNot found in database:', errors)
+        } else if (errors.length > 20) {
+            console.log('\nNot found in database (first 20):', errors.slice(0, 20))
+            console.log(`... and ${errors.length - 20} more`)
+        }
+    }
+
     return (
         <div>
             <Header/>
@@ -559,6 +750,108 @@ export default function RecordConsents() {
                                     <div key={index} style={{
                                         padding: '4px 0',
                                         borderBottom: index < notFoundRecords.length - 1 ? '1px solid #eee' : 'none',
+                                        fontFamily: 'monospace',
+                                        fontSize: '0.9em'
+                                    }}>
+                                        {record}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div style={{marginTop: 32, paddingTop: 24, borderTop: '2px solid #ddd'}}>
+                    <h3>Upload Unconfirmed Signatures (CSV)</h3>
+
+                    <div style={{marginBottom: 16, padding: 12, backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: 4}}>
+                        <strong>⚠ Unconfirmed Signatures:</strong>
+                        <div style={{marginTop: 8, fontSize: '0.95em'}}>
+                            Required columns: <code>person_id</code>, <code>submission_id</code>, <code>email</code>
+                        </div>
+                        <div style={{marginTop: 8, fontSize: '0.9em', color: '#856404'}}>
+                            💡 This will set signatures to "Unconfirmed" status. If a consent already exists, it will be updated to Unconfirmed. If no consent exists, a new one will be created with Unconfirmed status.
+                        </div>
+                    </div>
+
+                    <input
+                        type='file'
+                        accept='.csv'
+                        onChange={(e) => {
+                            setSelectedUnconfirmedFile(e.target.files?.[0] || null)
+                            setUnconfirmedNotFoundRecords([])
+                            setUnconfirmedUploadResults(null)
+                        }}
+                        style={{marginBottom: 12}}
+                    />
+                    <button
+                        onClick={handleUnconfirmedFileUpload}
+                        disabled={!selectedUnconfirmedFile || unconfirmedUploadProgress.total > 0}
+                        style={{
+                            backgroundColor: selectedUnconfirmedFile && unconfirmedUploadProgress.total === 0 ? '#ffc107' : '#ccc',
+                            color: '#333',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: 4,
+                            marginLeft: 12,
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        Upload Unconfirmed CSV
+                    </button>
+                    {unconfirmedUploadProgress.total > 0 && (
+                        <div style={{marginTop: 12}}>
+                            <div style={{
+                                width: '100%',
+                                height: 24,
+                                backgroundColor: '#e0e0e0',
+                                borderRadius: 4,
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{
+                                    width: `${(unconfirmedUploadProgress.current / unconfirmedUploadProgress.total) * 100}%`,
+                                    height: '100%',
+                                    backgroundColor: '#ffc107',
+                                    transition: 'width 0.3s ease'
+                                }}/>
+                            </div>
+                            <p style={{marginTop: 4, color: '#666', fontSize: 14}}>
+                                Processing {unconfirmedUploadProgress.current} of {unconfirmedUploadProgress.total}
+                            </p>
+                        </div>
+                    )}
+                    {unconfirmedUploadStatus && unconfirmedUploadProgress.total === 0 && <p style={{marginTop: 8, color: '#666'}}>{unconfirmedUploadStatus}</p>}
+
+                    {/* Display unconfirmed upload results */}
+                    {unconfirmedUploadResults && (
+                        <div style={{marginTop: 16, padding: 16, backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: 4}}>
+                            <h4>Unconfirmed Upload Summary</h4>
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8}}>
+                                <div>Total rows in CSV: <strong>{unconfirmedUploadResults.totalRows}</strong></div>
+                                <div style={{color: '#856404'}}>New unconfirmed consents: <strong>{unconfirmedUploadResults.newRecords}</strong></div>
+                                <div style={{color: '#856404'}}>Status updated to Unconfirmed: <strong>{unconfirmedUploadResults.statusUpdated}</strong></div>
+                                <div style={{color: '#dc3545'}}>Not found: <strong>{unconfirmedUploadResults.notFound}</strong></div>
+                                <div>Missing data: <strong>{unconfirmedUploadResults.skippedMissingData}</strong></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Display not found records for unconfirmed */}
+                    {unconfirmedNotFoundRecords.length > 0 && (
+                        <div style={{marginTop: 16, padding: 16, backgroundColor: '#f8d7da', border: '1px solid #dc3545', borderRadius: 4}}>
+                            <h4 style={{marginTop: 0, color: '#721c24'}}>⚠️ Records Not Found in Database ({unconfirmedNotFoundRecords.length})</h4>
+                            <div style={{
+                                maxHeight: 300,
+                                overflowY: 'auto',
+                                backgroundColor: 'white',
+                                padding: 12,
+                                borderRadius: 4,
+                                border: '1px solid #ddd'
+                            }}>
+                                {unconfirmedNotFoundRecords.map((record, index) => (
+                                    <div key={index} style={{
+                                        padding: '4px 0',
+                                        borderBottom: index < unconfirmedNotFoundRecords.length - 1 ? '1px solid #eee' : 'none',
                                         fontFamily: 'monospace',
                                         fontSize: '0.9em'
                                     }}>

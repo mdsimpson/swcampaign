@@ -96,6 +96,7 @@ const schema = a.schema({
         source: a.string(), // manual | bulk-upload | csv-upload
         email: a.string(), // Email from consent CSV upload (resident_email or expanded_email)
         submissionId: a.string(), // Submission ID from consent form uploads
+        signatureStatus: a.enum(['Signed','Unconfirmed','Not Signed']).default('Signed'), // Signature verification status
     }).authorization(allow => [
         allow.groups(['Administrator']).to(['create','read','update','delete']),
         allow.groups(['Organizer']).to(['read']),
