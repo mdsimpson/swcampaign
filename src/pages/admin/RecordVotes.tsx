@@ -71,7 +71,8 @@ export default function RecordConsents() {
                     addressId,
                     recordedAt: new Date().toISOString(),
                     source: source,
-                    email: email || null
+                    email: email || null,
+                    signatureStatus: 'Signed'
                 })
             } else {
                 // Update existing consent with email if provided
@@ -361,7 +362,8 @@ export default function RecordConsents() {
                             recordedAt: new Date().toISOString(),
                             source: 'csv-upload',
                             email: email || null,
-                            submissionId: submissionId || null
+                            submissionId: submissionId || null,
+                            signatureStatus: 'Signed'
                         })
                         await client.models.Resident.update({
                             id: foundResident.id,
