@@ -1264,6 +1264,17 @@ export default function CanvassingMap() {
                             }}></span>
                             <span>Has absentee owner(s)</span>
                         </div>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                            <span style={{
+                                display: 'inline-block',
+                                width: 0,
+                                height: 0,
+                                borderLeft: '8px solid transparent',
+                                borderRight: '8px solid transparent',
+                                borderBottom: '14px solid #ffc107'
+                            }}></span>
+                            <span>Has unconfirmed signature(s)</span>
+                        </div>
                     </div>
                     <p style={{marginTop: '12px'}}>Click on any marker to view details, record an interaction, or view history.</p>
                 </div>
