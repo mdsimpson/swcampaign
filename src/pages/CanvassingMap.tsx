@@ -39,6 +39,7 @@ export default function CanvassingMap() {
     const [allConsents, setAllConsents] = useState<any[]>([]) // Cache all consents
     const [allVolunteers, setAllVolunteers] = useState<any[]>([]) // Cache all volunteers
     const [allAssignments, setAllAssignments] = useState<any[]>([]) // Cache ALL assignments (not just current user)
+    const [currentUserVolunteer, setCurrentUserVolunteer] = useState<any>(null) // Current user's volunteer record
     const [hasInitialBounds, setHasInitialBounds] = useState(false) // Track if we've set initial bounds
     const [toggleLoading, setToggleLoading] = useState(false) // Track toggle loading state
     const [filterText, setFilterText] = useState('') // Text filter for addresses/names
@@ -393,18 +394,20 @@ export default function CanvassingMap() {
             setAllAssignments(allAssignmentsResult)
 
             // Find the volunteer record for the current user
-            const currentUserVolunteer = volunteers.find(v =>
+            const foundUserVolunteer = volunteers.find(v =>
                 v.userSub === user?.userId || v.userSub === user?.username
             )
 
-            if (!currentUserVolunteer) {
+            setCurrentUserVolunteer(foundUserVolunteer)
+
+            if (!foundUserVolunteer) {
                 setAssignments([])
                 return
             }
 
             // Step 3: Filter assignments for current user (for "My Assignments" view)
             const userAssignments = allAssignmentsResult.filter(a =>
-                a.volunteerId === currentUserVolunteer.id && a.status === 'NOT_STARTED'
+                a.volunteerId === foundUserVolunteer.id && a.status === 'NOT_STARTED'
             )
 
             // Step 4: Just store the current user's assignments - we'll load address details on demand for viewport
@@ -529,6 +532,57 @@ export default function CanvassingMap() {
             return () => {
                 navigator.geolocation.clearWatch(watchId)
             }
+        }
+    }
+
+    async function assignToMe(addressId: string) {
+        if (!currentUserVolunteer) {
+            alert('You must be registered as a volunteer to assign addresses.')
+            return
+        }
+
+        try {
+            // First, delete any existing assignments for this address (status NOT_STARTED)
+            const existingAssignments = allAssignments.filter(a =>
+                a.addressId === addressId && a.status === 'NOT_STARTED'
+            )
+
+            for (const assignment of existingAssignments) {
+                await client.models.Assignment.delete({ id: assignment.id })
+            }
+
+            // Create new assignment for current user
+            await client.models.Assignment.create({
+                addressId: addressId,
+                volunteerId: currentUserVolunteer.id,
+                assignedAt: new Date().toISOString(),
+                status: 'NOT_STARTED'
+            })
+
+            // Reload data to refresh the map
+            await loadInitialData()
+        } catch (error) {
+            console.error('Failed to assign address:', error)
+            alert('Failed to assign address. Please try again.')
+        }
+    }
+
+    async function unassignAddress(addressId: string) {
+        try {
+            // Delete all assignments for this address (status NOT_STARTED)
+            const existingAssignments = allAssignments.filter(a =>
+                a.addressId === addressId && a.status === 'NOT_STARTED'
+            )
+
+            for (const assignment of existingAssignments) {
+                await client.models.Assignment.delete({ id: assignment.id })
+            }
+
+            // Reload data to refresh the map
+            await loadInitialData()
+        } catch (error) {
+            console.error('Failed to unassign address:', error)
+            alert('Failed to unassign address. Please try again.')
         }
     }
 
@@ -1145,7 +1199,7 @@ export default function CanvassingMap() {
                                                 </div>
                                             )}
                                         </div>
-                                        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+                                        <div style={{display: 'flex', gap: '6px', flexWrap: 'wrap'}}>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation()
@@ -1155,10 +1209,10 @@ export default function CanvassingMap() {
                                                     backgroundColor: '#007bff',
                                                     color: 'white',
                                                     border: 'none',
-                                                    padding: '8px 12px',
+                                                    padding: '6px 10px',
                                                     borderRadius: 4,
                                                     cursor: 'pointer',
-                                                    fontSize: '12px'
+                                                    fontSize: '11px'
                                                 }}
                                             >
                                                 Record Interaction
@@ -1172,13 +1226,47 @@ export default function CanvassingMap() {
                                                     backgroundColor: '#6c757d',
                                                     color: 'white',
                                                     border: 'none',
-                                                    padding: '8px 12px',
+                                                    padding: '6px 10px',
                                                     borderRadius: 4,
                                                     cursor: 'pointer',
-                                                    fontSize: '12px'
+                                                    fontSize: '11px'
                                                 }}
                                             >
                                                 View History
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    assignToMe(selectedAddress.id)
+                                                }}
+                                                style={{
+                                                    backgroundColor: '#28a745',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '6px 10px',
+                                                    borderRadius: 4,
+                                                    cursor: 'pointer',
+                                                    fontSize: '11px'
+                                                }}
+                                            >
+                                                Assign to Me
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    unassignAddress(selectedAddress.id)
+                                                }}
+                                                style={{
+                                                    backgroundColor: '#dc3545',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    padding: '6px 10px',
+                                                    borderRadius: 4,
+                                                    cursor: 'pointer',
+                                                    fontSize: '11px'
+                                                }}
+                                            >
+                                                Unassign
                                             </button>
                                         </div>
 
