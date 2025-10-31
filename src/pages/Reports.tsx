@@ -9,6 +9,7 @@ interface ReportData {
     absenteeAddresses: number
     addressesWithAllConsents: number
     totalConsents: number
+    unconfirmedConsents: number
     activeAssignments: number
     completedAssignments: number
     totalInteractions: number
@@ -114,14 +115,25 @@ export default function Reports() {
             console.log(`Loaded ${allAddresses.length} total address records, ${addresses.length} unique addresses`)
 
             // Calculate key metrics
-            const absenteeAddresses = addresses.filter(addr => 
+            const absenteeAddresses = addresses.filter(addr =>
                 residents.some(r => r.addressId === addr.id && r.isAbsentee)
             ).length
-            
-            // Count unique residents who have signed (not total consent records)
-            const residentsWithConsents = new Set(consents.map(c => c.residentId))
 
-            // Calculate addresses with all consents (group by physical address)
+            // Count unique residents who have signed with confirmed status (exclude Unconfirmed)
+            const residentsWithConfirmedConsents = new Set(
+                consents
+                    .filter(c => c.signatureStatus !== 'Unconfirmed')
+                    .map(c => c.residentId)
+            )
+
+            // Count unconfirmed consents
+            const unconfirmedConsents = new Set(
+                consents
+                    .filter(c => c.signatureStatus === 'Unconfirmed')
+                    .map(c => c.residentId)
+            ).size
+
+            // Calculate addresses with all confirmed consents (group by physical address)
             let addressesWithAllConsents = 0
 
             // Group all address IDs by physical address
@@ -147,9 +159,9 @@ export default function Reports() {
                     )
                 )
 
-                // Check if ALL residents at this address have at least one consent
+                // Check if ALL residents at this address have at least one confirmed consent
                 const allSigned = uniqueResidents.length > 0 && uniqueResidents.every(resident =>
-                    residentsWithConsents.has(resident.id)
+                    residentsWithConfirmedConsents.has(resident.id)
                 )
 
                 if (allSigned) {
@@ -198,7 +210,8 @@ export default function Reports() {
                 totalResidents: residents.length,
                 absenteeAddresses,
                 addressesWithAllConsents,
-                totalConsents: residentsWithConsents.size,
+                totalConsents: residentsWithConfirmedConsents.size,
+                unconfirmedConsents,
                 activeAssignments: assignments.filter(a => a.status !== 'DONE').length,
                 completedAssignments: assignments.filter(a => a.status === 'DONE').length,
                 totalInteractions: interactions.length,
@@ -319,8 +332,12 @@ export default function Reports() {
                                 </div>
                             </div>
                             <div style={{backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8, textAlign: 'center'}}>
-                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Total Consents</h4>
+                                <h4 style={{margin: '0 0 8px 0', color: '#666'}}>Confirmed Consents</h4>
                                 <div style={{fontSize: '2em', fontWeight: 'bold', color: '#17a2b8'}}>{reportData.totalConsents}</div>
+                            </div>
+                            <div style={{backgroundColor: '#fff3cd', padding: 16, borderRadius: 8, textAlign: 'center', border: '1px solid #ffc107'}}>
+                                <h4 style={{margin: '0 0 8px 0', color: '#856404'}}>Unconfirmed Signatures</h4>
+                                <div style={{fontSize: '2em', fontWeight: 'bold', color: '#856404'}}>{reportData.unconfirmedConsents}</div>
                             </div>
                         </div>
 

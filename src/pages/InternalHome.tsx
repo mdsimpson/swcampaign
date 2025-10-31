@@ -97,20 +97,24 @@ export default function InternalHome() {
 
             const totalResidents = residents.data.length
 
-            // Count unique residents who have signed (not total consent records)
-            const residentsWithConsents = new Set(consents.data.map(c => c.residentId))
-            const consentsRecorded = residentsWithConsents.size
+            // Count unique residents who have signed with confirmed status (exclude Unconfirmed)
+            const residentsWithConfirmedConsents = new Set(
+                consents.data
+                    .filter(c => c.signatureStatus !== 'Unconfirmed')
+                    .map(c => c.residentId)
+            )
+            const consentsRecorded = residentsWithConfirmedConsents.size
 
-            // Calculate addresses where ALL residents have signed
+            // Calculate addresses where ALL residents have signed with confirmed status
             const addressIds = new Set(allAddresses.map(a => a.id))
             let addressesWithAllConsents = 0
 
             for (const addressId of addressIds) {
                 const addressResidents = residents.data.filter(r => r.addressId === addressId)
 
-                // Check if ALL residents at this address have at least one consent
+                // Check if ALL residents at this address have at least one confirmed consent
                 const allSigned = addressResidents.length > 0 && addressResidents.every(resident =>
-                    residentsWithConsents.has(resident.id)
+                    residentsWithConfirmedConsents.has(resident.id)
                 )
 
                 if (allSigned) {
