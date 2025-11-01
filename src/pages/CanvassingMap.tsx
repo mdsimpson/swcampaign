@@ -46,7 +46,7 @@ export default function CanvassingMap() {
     const [signatureFilters, setSignatureFilters] = useState({
         none: true,
         some: true,
-        complete: true
+        complete: false
     }) // Signature status filters (checkboxes)
 
     const client = generateClient<Schema>({
