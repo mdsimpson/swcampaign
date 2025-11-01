@@ -24,6 +24,7 @@ export default function Organize() {
     const [selectedAddresses, setSelectedAddresses] = useState<Set<string>>(new Set())
     const [assignToVolunteer, setAssignToVolunteer] = useState('')
     const [currentUserVolunteer, setCurrentUserVolunteer] = useState<any>(null)
+    const [isAdmin, setIsAdmin] = useState(false)
     
     // Initialize filter state from URL params
     const initializeFiltersFromURL = () => {
@@ -87,7 +88,7 @@ export default function Organize() {
         // Clean up empty filters on mount
         const params = new URLSearchParams(location.search)
         let hasChanges = false
-        
+
         if (params.get('address') === '') {
             params.delete('address')
             hasChanges = true
@@ -96,15 +97,31 @@ export default function Organize() {
             params.delete('resident')
             hasChanges = true
         }
-        
+
         if (hasChanges) {
             const newSearch = params.toString()
             const newPath = newSearch ? `${location.pathname}?${newSearch}` : location.pathname
             navigate(newPath, { replace: true })
         }
-        
+
         loadData()
     }, [currentPage, sortField, sortDirection])
+
+    useEffect(() => {
+        // Check if user is an administrator
+        async function checkAdminRole() {
+            try {
+                const session = await fetchAuthSession()
+                const groups = (session.tokens?.idToken?.payload['cognito:groups'] as string[]) || []
+                setIsAdmin(groups.includes('Administrator'))
+            } catch (error) {
+                console.error('Failed to check admin role:', error)
+                setIsAdmin(false)
+            }
+        }
+
+        checkAdminRole()
+    }, [user])
     
     // Get appropriate nextToken for current page
     function getNextTokenForPage() {
@@ -947,6 +964,54 @@ export default function Organize() {
         }
     }
 
+    async function removeAllAssignments() {
+        if (!isAdmin) {
+            alert('Only administrators can remove all assignments.')
+            return
+        }
+
+        const confirmMessage = 'WARNING: This will remove ALL canvassing assignments across the entire dataset. This action cannot be undone.\n\nAre you absolutely sure you want to proceed?'
+        if (!confirm(confirmMessage)) {
+            return
+        }
+
+        // Double confirmation for such a destructive action
+        if (!confirm('Please confirm again: Delete ALL assignments?')) {
+            return
+        }
+
+        try {
+            const client = generateClient<Schema>()
+
+            // Load all assignments
+            const allAssignments = await loadAllRecords(
+                (config) => client.models.Assignment.list(config),
+                QUERY_LIMITS.ADDRESSES_BATCH_SIZE
+            )
+
+            console.log(`Found ${allAssignments.length} total assignments to delete`)
+
+            // Delete all assignments
+            let deletedCount = 0
+            for (const assignment of allAssignments) {
+                try {
+                    await client.models.Assignment.delete({ id: assignment.id })
+                    deletedCount++
+                } catch (error) {
+                    console.error(`Failed to delete assignment ${assignment.id}:`, error)
+                }
+            }
+
+            alert(`Successfully removed ${deletedCount} of ${allAssignments.length} assignment(s)`)
+
+            // Reload data
+            await loadData()
+        } catch (error) {
+            console.error('Failed to remove all assignments:', error)
+            alert('Failed to remove all assignments. Please try again.')
+        }
+    }
+
     return (
         <div>
             <Header/>
@@ -1154,6 +1219,31 @@ export default function Organize() {
                             Remove My Assignments
                         </button>
                     </div>
+
+                    {/* Admin-only: Remove All Assignments button */}
+                    {isAdmin && (
+                        <div style={{
+                            marginLeft: 'auto',
+                            paddingLeft: 16,
+                            borderLeft: '2px solid #dc3545'
+                        }}>
+                            <button
+                                onClick={removeAllAssignments}
+                                style={{
+                                    backgroundColor: '#dc3545',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: 4,
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                                title="Administrator only: Remove ALL assignments across the entire dataset"
+                            >
+                                Remove ALL Assignments
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Stats */}
